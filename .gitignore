@@ -1,0 +1,15 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.key
+
+# tooling / OS
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# local experiments
+scratch/

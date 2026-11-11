@@ -1,0 +1,84 @@
+:root {
+  --bg: #0b0d0e;
+  --text: #c9ccc6;
+  --text-dim: #7c827b;
+  --accent: #8f9a7e;
+  --panel: rgba(14, 17, 18, 0.72);
+  --line: rgba(150, 160, 150, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", "Rubik", "Arial Hebrew", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  cursor: crosshair;
+  background: var(--bg);
+}
+
+/* Static HUD: never re-laid-out per frame, so nothing jumps. */
+.hud {
+  position: fixed;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+body.ready .hud { opacity: 1; }
+
+.title {
+  top: 22px;
+  right: 28px;
+  text-align: right;
+}
+.title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.title p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.controls {
+  bottom: 22px;
+  right: 28px;
+  display: flex;
+  gap: 18px;
+  padding: 9px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.controls kbd {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  text-align: center;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+}

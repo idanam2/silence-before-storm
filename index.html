@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>השקט שלפני הסערה</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game" aria-label="מסך המשחק"></canvas>
+
+  <div class="hud title">
+    <h1>השקט שלפני הסערה</h1>
+    <p>שלב 0 · שלד</p>
+  </div>
+
+  <div class="hud controls">
+    <span><kbd>WASD</kbd>תנועה</span>
+    <span><kbd>Shift</kbd>ריצה</span>
+    <span><kbd>עכבר</kbd>כיוון</span>
+  </div>
+
+  <!-- Load order matters: plain scripts (no modules) so the game runs from file:// -->
+  <script src="js/core.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
