@@ -667,10 +667,10 @@
 
   // ---- trees with height: the crown leans away from the screen center (parallax), so trunks show ----
 
-  var TREE_K = 0.115, TREE_TILT = 260;     // crowns also sit a little north of the roots (view from the south)
+  var VIEW = G.config.view;                // crowns sit north of the roots (tilted view from the south)
   function treeLean(n, vr) {
-    var k = TREE_K * (n.canopy / 100) * (n.type === 'dead_tree' ? 0.75 : 1);
-    return { x: (n.x - (vr.x0 + vr.x1) / 2) * k, y: (n.y - (vr.y0 + vr.y1) / 2 - TREE_TILT) * k };
+    var k = VIEW.treeK * (n.canopy / 100) * (n.type === 'dead_tree' ? 0.75 : 1);
+    return { x: (n.x - (vr.x0 + vr.x1) / 2) * k, y: ((n.y - (vr.y0 + vr.y1) / 2) * VIEW.persp - VIEW.tilt) * k };
   }
 
   function drawTreeShadows(ctx, nodes, vr) {
@@ -696,21 +696,18 @@
     }
   }
 
-  function drawTreeTops(ctx, nodes, vr, time, gNode, shake) {
+  // Trunks are sorted against the player: those rooted north of the feet (`front` false) go under the player,
+  // the rest over. Crowns always come later, so the order between trees never changes while walking.
+  function drawTreeTrunks(ctx, nodes, vr, py, front) {
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
-      if (!n.canopy || !seen(vr, n.x, n.y, n.canopy * 1.5 + 80)) continue;
+      if (!n.canopy || (n.y > py) !== front || !seen(vr, n.x, n.y, n.canopy * 1.5 + 80)) continue;
       var a = n.fade, o = treeLean(n, vr);
-      var sx = Math.sin(time * 0.55 + n.phase) * 1.6, sy = Math.cos(time * 0.45 + n.phase * 1.7) * 1.1;
-      if (n.dead) {                                       // felled: the crown tips over and fades
+      if (n.dead) {
         var f = n.deadT / 0.55;
         if (f >= 1) continue;
         a *= 1 - f;
-        sx += Math.cos(n.phase) * f * f * 46; sy += Math.sin(n.phase) * f * f * 46;
-      } else if (gNode === n) {
-        sx += Math.sin(time * 70) * shake;
       }
-      var list = SP[n.type], sp = list[n.variant % list.length], k = n.canopy / 100;
       var tx = n.x + o.x, ty = n.y + o.y, len = Math.sqrt(o.x * o.x + o.y * o.y);
       ctx.globalAlpha = n.dead ? a : Math.max(a, 0.8);
       if (len > 1.5) {                                    // trunk rising from the roots to the crown
@@ -727,6 +724,26 @@
       }
       ctx.fillStyle = '#241c14';
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r * 0.82, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTreeTops(ctx, nodes, vr, time, gNode, shake) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (!n.canopy || !seen(vr, n.x, n.y, n.canopy * 1.5 + 80)) continue;
+      var a = n.fade, o = treeLean(n, vr);
+      var sx = Math.sin(time * 0.55 + n.phase) * 1.6, sy = Math.cos(time * 0.45 + n.phase * 1.7) * 1.1;
+      if (n.dead) {                                       // felled: the crown tips over and fades
+        var f = n.deadT / 0.55;
+        if (f >= 1) continue;
+        a *= 1 - f;
+        sx += Math.cos(n.phase) * f * f * 46; sy += Math.sin(n.phase) * f * f * 46;
+      } else if (gNode === n) {
+        sx += Math.sin(time * 70) * shake;
+      }
+      var list = SP[n.type], sp = list[n.variant % list.length], k = n.canopy / 100;
+      var tx = n.x + o.x, ty = n.y + o.y;
       ctx.globalAlpha = a;
       if (sp.dark) blit(ctx, sp.dark, n.x + o.x * 0.5 + sx * 0.5, n.y + o.y * 0.5 + sy * 0.5, k);
       blit(ctx, sp, tx + sx, ty + sy, k * (sp.dark ? 0.9 : 1));
@@ -737,7 +754,7 @@
   function nodeAlpha(n) { return n.dead ? Math.max(0, 1 - n.deadT / 0.3) : 1; }
 
   // Ground, water, decor, resources. Drawn before the player.
-  function drawBelow(ctx, area, st, vr, time) {
+  function drawBelow(ctx, area, st, vr, time, py) {
     var T = prepare(area), i, n, a;
     ctx.fillStyle = groundPattern;
     ctx.fillRect(vr.x0, vr.y0, vr.x1 - vr.x0, vr.y1 - vr.y0);
@@ -783,13 +800,15 @@
       blit(ctx, list[n.variant % list.length], n.x + ox, n.y, n.type === 'boulder' ? n.scale : 1);
     }
     ctx.globalAlpha = 1;
+    drawTreeTrunks(ctx, area.nodes, vr, py, false);
   }
 
   // Tree crowns, drifting spores, mist, target ring. Drawn after the player.
-  function drawAbove(ctx, area, st, vr, time) {
+  function drawAbove(ctx, area, st, vr, time, py) {
     var T = prepare(area), i, n;
     var g = st.gather, shake = 0;
     if (g && g.node && g.t > 0) shake = Math.exp(-((g.t % G.area.HIT) / G.area.HIT) * 5) * 3;
+    drawTreeTrunks(ctx, area.nodes, vr, py, true);
     drawTreeTops(ctx, area.nodes, vr, time, g ? g.node : null, shake);
 
     for (i = 0; i < T.spores.length; i++) {               // drifting spores / dust in the air
@@ -828,34 +847,6 @@
     }
   }
 
-  // The tool (or bare hands) in front of the player while gathering.
-  function drawTool(ctx, p, alpha, g, tool) {
-    if (!g || !g.node || g.t <= 0) return;
-    var x = G.util.lerp(p.prevX, p.x, alpha), y = G.util.lerp(p.prevY, p.y, alpha), r = p.radius;
-    var ph = (g.t % G.area.HIT) / G.area.HIT;
-    ctx.save();
-    ctx.translate(x, y); ctx.rotate(p.angle);
-    ctx.lineCap = 'round';
-    if (tool) {
-      var sw = ph < 0.7 ? -1.25 * Math.sin(ph / 0.7 * Math.PI / 2) : -1.25 * (1 - Math.pow((ph - 0.7) / 0.3, 2));
-      ctx.translate(r * 0.35, r * 0.75); ctx.rotate(sw + 0.35);
-      ctx.strokeStyle = '#1e1811'; ctx.lineWidth = 5.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(26, 0); ctx.stroke();
-      ctx.strokeStyle = '#8d7556'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(26, 0); ctx.stroke();
-      ctx.fillStyle = '#8b9491'; ctx.strokeStyle = '#161918'; ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      if (tool === 'pickaxe') { ctx.moveTo(22, -13); ctx.quadraticCurveTo(33, 0, 22, 13); ctx.quadraticCurveTo(27, 0, 22, -13); }
-      else { ctx.moveTo(20, -2); ctx.lineTo(21, -8); ctx.quadraticCurveTo(28, -13, 31, -11); ctx.quadraticCurveTo(33, -4, 30, 3); ctx.quadraticCurveTo(25, 1, 27, -2); ctx.closePath(); }
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = G.config.colors.playerHead; ctx.beginPath(); ctx.arc(2, 0, 4, 0, TAU); ctx.fill();
-    } else {
-      var reach = r * 0.95 + Math.sin(ph * TAU) * 3;
-      ctx.fillStyle = G.config.colors.playerHead; ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(reach, -6, 4, 0, TAU); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.arc(reach - Math.sin(ph * TAU) * 2, 6, 4, 0, TAU); ctx.fill(); ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   var FX = {
     wood:  ['#9a8158', '#6b5a44', '#b09a74'],
     stone: ['#858b87', '#5c625e', '#a3a9a4'],
@@ -884,7 +875,7 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (var i = 0; i < list.length; i++) {
       var f = list[i], k = f.t / f.max;
-      var y = f.y - 34 - k * 30;
+      var y = f.y - 64 - k * 30;
       ctx.globalAlpha = k < 0.12 ? k / 0.12 : Math.min(1, (1 - k) / 0.35);
       ctx.font = '600 15px "Segoe UI", Arial, sans-serif';
       ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(8,10,9,0.85)'; ctx.lineJoin = 'round';
@@ -912,12 +903,11 @@
     prepare: prepare,
     kit: function () {
       return { SP: SP, mk: mk, blit: blit, softShadow: softShadow, hsl: hsl, seen: seen, ground: groundPattern,
-        treeShadows: drawTreeShadows, treeBases: drawTreeBases, treeTops: drawTreeTops };
+        treeShadows: drawTreeShadows, treeBases: drawTreeBases, treeTrunks: drawTreeTrunks, treeTops: drawTreeTops };
     },
     drawBelow: drawBelow,
     drawAbove: drawAbove,
     drawExit: drawExit,
-    drawTool: drawTool,
     spawnFx: spawnFx,
     drawParticles: drawParticles,
     drawFloaters: drawFloaters

@@ -250,7 +250,7 @@
       if (n.dead) n.deadT += dt;
       if (n.canopy) {
         // the crown is drawn a little north of the roots (see forestart.js), so test against that spot
-        var want = dist(p.x, p.y, n.x, n.y - n.canopy * 0.3) < n.canopy * 0.86 + 8 ? 0.26 : 1;
+        var want = dist(p.x, p.y - 22, n.x, n.y - n.canopy * G.config.view.tilt * G.config.view.treeK / 100) < n.canopy * 0.86 + 8 ? 0.26 : 1;
         n.fade += (want - n.fade) * k;
       }
     }

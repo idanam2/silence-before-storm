@@ -6,11 +6,11 @@
   var G = root.G, TAU = Math.PI * 2;
   var K = null, T = null;           // forest art kit (shared sprites), prerendered base terrain
 
-  var H = { fence: 0.03, post: 0.048, gatePost: 0.07, chest: 0.04, pile: 0.045, wall: 0.09, ridge: 0.145, chimney: 0.18 };
-  var TILT = 380;                   // the camera looks slightly from the south, so south faces always show
+  var H = { fence: 0.03, post: 0.048, gatePost: 0.07, chest: 0.04, pile: 0.045, wall: 0.104, ridge: 0.162, chimney: 0.2 };
+  var VIEW = G.config.view;         // the camera looks from the south at an angle, so south faces always show
   var SUN = { x: 0.62, y: 0.78 };   // direction shadows fall (south-east), per unit of height
 
-  function lift(x, y, k, c) { return [x + (x - c.x) * k, y + (y - c.y) * k]; }
+  function lift(x, y, k, c) { return [x + (x - c.x) * k, y + (y - c.y) * k * VIEW.persp]; }
   function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
   function poly(ctx, pts, fill, stroke) {
     ctx.beginPath();
@@ -542,11 +542,12 @@
 
     T.smokeAt = null; T.fireAt = null;
     structures(ctx, b, vr, time, py, false, opts);
+    K.treeTrunks(ctx, b.trees, vr, py, false);
   }
 
   // Structures whose base is south of the player are drawn after the player (they stand in front).
   function structures(ctx, b, vr, time, py, front, opts) {
-    var c = { x: (vr.x0 + vr.x1) / 2, y: (vr.y0 + vr.y1) / 2 + TILT };
+    var c = { x: (vr.x0 + vr.x1) / 2, y: (vr.y0 + vr.y1) / 2 + VIEW.tilt / VIEW.persp };
     for (var i = 0; i < T.order.length; i++) {
       var r = T.order[i], lv = (b.levels && b.levels[r.kind]) || 1;
       if ((r.y + r.h > py) !== front) continue;
@@ -563,6 +564,7 @@
 
   function drawAbove(ctx, b, vr, time, py, opts) {
     structures(ctx, b, vr, time, py, true, opts);
+    K.treeTrunks(ctx, b.trees, vr, py, true);
     K.treeTops(ctx, b.trees, vr, time, null, 0);
     if (T.smokeAt) drawSmoke(ctx, T.smokeAt, time);
     if (T.fireAt) {                                                         // thin smoke from the campfire

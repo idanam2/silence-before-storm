@@ -14,6 +14,7 @@
   var FAINT_FADE = 0.9;
   var AUTOSAVE = 30;           // seconds between automatic saves
   var ZERO = { x: 0, y: 0, run: false };
+  var HOLD = { Digit1: ['hands', 'ידיים ריקות'], Digit2: ['axe', 'גרזן'], Digit3: ['club', 'אלה'], Digit4: ['gun', 'אקדח'], Digit5: ['crate', 'ארגז'] };
   var PROMPTS = { chest: 'E · פתיחת המחסן', workbench: 'E · שולחן עבודה', campfire: 'E · מדורה' };
   var LOW_NOTE = { hunger: 'מתחילים להיות רעבים', thirst: 'מתחילים להיות צמאים', energy: 'מתחילים להיות עייפים' };
   var pcfg = { radius: cfg.player.radius, walkSpeed: cfg.player.walkSpeed, runMult: cfg.player.runMult };
@@ -68,8 +69,7 @@
   function place(x, y, angle) {
     var p = st.player;
     p.x = p.prevX = x; p.y = p.prevY = y;
-    p.angle = p.prevAngle = angle;
-    p.moving = p.running = false; p.stride = 0;
+    G.player.settle(p, angle);
     var t = cameraTarget();
     cam.x = t.x; cam.y = t.y;
   }
@@ -296,6 +296,8 @@
     var aim = !frozen && inp.mouse.inside ? { x: inp.mouse.x + cam.x, y: inp.mouse.y + cam.y } : null;
     pcfg.walkSpeed = cfg.player.walkSpeed * G.needs.speedMult(st.needs);
     G.player.update(p, frozen ? ZERO : moveInput(), aim, dt, st.world, pcfg);
+    if (!frozen && inp.mouse.clicked) G.player.swing(p);
+    G.player.animate(p, dt, null);
     G.base.collide(p, st.base.solids);
     G.area.updateVisuals({ nodes: st.base.trees }, p, dt);
 
@@ -334,6 +336,8 @@
       : (!frozen && inp.mouse.inside ? { x: inp.mouse.x + cam.x, y: inp.mouse.y + cam.y } : null);
     pcfg.walkSpeed = cfg.player.walkSpeed * G.needs.speedMult(st.needs);
     G.player.update(p, frozen || out.active ? ZERO : moveInput(), aim, dt, st.world, pcfg);
+    if (!frozen && !out.active && inp.mouse.clicked) G.player.swing(p);
+    G.player.animate(p, dt, out.active ? { tool: def ? def.tool : null, phase: (st.gather.t % G.area.HIT) / G.area.HIT } : null);
     G.area.collide(p, F);
     G.area.updateVisuals(F, p, dt);
 
@@ -408,6 +412,13 @@
     }
     if (!st.fade && (inp.wasPressed('KeyI') || inp.wasPressed('Tab'))) ui.toggleBag();
 
+    // Preview of what the player holds (visual only until combat in stage 5 ties it to real items).
+    if (!st.fade && !ui.isOpen()) {
+      for (var hk in HOLD) {
+        if (inp.wasPressed(hk) && st.player.held !== HOLD[hk][0]) { G.player.setHeld(st.player, HOLD[hk][0]); ui.toast('ביד: ' + HOLD[hk][1], 1400); }
+      }
+    }
+
     if (st.area === 'base') tickBase(dt, frozen); else tickZone(dt, frozen);
 
     for (i = st.floaters.length - 1; i >= 0; i--) {
@@ -448,20 +459,18 @@
     ctx.translate(-cx, -cy);
 
     var vr = { x0: cx, y0: cy, x1: cx + view.w, y1: cy + view.h };
+    var py = G.util.lerp(p.prevY, p.y, alpha);
     if (st.area !== 'base') {
-      var def = st.gather.node ? G.data.resources[st.gather.node.type] : null;
-      G.forestArt.drawBelow(ctx, st.zone, st, vr, time);
-      G.player.draw(ctx, p, alpha);
-      G.forestArt.drawTool(ctx, p, alpha, st.gather, def ? def.tool : null);
+      G.forestArt.drawBelow(ctx, st.zone, st, vr, time, py);
+      G.player.draw(ctx, p, alpha, time);
       G.forestArt.drawParticles(ctx, st.particles);
-      G.forestArt.drawAbove(ctx, st.zone, st, vr, time);
+      G.forestArt.drawAbove(ctx, st.zone, st, vr, time, py);
     } else {
       var tr = G.base.layout.trail;
-      var py = G.util.lerp(p.prevY, p.y, alpha);
       var opts = { near: st.near, spots: G.ui.mode() === 'build' };
       G.baseArt.drawBelow(ctx, st.base, vr, time, py, opts);
       G.forestArt.drawExit(ctx, tr.x, tr.y, tr.r, time, -1);
-      G.player.draw(ctx, p, alpha);
+      G.player.draw(ctx, p, alpha, time);
       G.baseArt.drawAbove(ctx, st.base, vr, time, py, opts);
     }
     G.forestArt.drawFloaters(ctx, st.floaters);

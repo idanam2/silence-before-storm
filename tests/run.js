@@ -124,6 +124,47 @@ test('keeps previous position for interpolation', () => {
   eq(p.prevX, 500);
 });
 
+test('walk blend eases in and back out, the body turns toward the aim', () => {
+  const p = G.player.create(500, 400);
+  for (let i = 0; i < 30; i++) G.player.update(p, { x: 1, y: 0 }, null, 1 / 60, world);
+  if (!(p.gait > 0.95 && p.stride > 0)) throw new Error('gait ' + p.gait);
+  near(p.face, 0, 0.01);
+  G.player.update(p, { x: 0, y: 0 }, null, 1 / 60, world);
+  if (!(p.gait > 0.5)) throw new Error('legs snapped to standing: ' + p.gait);
+  for (let i = 0; i < 60; i++) G.player.update(p, { x: 0, y: 0 }, null, 1 / 60, world);
+  eq(p.gait, 0); eq(p.stride, 0);
+});
+test('swing needs a melee tool, runs once and ends', () => {
+  const p = G.player.create(500, 400);
+  eq(G.player.swing(p), false);
+  eq(G.player.setHeld(p, 'gun'), true); eq(G.player.swing(p), false);
+  eq(G.player.setHeld(p, 'nope'), false); eq(p.held, 'gun');
+  G.player.setHeld(p, 'axe'); eq(p.heldK, 0);
+  eq(G.player.swing(p), true); eq(G.player.swing(p), false);
+  G.player.animate(p, 0.1, null);
+  near(p.swing, 0.1);
+  for (let i = 0; i < 60; i++) G.player.animate(p, 1 / 60, null);
+  eq(p.swing, -1); eq(p.heldK, 1);
+  eq(G.player.swing(p), true);
+});
+test('gathering drives the work pose and cancels a swing', () => {
+  const p = G.player.create(500, 400);
+  G.player.setHeld(p, 'club'); G.player.swing(p);
+  G.player.animate(p, 1 / 60, { tool: 'axe', phase: 0.5 });
+  eq(p.swing, -1); eq(p.workTool, 'axe'); near(p.workPh, 0.5);
+  for (let i = 0; i < 40; i++) G.player.animate(p, 1 / 60, { tool: null, phase: 0.2 });
+  if (!(p.work > 0.95)) throw new Error('work ' + p.work);
+  eq(p.workTool, null); eq(G.player.swing(p), false);
+  for (let i = 0; i < 80; i++) G.player.animate(p, 1 / 60, null);
+  eq(p.work, 0);
+});
+test('settle resets the animation after a teleport', () => {
+  const p = G.player.create(500, 400);
+  for (let i = 0; i < 20; i++) G.player.update(p, { x: 1, y: 1, run: true }, null, 1 / 60, world);
+  G.player.settle(p, 1);
+  eq(p.gait, 0); eq(p.runK, 0); eq(p.stride, 0); eq(p.face, 1); eq(p.angle, 1); eq(p.moving, false);
+});
+
 console.log('inventory');
 test('add fills existing stack, then a new slot', () => {
   const inv = G.inventory.create(3);

@@ -12,6 +12,9 @@
     maxStepsPerFrame: 8,
     world: { width: 3200, height: 2000 },
     camera: { follow: 10 }, // higher = snappier camera
+    // Tilted view: a point at height k is pushed north by tilt * k on screen (plus a mild parallax from the
+    // screen center, `persp` of it vertically). Shared by the base, the trees and the canopy fade.
+    view: { tilt: 680, persp: 0.5, treeK: 0.105 },
     player: {
       radius: 18,
       walkSpeed: 150,       // world px per second
