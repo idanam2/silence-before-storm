@@ -31,7 +31,7 @@
     },
 
     attach: function (canvas) {
-      var gameKeys = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, KeyE: 1, Space: 1,
+      var gameKeys = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, KeyE: 1, KeyI: 1, Tab: 1, Escape: 1, Space: 1,
         ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1 };
       root.addEventListener('keydown', function (e) {
         if (gameKeys[e.code]) e.preventDefault(); // no page scroll

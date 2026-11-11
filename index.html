@@ -11,19 +11,53 @@
 
   <div class="hud title">
     <h1>השקט שלפני הסערה</h1>
-    <p>שלב 0 · שלד</p>
+    <p id="area-name">הבסיס</p>
   </div>
 
   <div class="hud controls">
     <span><kbd>WASD</kbd>תנועה</span>
     <span><kbd>Shift</kbd>ריצה</span>
     <span><kbd>עכבר</kbd>כיוון</span>
+    <span><kbd>E</kbd>פעולה · החזקה לאיסוף</span>
+    <span><kbd>I</kbd>תיק</span>
+  </div>
+
+  <div id="bag-hud" class="hud baghud">
+    <span class="label">תיק</span>
+    <span class="meter"><i id="bag-hud-fill"></i></span>
+    <span id="bag-hud-count" class="num"></span>
+  </div>
+
+  <div id="prompt" class="prompt"></div>
+
+  <div id="inv-layer" class="inv-layer">
+    <div class="inv-wrap">
+      <section id="chest-panel" class="panel hidden">
+        <header><h2>מחסן</h2><span id="chest-count" class="cap"></span></header>
+        <div id="chest-grid" class="grid chest"></div>
+      </section>
+      <section id="bag-panel" class="panel">
+        <header><h2>תיק</h2><span id="bag-count" class="cap"></span></header>
+        <div id="bag-grid" class="grid bag"></div>
+      </section>
+    </div>
+    <p id="inv-hint" class="inv-hint"></p>
   </div>
 
   <!-- Load order matters: plain scripts (no modules) so the game runs from file:// -->
   <script src="js/core.js"></script>
+  <script src="data/items.js"></script>
+  <script src="data/resources.js"></script>
+  <script src="data/areas.js"></script>
   <script src="js/input.js"></script>
+  <script src="js/inventory.js"></script>
   <script src="js/player.js"></script>
+  <script src="js/base.js"></script>
+  <script src="js/area.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/forestart.js"></script>
+  <script src="js/baseart.js"></script>
+  <script src="js/ui.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

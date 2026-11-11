@@ -61,9 +61,13 @@
       ctx.translate(x, y);
 
       // soft shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';             // cast shadow (light from the north-west)
       ctx.beginPath();
-      ctx.ellipse(2, 3, r * 1.05, r * 1.05, 0, 0, Math.PI * 2);
+      ctx.ellipse(9, 12, r * 1.25, r * 0.9, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.34)';            // contact shadow under the feet
+      ctx.beginPath();
+      ctx.ellipse(3, 4, r * 1.0, r * 0.95, 0.9, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.rotate(a + sway);

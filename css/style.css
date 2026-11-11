@@ -82,3 +82,145 @@ body.ready .hud { opacity: 1; }
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* ---- interaction prompt ---- */
+.prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  white-space: nowrap;
+}
+.prompt.show { opacity: 1; }
+
+/* ---- inventory overlay (always in the DOM, only opacity changes: no layout jumps) ---- */
+.inv-layer {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(5, 7, 8, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+.inv-layer.open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.18s ease;
+}
+.inv-wrap {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+.panel {
+  padding: 16px 18px 18px;
+  background: #121516;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.panel.hidden { display: none; }
+.panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+.panel h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.cap { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; gap: 7px; }
+.grid.bag { grid-template-columns: repeat(4, 74px); }
+.grid.chest { grid-template-columns: repeat(6, 74px); }
+
+.slot {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.slot.empty { cursor: default; background: rgba(255, 255, 255, 0.015); }
+.slot:not(.empty):hover { background: rgba(143, 154, 126, 0.12); border-color: rgba(143, 154, 126, 0.45); }
+.slot .tile {
+  width: 42px;
+  height: 42px;
+  background: center / contain no-repeat;
+}
+.slot .name { font-size: 11px; color: var(--text-dim); max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot .count {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.inv-hint { margin: 0; font-size: 12px; color: var(--text-dim); }
+
+/* ---- backpack meter (top-left). Only the bar's transform changes, so nothing re-flows. ---- */
+.baghud {
+  top: 22px;
+  left: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  direction: rtl;
+}
+.baghud .meter {
+  width: 92px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.baghud .meter i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.25s ease, background-color 0.25s ease;
+}
+.baghud .num {
+  min-width: 34px;
+  text-align: left;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.25s ease;
+}
+.baghud.full .meter i { background: #b98a5c; }
+.baghud.full .num { color: #d2a878; }
