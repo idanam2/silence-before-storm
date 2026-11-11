@@ -93,7 +93,74 @@
     g.strokeStyle = '#1b1e1c'; g.lineWidth = 1; rr(g, 26, 7, 12, 8, 2); g.stroke();
   }
 
+  function plankShape(g, y, rot, tone) {
+    g.save(); g.translate(32, y); g.rotate(rot);
+    var gr = g.createLinearGradient(0, -6, 0, 6);
+    gr.addColorStop(0, tone[0]); gr.addColorStop(1, tone[1]);
+    g.fillStyle = gr; rr(g, -26, -6, 52, 12, 2); g.fill();
+    g.strokeStyle = 'rgba(40,28,16,0.45)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(-20, -2); g.lineTo(-4, -2); g.moveTo(2, 2); g.lineTo(18, 2); g.stroke();
+    g.fillStyle = '#2a2218'; g.beginPath(); g.arc(-21, 0, 1.3, 0, TAU); g.arc(21, 0, 1.3, 0, TAU); g.fill();
+    g.strokeStyle = '#211a11'; g.lineWidth = 1.4; rr(g, -26, -6, 52, 12, 2); g.stroke();
+    g.restore();
+  }
+
+  function bowl(g, fill, topFill, steam) {
+    shadow(g, 32, 53, 22, 4);
+    var gr = g.createLinearGradient(10, 0, 54, 0);
+    gr.addColorStop(0, '#3e4440'); gr.addColorStop(0.4, '#6c746f'); gr.addColorStop(1, '#343a37');
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(9, 33); g.quadraticCurveTo(10, 52, 32, 52); g.quadraticCurveTo(54, 52, 55, 33); g.closePath(); g.fill();
+    g.strokeStyle = '#161918'; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = '#80887f'; g.beginPath(); g.ellipse(32, 33, 23, 7, 0, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = fill; g.beginPath(); g.ellipse(32, 33.5, 20, 5.2, 0, 0, TAU); g.fill();
+    g.fillStyle = topFill;
+    [[24, 32, 4], [34, 34, 4.5], [41, 32, 3.2], [29, 35, 3]].forEach(function (b) {
+      g.beginPath(); g.ellipse(b[0], b[1], b[2], b[2] * 0.62, 0, 0, TAU); g.fill();
+    });
+    g.strokeStyle = 'rgba(225,225,215,0.22)'; g.lineWidth = 1.6;
+    for (var i = 0; i < steam; i++) {
+      var x = 22 + i * 10;
+      g.beginPath(); g.moveTo(x, 24); g.quadraticCurveTo(x + 4, 18, x, 12); g.quadraticCurveTo(x - 4, 7, x + 1, 3); g.stroke();
+    }
+  }
+
   var draw = {
+    plank: function (g) {
+      shadow(g, 32, 53, 25, 5);
+      plankShape(g, 44, -0.05, ['#8a7456', '#5d4c36']);
+      plankShape(g, 32, 0.07, ['#9a8262', '#66533b']);
+      plankShape(g, 20, -0.1, ['#8f7a5a', '#5f4e38']);
+    },
+    nails: function (g) {
+      shadow(g, 32, 52, 21, 4);
+      [[18, 0.5, 38], [27, -0.2, 40], [36, 0.15, 42], [44, -0.5, 38], [31, 0.8, 34]].forEach(function (n, i) {
+        g.save(); g.translate(n[0], 30 + (i % 2) * 4); g.rotate(n[1]);
+        var gr = g.createLinearGradient(-2, 0, 2, 0);
+        gr.addColorStop(0, '#6a7276'); gr.addColorStop(0.5, '#b2bab8'); gr.addColorStop(1, '#565e62');
+        g.fillStyle = gr; g.beginPath(); g.moveTo(-1.6, -n[2] / 2 + 4); g.lineTo(1.6, -n[2] / 2 + 4); g.lineTo(0, n[2] / 2); g.closePath(); g.fill();
+        g.strokeStyle = '#1a1d1f'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#9aa3a5'; g.beginPath(); g.ellipse(0, -n[2] / 2 + 3, 4.6, 2, 0, 0, TAU); g.fill(); g.stroke();
+        g.restore();
+      });
+    },
+    club: function (g) {
+      shadow(g, 32, 54, 20, 4);
+      g.save(); g.translate(32, 32); g.rotate(0.75);
+      var gr = g.createLinearGradient(-8, 0, 8, 0);
+      gr.addColorStop(0, '#4a3b2b'); gr.addColorStop(0.45, '#8d7556'); gr.addColorStop(1, '#3d3024');
+      g.fillStyle = gr;
+      g.beginPath(); g.moveTo(-3, 26); g.lineTo(3, 26); g.lineTo(4.5, 0); g.quadraticCurveTo(10, -10, 8, -22);
+      g.quadraticCurveTo(0, -29, -8, -22); g.quadraticCurveTo(-10, -10, -4.5, 0); g.closePath(); g.fill();
+      g.strokeStyle = '#1e1811'; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = '#aab2b0'; g.strokeStyle = '#1a1d1f'; g.lineWidth = 1;
+      [[-4, -20], [4, -16], [-2, -11], [5, -24], [0, -26]].forEach(function (n) { g.beginPath(); g.arc(n[0], n[1], 1.7, 0, TAU); g.fill(); g.stroke(); });
+      g.strokeStyle = 'rgba(30,22,14,0.5)'; g.lineWidth = 1;
+      for (var y = 14; y < 24; y += 3) { g.beginPath(); g.moveTo(-3, y); g.lineTo(3, y + 1.5); g.stroke(); }
+      g.restore();
+    },
+    cooked_food: function (g) { bowl(g, '#5a3f28', '#9a6a3c', 3); },
+    stew: function (g) { bowl(g, '#6e5a30', '#7d6a50', 2); },
     wood: function (g) {
       shadow(g, 32, 52, 24, 5);
       g.save(); g.translate(24, 42); g.rotate(-0.12); logShape(g, 40, 14); g.restore();

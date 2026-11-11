@@ -69,7 +69,30 @@
     solids.push(rect(layout.woodpile.x, layout.woodpile.y, layout.woodpile.w, layout.woodpile.h, 'woodpile'));
     var trees = plantTrees(W), s = layout.trees.trunk;
     for (var i = 0; i < trees.length; i++) solids.push(rect(trees[i].x - s / 2, trees[i].y - s / 2, s, s, 'trunk'));
-    return { layout: layout, solids: solids, trees: trees, width: W.width, height: W.height };
+    // fixed = always there; solids = fixed + the structures the player has built (see setBuildings)
+    return { layout: layout, fixed: solids, solids: solids.slice(), levels: {}, trees: trees, width: W.width, height: W.height };
+  }
+
+  // Applies the built structures ({ id: level }) to the base: built ones become solid rects.
+  function setBuildings(b, levels) {
+    var defs = G.data.buildings, s = b.fixed.slice();
+    b.levels = levels;
+    for (var id in defs) {
+      var spot = defs[id].spot;
+      if (!spot || !(levels[id] > 0)) continue;
+      var r = rect(spot.x, spot.y, spot.w, spot.h, id);
+      r.level = levels[id];
+      s.push(r);
+    }
+    b.solids = s;
+    return b;
+  }
+
+  // Rect of a structure you can use with E (chest, or a built workbench / campfire).
+  function stationRect(b, id) {
+    if (id === 'chest') return layout.chest;
+    var d = G.data.buildings[id];
+    return d && d.spot && b.levels[id] > 0 ? d.spot : null;
   }
 
   // Closest point on rect r to (px, py).
@@ -110,10 +133,26 @@
     return dx * dx + dy * dy <= reach * reach;
   }
 
+  // Id of the closest usable structure within reach ('chest' | 'workbench' | 'campfire' | 'bed' | 'tank'), or null.
+  function nearStation(p, b) {
+    var defs = G.data.buildings, best = null, bestD = Infinity, reach = p.radius + layout.interactRange;
+    for (var id in defs) {
+      if (!defs[id].station && !defs[id].use) continue;
+      var r = stationRect(b, id);
+      if (!r) continue;
+      var c = closest(r, p.x, p.y), dx = p.x - c.x, dy = p.y - c.y, d2 = dx * dx + dy * dy;
+      if (d2 <= reach * reach && d2 < bestD) { best = id; bestD = d2; }
+    }
+    return best;
+  }
+
   function nearTrail(p) {
     var dx = p.x - layout.trail.x, dy = p.y - layout.trail.y;
     return dx * dx + dy * dy <= layout.trail.r * layout.trail.r;
   }
 
-  G.base = { layout: layout, build: build, collide: collide, nearChest: nearChest, nearTrail: nearTrail };
+  G.base = {
+    layout: layout, build: build, setBuildings: setBuildings, collide: collide,
+    nearChest: nearChest, nearStation: nearStation, nearTrail: nearTrail
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

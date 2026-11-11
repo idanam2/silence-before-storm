@@ -42,7 +42,7 @@
     var rT = G.util.rng(def.seed), rR = G.util.rng(def.seed * 31 + (visit || 0) * 977 + 5);
     var A = {
       id: def.id, name: def.name, width: def.width, height: def.height,
-      exit: def.exit, spawn: def.spawn, paths: def.paths, reach: def.reach,
+      exit: def.exit, spawn: def.spawn, paths: def.paths, reach: def.reach, theme: def.theme,
       ponds: [], nodes: [], visit: visit || 0
     };
     var i, k;
@@ -66,24 +66,27 @@
         variant: Math.floor(rand() * 1000), phase: rand() * TAU,
         border: false, dead: false, deadT: 0, fade: 1
       };
+      n.a0 = n.amount;                      // amount when generated: lets the save store only what changed
       if (d.canopy) n.canopy = d.canopy[0] + rand() * (d.canopy[1] - d.canopy[0]);
       A.nodes.push(n);
       return n;
     }
 
     // wall of trees around the map (not harvestable), open where the trail leaves
-    var B = def.border, kinds = ['pine', 'pine', 'oak'];
+    var B = def.border, kinds = (B && B.kinds) || ['pine', 'pine', 'oak'];
     function borderTree(x, y) {
       if (dist(x, y, def.exit.x, def.height) < B.gap && y > def.height - 260) return;
       makeNode(kinds[Math.floor(rT() * kinds.length)], x, y, rT).border = true;
     }
-    for (var bx = 30; bx < def.width; bx += B.step) {
-      borderTree(bx + rT() * 30, 14 + rT() * B.depth);
-      borderTree(bx + rT() * 30, def.height - 14 - rT() * B.depth);
-    }
-    for (var by = 90; by < def.height - 60; by += B.step) {
-      borderTree(14 + rT() * B.depth, by + rT() * 30);
-      borderTree(def.width - 14 - rT() * B.depth, by + rT() * 30);
+    if (B) {                                // border: null = open edge
+      for (var bx = 30; bx < def.width; bx += B.step) {
+        borderTree(bx + rT() * 30, 14 + rT() * B.depth);
+        borderTree(bx + rT() * 30, def.height - 14 - rT() * B.depth);
+      }
+      for (var by = 90; by < def.height - 60; by += B.step) {
+        borderTree(14 + rT() * B.depth, by + rT() * 30);
+        borderTree(def.width - 14 - rT() * B.depth, by + rT() * 30);
+      }
     }
 
     function free(d, x, y, gap) {
@@ -195,6 +198,27 @@
     return { item: d.item, gained: n - left, left: left, fx: d.fx };
   }
 
+  // What the player changed in a visit, as [[nodeIndex, amountLeft], ...] (0 = used up). Node order is
+  // deterministic for a given area + visit, so the save only needs this list to restore the area.
+  function delta(area) {
+    var out = [];
+    for (var i = 0; i < area.nodes.length; i++) {
+      var n = area.nodes[i];
+      if (n.dead || n.amount !== n.a0) out.push([i, n.dead ? 0 : n.amount]);
+    }
+    return out;
+  }
+
+  function applyDelta(area, list) {
+    for (var k = 0; k < list.length; k++) {
+      var n = area.nodes[list[k][0]];
+      if (!n || n.border) continue;
+      n.amount = list[k][1];
+      if (n.amount <= 0) { n.amount = 0; n.dead = true; n.deadT = 9; }   // deadT 9: the fall animation is over
+    }
+    return area;
+  }
+
   function newGather() { return { node: null, t: 0, time: 0 }; }
 
   // One simulation step of "hold E to gather". g is mutated. Returns what happened this step.
@@ -235,6 +259,7 @@
   G.area = {
     HIT: HIT, generate: generate, collide: collide, findTarget: findTarget, check: check,
     harvest: harvest, newGather: newGather, gatherStep: gatherStep, updateVisuals: updateVisuals,
+    delta: delta, applyDelta: applyDelta,
     inWater: inWater, pathDist: pathDist
   };
 })(typeof window !== 'undefined' ? window : globalThis);

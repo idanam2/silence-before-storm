@@ -85,6 +85,12 @@
       return moved;
     },
 
+    // Grows an inventory to `size` slots (never shrinks, so nothing can be lost).
+    resize: function (inv, size) {
+      while (inv.slots.length < size) inv.slots.push(null);
+      return inv;
+    },
+
     // Builds an inventory from [[id, n], ...] (used for the starting loadout).
     fromList: function (size, list, items) {
       var inv = inventory.create(size);

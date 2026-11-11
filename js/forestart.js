@@ -563,7 +563,7 @@
       gr.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)');
       g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
     }
-    var tones = [['44,78,42', 0.14], ['86,66,40', 0.12], ['0,0,0', 0.22], ['0,0,0', 0.16], ['36,62,44', 0.14], ['170,180,140', 0.045]];
+    var tones = (area.theme && area.theme.tones) || [['44,78,42', 0.14], ['86,66,40', 0.12], ['0,0,0', 0.22], ['0,0,0', 0.16], ['36,62,44', 0.14], ['170,180,140', 0.045]];
     for (i = 0; i < 120; i++) {
       var t = tones[Math.floor(rand() * tones.length)];
       blob(rand() * W, rand() * H, 140 + rand() * 330, t[0], t[1] * (0.5 + rand() * 0.5));
