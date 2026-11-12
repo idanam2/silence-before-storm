@@ -24,9 +24,9 @@ function test(name, fn) {
 function eq(a, b, msg) { if (a !== b) throw new Error((msg || '') + ` expected ${b}, got ${a}`); }
 function near(a, b, eps, msg) { if (Math.abs(a - b) > (eps || 1e-6)) throw new Error((msg || '') + ` expected ~${b}, got ${a}`); }
 
-const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', 'data/interiors.js', 'data/recipes.js', 'data/buildings.js',
-  'data/difficulty.js', 'data/needs.js', 'data/world.js',
-  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/area.js']);
+const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', ...fs.readdirSync(path.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f), 'data/interiors.js', 'data/recipes.js', 'data/buildings.js',
+  'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js',
+  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
 // Fixed item table for the inventory tests, so balance changes in data/items.js do not break them.
 const IT = { wood: { stack: 20 }, stone: { stack: 20 }, axe: { stack: 1 } };
 const world = { width: 1000, height: 800 };
@@ -439,7 +439,7 @@ test('data: every building has 2 levels, known costs, a spot inside the yard tha
   for (const id of G.data.buildingOrder) {
     const d = BLD[id];
     if (!d) throw new Error('order ' + id);
-    eq(d.levels.length, 2, id + ' levels: ');
+    if (!(d.levels.length >= 2)) throw new Error(id + ' needs at least 2 levels');     // the bag, workbench and rack have more
     for (const lv of d.levels) for (const [it, n] of Object.entries(lv.cost)) if (!ITEMS[it] || !(n > 0)) throw new Error(id + ' cost ' + it);
     if (d.spot) spots.push([id, d.spot]);
   }
@@ -455,6 +455,8 @@ test('data: every building has 2 levels, known costs, a spot inside the yard tha
 test('data: nothing is stuck: every upgrade cost is made of items the player can obtain in the forest or chest', () => {
   const obtainable = new Set(['wood', 'stone', 'plank', 'mushroom', 'water_dirty']);
   for (const id of G.data.buildingOrder) for (const lv of BLD[id].levels) for (const it of Object.keys(lv.cost)) {
+    if (id === 'bag') continue;                  // the bag needs cloth and nails from the places beyond the forest (checked in its own test)
+    if (BLD[id].levels.indexOf(lv) >= 3 && ['nails', 'metal', 'cloth'].includes(it)) continue;   // the last upgrade needs things from beyond the forest
     if (!obtainable.has(it)) throw new Error(id + ' needs ' + it);
   }
 });
@@ -476,11 +478,12 @@ test('building: not enough materials changes nothing', () => {
   eq(r.ok, false); eq(r.reason, 'cost'); eq(c.buildings.workbench, 0); eq(total(c, 'wood'), 5); eq(total(c, 'stone'), 4);
 });
 test('building: upgrade to level 2, then the top is reached', () => {
-  const c = mkctx([['wood', 10], ['stone', 10]], [['plank', 6]], { workbench: 1 });
-  eq(G.crafting.nextLevel(c, 'workbench'), 2);
-  eq(G.crafting.build(c, 'workbench').level, 2);
-  eq(G.crafting.nextLevel(c, 'workbench'), 0);
-  eq(G.crafting.build(c, 'workbench').reason, 'max');
+  const c = mkctx([['wood', 10], ['stone', 50]], [['plank', 20], ['metal', 8]], { campfire: 1 });     // (the workbench has 3 levels now, see the tests at the end)
+  eq(G.crafting.nextLevel(c, 'campfire'), 2);
+  eq(G.crafting.build(c, 'campfire').level, 2);
+  eq(G.crafting.build(c, 'campfire').level, 3); eq(G.crafting.build(c, 'campfire').level, 4);
+  eq(G.crafting.nextLevel(c, 'campfire'), 0);
+  eq(G.crafting.build(c, 'campfire').reason, 'max');
   eq(G.crafting.build(c, 'nope').ok, false);
 });
 test('chest upgrade grows the chest and never drops items', () => {
@@ -525,7 +528,7 @@ test('crafting: with no room anywhere it is refused and every change is rolled b
   eq(G.inventory.count(c.bag, 'plank'), 0);
 });
 test('crafting: recipes are split between the workbench and the campfire', () => {
-  eq(G.crafting.recipesFor('workbench').length + G.crafting.recipesFor('campfire').length, RECIPES.length);
+  eq(G.crafting.recipesFor('workbench').length + G.crafting.recipesFor('campfire').length + G.crafting.recipesFor('rack').length, RECIPES.length);
   const c = mkctx([['mushroom', 2], ['water_dirty', 1]], [], { campfire: 1 });
   eq(G.crafting.craft(c, 'cooked_food').ok, true); eq(total(c, 'cooked_food'), 1);
   eq(G.crafting.craft(c, 'water_clean').ok, true); eq(total(c, 'water_clean'), 1);
@@ -715,10 +718,11 @@ test('level 2 holds more and fills faster', () => {
   eq(G.tank.cap(0), 0); eq(G.tank.cap(2), b.cap);
 });
 test('collecting moves water into the bag, then the chest; the rest stays in the tank', () => {
-  const t = { amount: 6, t: 0 }, bag = G.inventory.create(1), chest = G.inventory.create(1);
+  const WS = ITEMS.water_clean.stack;
+  const t = { amount: 6, t: 0 }, bag = G.inventory.fromList(1, [['water_clean', WS - 3]]), chest = G.inventory.create(1);
   eq(G.tank.take(t, bag, chest), 6);
-  eq(G.inventory.count(bag, 'water_clean'), 3); eq(G.inventory.count(chest, 'water_clean'), 3); eq(t.amount, 0);
-  const u = { amount: 5, t: 0 }, b2 = G.inventory.fromList(1, [['stone', 10]]), c2 = G.inventory.create(1);
+  eq(G.inventory.count(bag, 'water_clean'), WS); eq(G.inventory.count(chest, 'water_clean'), 3); eq(t.amount, 0);
+  const u = { amount: 5, t: 0 }, b2 = G.inventory.fromList(1, [['stone', ITEMS.stone.stack]]), c2 = G.inventory.fromList(1, [['water_clean', WS - 3]]);
   eq(G.tank.take(u, b2, c2), 3); eq(u.amount, 2, 'what does not fit stays: ');
   eq(G.tank.take(u, b2, c2), 0); eq(u.amount, 2);
 });
@@ -958,7 +962,7 @@ test('wrong or missing values are repaired: unknown items, overstacks, NaN, unkn
   eq(d.needs.health, 1, 'health is at least 1: '); eq(d.needs.hunger, 100); eq(d.needs.thirst, 100); eq(d.needs.energy, 100);
   eq(d.bag.slots.length, 12); eq(d.bag.slots[0].n, ITEMS.wood.stack); eq(d.bag.slots[1], null); eq(d.bag.slots[2].n, 1);
   eq(d.bag.slots[3], null); eq(d.bag.slots[4], null); eq(d.bag.slots[6].n, 2);
-  eq(d.buildings.workbench, 2); eq(d.buildings.ghost, undefined); eq(d.buildings.tank, 0); eq(d.buildings.chest, 1); eq(d.buildings.bed, 0);
+  eq(d.buildings.workbench, BLD.workbench.levels.length); eq(d.buildings.ghost, undefined); eq(d.buildings.tank, 0); eq(d.buildings.chest, 1); eq(d.buildings.bed, 0);
   eq(d.tank.amount, 0, 'no tank built: nothing stored: ');
   eq(d.visits.forest, 2); eq(d.visits.ghost, undefined);
   eq(d.area, 'base'); eq(d.zone, null); eq(d.pos, null);
@@ -1017,6 +1021,586 @@ test('save: the inside of a building and the floors already searched survive a r
   eq(JSON.stringify(d.trip), JSON.stringify({ police: [[1, 0]], police_f1: [[0, 0], [2, 1]] }));
   const bad = G.save.parse(JSON.stringify(Object.assign(G.save.snapshot(st, 1), { trip: { ghost: [[0, 0]], police: 'x' } }))).data;
   eq(JSON.stringify(bad.trip), JSON.stringify({ police: [] }));
+});
+
+console.log('combat (stage 5)');
+const WP = G.data.weapons, EN = G.data.enemies;
+// A bare 2000x1500 area for fights, optionally with solids.
+const arena = (solids) => ({ width: 2000, height: 1500, nodes: [], ponds: [], water: [], decks: [], solids: solids || [], doors: [], exit: null });
+const rig = (x, y, angle) => { const p = G.player.create(x, y); G.player.settle(p, angle || 0); p.radius = 18; return p; };
+const mkEnemy = (type, x, y) => G.enemies.create(type, x, y, G.util.rng(5));
+const thePlayer = (p, alive) => ({ x: p.x, y: p.y, radius: p.radius, alive: alive !== false });
+const stepFor = (e, c, seconds) => { let hit = 0; for (let t = 0; t < seconds * 60; t++) hit += G.enemies.step(e, c, 1 / 60).hit; return hit; };
+
+test('weapons: every item, ammo and key points at something real', () => {
+  for (const id in WP) {
+    const w = WP[id];
+    if (w.item && !ITEMS[w.item]) throw new Error(id + ': unknown item ' + w.item);
+    if (w.kind === 'gun' && !ITEMS[w.ammo]) throw new Error(id + ': unknown ammo');
+    if (w.kind !== 'gun' && !(w.hitU > 0 && w.hitU < 1 && w.dur > 0)) throw new Error(id + ': bad timing');
+  }
+  for (const k in G.data.weaponKeys) if (!WP[G.data.weaponKeys[k]]) throw new Error(k);
+  eq(WP.hands.item, null);
+});
+test('enemies: data is sane (the runner is faster than a walking player and weaker than a shambler)', () => {
+  const s = EN.types.shambler, r = EN.types.runner;
+  if (!(r.speed > pc.walkSpeed && r.speed < pc.walkSpeed * pc.runMult)) throw new Error('runner speed ' + r.speed);
+  if (!(s.speed < pc.walkSpeed)) throw new Error('shambler too fast');
+  if (!(r.hp < s.hp && r.dmg < s.dmg)) throw new Error('runner should be weaker');
+  for (const t in EN.types) if (!(EN.types[t].hitU > 0.2 && EN.types[t].hitU < 0.9)) throw new Error(t);
+});
+
+test('swing and shove: the blow lands exactly once, at hitU, and a shove is quicker than a club swing', () => {
+  const p = G.player.create(500, 400);
+  eq(G.player.shove(p), true); eq(G.player.shove(p), false);
+  let hits = 0;
+  for (let i = 0; i < 80; i++) { G.player.animate(p, 1 / 60, null); if (G.player.swingHit(p, WP.hands.hitU)) hits++; }
+  eq(hits, 1); eq(p.swing, -1);
+  G.player.setHeld(p, 'club'); eq(G.player.shove(p), false);
+  eq(G.player.swing(p), true); near(p.swingDur, 0.5);
+  let t = 0; hits = 0;
+  while (p.swing >= 0 && t < 2) { G.player.animate(p, 1 / 60, null); t += 1 / 60; if (G.player.swingHit(p, WP.club.hitU)) { hits++; if (!(t > 0.2 && t < 0.3)) throw new Error('blow at ' + t); } }
+  eq(hits, 1);
+  if (!(WP.hands.dur < WP.club.dur)) throw new Error('a shove should be quicker');
+});
+
+test('sight and shots: walls and trunks block, low furniture does not', () => {
+  const wall = { x: 900, y: 0, w: 40, h: 1500, kind: 'iwall' }, desk = { x: 900, y: 0, w: 40, h: 1500, kind: 'furn' };
+  eq(G.combat.clear(arena([wall]), 500, 700, 1300, 700), false);
+  eq(G.combat.clear(arena([desk]), 500, 700, 1300, 700), true);
+  eq(G.combat.clear(arena([]), 500, 700, 1300, 700), true);
+  const d = G.combat.rayBlock(arena([wall]), 500, 700, 0, 780);
+  if (!(d > 380 && d < 410)) throw new Error('ray stopped at ' + d);
+  const tree = Object.assign(arena([]), { nodes: [{ x: 800, y: 700, solid: 16, dead: false }] });
+  eq(G.combat.clear(tree, 500, 700, 1100, 700), false);
+  tree.nodes[0].dead = true; tree.sn = null;
+  eq(G.combat.clear(tree, 500, 700, 1100, 700), true);
+});
+
+test('melee: reaches the enemy in front, not behind, not too far, not through a wall, not the dead', () => {
+  const A = arena(), p = rig(500, 700, 0), w = WP.axe;
+  const front = mkEnemy('shambler', 550, 700), back = mkEnemy('shambler', 450, 700), far = mkEnemy('shambler', 640, 700);
+  const dead = mkEnemy('shambler', 540, 710); dead.state = 'dead';
+  const got = G.combat.meleeTargets(A, p, w, [back, far, dead, front]);
+  eq(got.length, 1); eq(got[0], front);
+  const wall = arena([{ x: 520, y: 600, w: 16, h: 200, kind: 'iwall' }]);
+  eq(G.combat.meleeTargets(wall, p, w, [front]).length, 0);
+  const two = [mkEnemy('shambler', 555, 700), mkEnemy('shambler', 560, 722), mkEnemy('shambler', 560, 678)];
+  eq(G.combat.meleeTargets(A, p, w, two).length, 2);             // the axe hits two at most
+  eq(G.combat.meleeTargets(A, p, WP.pickaxe, two).length, 1);
+});
+
+test('gun: hits the first enemy on the line, a wall stops the bullet, a miss just flies on', () => {
+  const p = rig(500, 700, 0), w = WP.gun, near1 = mkEnemy('shambler', 700, 700), far1 = mkEnemy('shambler', 900, 700);
+  let r = G.combat.shoot(arena(), p, w, [far1, near1], 0);
+  eq(r.enemy, near1); if (!(r.dist > 170 && r.dist < 200)) throw new Error('dist ' + r.dist);       // the near one's front edge, not the far one
+  r = G.combat.shoot(arena([{ x: 600, y: 600, w: 20, h: 200, kind: 'iwall' }]), p, w, [near1], 0);
+  eq(r.enemy, null); eq(r.wall, true);
+  r = G.combat.shoot(arena(), p, w, [near1], 0.4);              // aimed well off to the side
+  eq(r.enemy, null); eq(r.wall, false); near(r.dist, w.range);
+  near1.state = 'dying';
+  eq(G.combat.shoot(arena(), p, w, [near1], 0).enemy, null);
+});
+
+test('hurt: damage, knock-back away from the source, stagger, a quiet hit does extra, death', () => {
+  const e = mkEnemy('shambler', 600, 700);
+  eq(e.state, 'idle');
+  const r1 = G.enemies.hurt(e, 20, 500, 700, WP.club);
+  near(r1.dealt, 30); eq(r1.sneak, true); eq(r1.killed, false);                // unaware: x1.5
+  eq(e.state, 'stagger'); if (!(e.kvx > 0 && Math.abs(e.kvy) < 1e-6)) throw new Error('knock ' + e.kvx);
+  near(e.hp, EN.types.shambler.hp - 30);
+  const r2 = G.enemies.hurt(e, 20, 500, 700, WP.club);
+  near(r2.dealt, 20); eq(r2.sneak, false);                                      // already alerted
+  const r3 = G.enemies.hurt(e, 999, 500, 700, WP.club);
+  eq(r3.killed, true); eq(e.state, 'dying'); eq(e.hp, 0);
+  near(Math.cos(e.angle + Math.PI), 1, 1e-9);                                    // hit from the left: lies with the head to the right
+  eq(G.enemies.hurt(e, 5, 500, 700, WP.club).dealt, 0);                         // the dying cannot be hurt again
+  const c = { area: arena(), world, player: thePlayer(rig(100, 100)), noise: 0 };
+  for (let i = 0; i < 60; i++) G.enemies.step(e, c, 1 / 60);
+  eq(e.state, 'dead'); eq(e.fall, 1);
+  const light = mkEnemy('runner', 600, 700), heavy = mkEnemy('shambler', 600, 700);
+  G.enemies.hurt(light, 1, 500, 700, WP.club); G.enemies.hurt(heavy, 1, 500, 700, WP.club);
+  if (!(light.stun > heavy.stun && light.kvx > heavy.kvx)) throw new Error('the light one should fly and stagger more');
+});
+
+test('senses: unaware at a distance, notices in sight, a wall hides the player, noise draws it in', () => {
+  const A = arena(), c = (area, pl, noise) => ({ area, world, player: thePlayer(pl), noise: noise || 0 });
+  const p = rig(300, 700), e = mkEnemy('shambler', 1200, 700);
+  stepFor(e, c(A, p), 2);
+  if (e.state === 'chase') throw new Error('noticed from 900px');
+  const near1 = mkEnemy('shambler', 500, 700);
+  stepFor(near1, c(A, p), 1);
+  eq(near1.state, 'chase');
+  const walled = arena([{ x: 380, y: 0, w: 30, h: 1500, kind: 'iwall' }]), hidden = mkEnemy('shambler', 500, 700);
+  stepFor(hidden, c(walled, p), 1);
+  if (hidden.state === 'chase') throw new Error('saw through a wall');
+  const heard = mkEnemy('shambler', 700, 700);
+  stepFor(heard, c(walled, p, 600), 0.6);
+  eq(heard.state, 'investigate');
+  const still = mkEnemy('shambler', 700, 700);
+  stepFor(still, c(walled, p, 100), 0.6);                       // too quiet for 400px
+  if (still.state === 'investigate') throw new Error('heard a whisper');
+});
+
+test('a shambler walks to the player, winds up, and the blow lands (with the player standing still)', () => {
+  const A = arena(), p = rig(300, 700), e = mkEnemy('shambler', 560, 700), c = { area: A, world, player: thePlayer(p), noise: 0 };
+  const hit = stepFor(e, c, 12);
+  eq(hit > 0, true);
+  eq(hit % EN.types.shambler.dmg, 0);
+  if (dist2(e, p) > 80) throw new Error('did not close in: ' + dist2(e, p));
+});
+function dist2(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+test('stepping away during the wind-up dodges the blow', () => {
+  const A = arena(), p = rig(300, 700), e = mkEnemy('shambler', 345, 700), d = EN.types.shambler;
+  const c = { area: A, world, player: thePlayer(p), noise: 0 };
+  let t = 0, hit = 0;
+  while (e.state !== 'windup' && t < 3) { hit += G.enemies.step(e, c, 1 / 60).hit; t += 1 / 60; }
+  eq(e.state, 'windup'); eq(hit, 0);
+  p.x = 60; c.player = thePlayer(p);                            // the player is well out of reach before it lands
+  for (let i = 0; i < d.attackTime * 60 + 5; i++) hit += G.enemies.step(e, c, 1 / 60).hit;
+  eq(hit, 0);
+});
+
+test('a runner is faster than a walking player and slower than a running one', () => {
+  const A = arena(), r = mkEnemy('runner', 900, 700), c = { area: A, world, player: thePlayer(rig(100, 700)), noise: 0 };
+  r.state = 'chase'; r.goal = { x: 100, y: 700 }; r.sees = true;
+  const x0 = r.x; stepFor(r, c, 1);
+  const moved = x0 - r.x;
+  if (!(moved > pc.walkSpeed && moved < pc.walkSpeed * pc.runMult)) throw new Error('moved ' + moved + ' px in a second');
+});
+
+test('a hit enemy staggers, then comes back at the player', () => {
+  const A = arena(), p = rig(300, 700), e = mkEnemy('shambler', 400, 700), c = { area: A, world, player: thePlayer(p), noise: 0 };
+  G.enemies.hurt(e, 5, 300, 700, WP.axe);
+  eq(e.state, 'stagger');
+  stepFor(e, c, 1);
+  eq(e.state === 'chase' || e.state === 'windup', true);
+});
+
+test('a dead player is left alone', () => {
+  const A = arena(), p = rig(300, 700), e = mkEnemy('shambler', 360, 700), c = { area: A, world, player: thePlayer(p, false), noise: 0 };
+  e.state = 'chase'; e.goal = { x: 300, y: 700 };
+  eq(stepFor(e, c, 3), 0);
+});
+
+test('bodies keep apart: enemies do not stand inside each other or the player', () => {
+  const p = rig(500, 500), a = mkEnemy('shambler', 500, 505), b = mkEnemy('shambler', 503, 500);
+  G.enemies.separate([a, b], thePlayer(p), arena());
+  if (dist2(a, b) < 20) throw new Error('overlap ' + dist2(a, b));
+  if (dist2(a, p) < a.radius + p.radius * 0.7 - 1) throw new Error('inside the player');
+});
+
+test('spawning: seeded per visit, away from the arrival point, on free ground, more at higher risk', () => {
+  const A1 = G.area.generate(G.data.areas.forest, RES, 1), A2 = G.area.generate(G.data.areas.forest, RES, 2);
+  const av = { x: A1.spawn.x, y: A1.spawn.y, r: EN.avoidSpawn };
+  const l1 = G.enemies.spawnFor(A1, 1, 1, av), l1b = G.enemies.spawnFor(A1, 1, 1, av), l2 = G.enemies.spawnFor(A2, 1, 2, av);
+  eq(JSON.stringify(l1.map(e => [e.type, e.x, e.y])), JSON.stringify(l1b.map(e => [e.type, e.x, e.y])));
+  eq(JSON.stringify(l1.map(e => [e.x, e.y])) === JSON.stringify(l2.map(e => [e.x, e.y])), false);
+  if (!(l1.length >= 1 && l1.length <= 4)) throw new Error('forest count ' + l1.length);
+  l1.forEach(e => {
+    if (dist2(e, A1.spawn) < EN.avoidSpawn) throw new Error('too near the arrival');
+    if (G.area.inWater(A1, e.x, e.y, 0) || G.area.inSolid(A1, e.x, e.y, 0)) throw new Error('in water / a wall');
+  });
+  const P = G.area.generate(G.data.areas.port, RES, 1), air = G.area.generate(G.data.areas.airport, RES, 1);
+  let lo = 0, hi = 0;
+  for (let v = 1; v <= 6; v++) { lo += G.enemies.spawnFor(A1, 1, v, null).length; hi += G.enemies.spawnFor(air, 5, v, null).length; }
+  if (!(hi > lo * 2)) throw new Error('risk 5 should be much busier: ' + lo + ' vs ' + hi);
+  const inside = G.area.generate(G.data.areas.police_f1, RES, 1);
+  let out = 0, inn = 0;
+  for (let v = 1; v <= 8; v++) { out += G.enemies.spawnFor(G.area.generate(G.data.areas.police, RES, v), 3, v, null).length; inn += G.enemies.spawnFor(G.area.generate(G.data.areas.police_f1, RES, v), 3, v, null).length; }
+  if (!(inn < out)) throw new Error('a floor should be calmer than the street: ' + inn + ' vs ' + out);
+  void P; void inside;
+});
+
+test('spawning: every outdoor and indoor area gets valid, free spots', () => {
+  let n = 0;
+  for (const id in G.data.areas) {
+    const def = G.data.areas[id];
+    if (!def.spawns) continue;                                   // the base has no destination terrain
+    const A = G.area.generate(def, RES, 1);
+    const list = G.enemies.spawnFor(A, 5, 1, { x: A.spawn.x, y: A.spawn.y, r: 300 });
+    list.forEach(e => {
+      n++;
+      if (!(e.x > 0 && e.x < A.width && e.y > 0 && e.y < A.height)) throw new Error(id + ' outside');
+      if (G.area.inWater(A, e.x, e.y, 0) || G.area.inSolid(A, e.x, e.y, 0)) throw new Error(id + ': inside something');
+      if (A.footprint && !(e.x > A.footprint.x && e.x < A.footprint.x + A.footprint.w && e.y > A.footprint.y && e.y < A.footprint.y + A.footprint.h)) throw new Error(id + ': outside the building');
+    });
+  }
+  if (n < 100) throw new Error('only ' + n + ' enemies in the whole world');
+});
+
+test('noise: standing is silent, running is louder than walking, a burst lasts a moment', () => {
+  const p = rig(0, 0), b = G.combat.newBurst();
+  eq(G.combat.noiseRadius(p, b), 0);
+  p.moving = true; const walk = G.combat.noiseRadius(p, b);
+  p.running = true; const run = G.combat.noiseRadius(p, b);
+  if (!(walk > 0 && run > walk)) throw new Error(walk + ' ' + run);
+  p.moving = p.running = false;
+  G.combat.addBurst(b, WP.gun.noise);
+  eq(G.combat.noiseRadius(p, b), WP.gun.noise);
+  G.combat.stepBurst(b, 0.3); eq(G.combat.noiseRadius(p, b), WP.gun.noise);
+  G.combat.stepBurst(b, 1); eq(G.combat.noiseRadius(p, b), 0);
+});
+
+test('death: the held weapon is kept unless the difficulty takes it, the rest of the bag goes', () => {
+  const L = G.data.difficulty.levels, mk = () => bagWith([['axe', 1], ['club', 1], ['pistol', 1], ['ammo', 10], ['wood', 5]]);
+  let bag = mk(); G.combat.deathLoss(bag, L.normal, 'gun');
+  eq(G.inventory.count(bag, 'pistol'), 1); eq(G.inventory.count(bag, 'ammo'), 0); eq(G.inventory.count(bag, 'axe'), 0); eq(G.inventory.count(bag, 'wood'), 0);
+  bag = mk(); G.combat.deathLoss(bag, L.hard, 'gun');
+  eq(G.inventory.count(bag, 'pistol'), 0);
+  bag = mk(); G.combat.deathLoss(bag, L.normal, 'hands');
+  eq(G.inventory.usedSlots(bag), 0);
+  bag = mk(); const lost = G.combat.deathLoss(bag, L.easy, 'club');
+  eq(G.inventory.count(bag, 'club'), 1); if (!lost.length) throw new Error('easy lost nothing');
+});
+
+test('holding: hands always, others only with the item in the backpack; gun ammo counts', () => {
+  const bag = bagWith([['axe', 1]]);
+  eq(G.combat.canHold(bag, 'hands'), true); eq(G.combat.canHold(bag, 'axe'), true);
+  eq(G.combat.canHold(bag, 'gun'), false); eq(G.combat.canHold(bag, 'nope'), false);
+  G.inventory.add(bag, 'pistol', 1);
+  eq(G.combat.canHold(bag, 'gun'), true);
+});
+
+test('needs: an exhausted body hits weaker, swings and shots cost energy (scaled by difficulty)', () => {
+  const n = G.needs.create(), L = G.data.difficulty.levels;
+  eq(G.needs.attackMult(n), 1);
+  G.needs.spend(n, 2, L.hard); near(n.energy, 100 - 2 * L.hard.energy);
+  n.energy = 5; if (!(G.needs.attackMult(n) < 1)) throw new Error('exhausted should hit weaker');
+  G.needs.spend(n, 50, L.normal); eq(n.energy, 0);
+});
+
+test('damage to the player is scaled by the difficulty (the same blow hurts more on hard)', () => {
+  const L = G.data.difficulty.levels, a = G.needs.create(), b = G.needs.create(), c2 = G.needs.create();
+  G.needs.hurt(a, EN.types.shambler.dmg, L.easy); G.needs.hurt(b, EN.types.shambler.dmg, L.normal); G.needs.hurt(c2, EN.types.shambler.dmg, L.hard);
+  if (!(a.health > b.health && b.health > c2.health)) throw new Error([a.health, b.health, c2.health].join(' '));
+});
+
+test('a whole fight: a shambler reaches a standing player, the player kills it with the club in a few blows', () => {
+  const A = arena(), p = rig(300, 700, 0), e = mkEnemy('shambler', 360, 700), d = EN.types.shambler;
+  e.state = 'chase'; e.goal = { x: 300, y: 700 }; e.sees = true;
+  const c = { area: A, world, player: thePlayer(p), noise: 0 };
+  G.player.setHeld(p, 'club');
+  let blows = 0, t = 0;
+  while (e.state !== 'dying' && e.state !== 'dead' && t < 20) {
+    if (p.swing < 0 && t > 0.1 * blows) { G.player.swing(p); blows++; }
+    G.player.animate(p, 1 / 60, null);
+    if (G.player.swingHit(p, WP.club.hitU)) G.combat.meleeTargets(A, p, WP.club, [e]).forEach(x => G.enemies.hurt(x, WP.club.dmg, p.x, p.y, WP.club));
+    G.enemies.step(e, c, 1 / 60);
+    t += 1 / 60;
+  }
+  eq(e.state === 'dying' || e.state === 'dead', true);
+  if (!(blows >= 3 && blows <= 6)) throw new Error('blows ' + blows);
+  void d;
+});
+
+console.log('pistol: magazine, wear, aim tolerance');
+test('gun: a shot slightly off still hits, more so up close than far, and a really wide one misses', () => {
+  const p = rig(500, 700, 0), w = WP.gun, e = mkEnemy('shambler', 800, 700);          // 300 px away
+  const at = (off) => { const q = mkEnemy('shambler', 800, 700 + off); return G.combat.shoot(arena(), p, w, [q], 0).enemy === q; };
+  eq(at(0), true); eq(at(24), true);                                                   // the body radius is 15: 24 px off used to miss
+  eq(at(30), true); eq(at(60), false);
+  const bare = Object.assign({}, w, { aim: undefined });                               // the old, exact aim
+  const q = mkEnemy('shambler', 800, 726);
+  eq(G.combat.shoot(arena(), p, bare, [q], 0).enemy, null);
+  const r = G.combat.shoot(arena(), p, w, [e], 0);
+  if (!(r.dist > 270 && r.dist < 310)) throw new Error('the tracer should end near the body: ' + r.dist);
+});
+test('gun: the magazine holds a few rounds, a reload takes them from the backpack, an empty click does nothing', () => {
+  const w = WP.gun, g = G.combat.newGun(w, () => 0.5, false), bag = G.inventory.create(6);
+  eq(g.mag, 0); eq(G.combat.gunFire(g), 'empty'); eq(g.shots, 0);
+  G.inventory.add(bag, 'ammo', 20, ITEMS);
+  eq(G.combat.gunRoom(g, w, bag), w.mag);
+  eq(G.combat.gunLoad(g, w, bag), w.mag); eq(g.mag, w.mag); eq(G.inventory.count(bag, 'ammo'), 20 - w.mag);
+  eq(G.combat.gunFire(g), 'ok'); eq(g.mag, w.mag - 1); eq(g.shots, 1);
+  eq(G.combat.gunLoad(g, w, bag), 1); eq(g.mag, w.mag);                                // tops up only what is missing
+  eq(G.combat.gunLoad(g, w, bag), 0);                                                  // full: nothing moves
+  const few = G.inventory.create(2); G.inventory.add(few, 'ammo', 3, ITEMS); const h = G.combat.newGun(w, () => 0.5, false);
+  eq(G.combat.gunLoad(h, w, few), 3); eq(h.mag, 3);                                    // fewer rounds than room: takes what there is
+});
+test('gun: wears out after roughly a hundred and fifty shots, breaks on the last one, gives the loaded rounds back', () => {
+  const w = WP.gun, bag = G.inventory.create(6);
+  const lo = G.combat.newGun(w, () => 0, true), hi = G.combat.newGun(w, () => 1, true);
+  if (!(lo.life >= 100 && lo.life < 120 && hi.life > 180 && hi.life <= 200)) throw new Error(lo.life + ' ' + hi.life);
+  const g = G.combat.newGun(w, () => 0.5, true); eq(g.life, w.life);
+  let n = 0, res = 'ok';
+  while (res !== 'broke' && n < 1000) { if (g.mag <= 0) g.mag = w.mag; res = G.combat.gunFire(g); n++; }
+  eq(n, w.life); eq(res, 'broke');
+  g.mag = 5; eq(G.combat.gunBreak(g, w, bag), 5); eq(G.inventory.count(bag, 'ammo'), 5);
+  const sp = (k) => { const x = G.combat.newGun(w, () => 0.5, true); x.shots = Math.floor(x.life * k); return G.combat.gunSpread(x, w); };
+  if (!(sp(0) < sp(0.5) && sp(0.5) < sp(0.9))) throw new Error('a worn pistol should be less accurate');
+  near(sp(0), w.spread); near(G.combat.gunCondition({ mag: 0, shots: 30, life: 120 }), 0.75);
+});
+test('saving: the pistol state survives a round trip, and a broken or odd one is cleaned', () => {
+  const st = mkState();
+  st.guns = { gun: { mag: 3, shots: 40, life: 150 }, ak: { mag: 30, shots: 7, life: 500 } };
+  const back = G.save.parse(JSON.stringify(G.save.snapshot(st, 1)));
+  eq(back.ok, true); eq(back.data.guns.gun.mag, 3); eq(back.data.guns.gun.shots, 40); eq(back.data.guns.gun.life, 150);
+  eq(back.data.guns.ak.mag, 30); eq(back.data.guns.uzi, undefined);
+  st.guns = {}; eq(Object.keys(G.save.parse(JSON.stringify(G.save.snapshot(st, 1))).data.guns).length, 0);
+  const old = Object.assign(G.save.snapshot(mkState(), 1), { gun: { mag: 2, shots: 9, life: 120 } });   // a save from before there were several guns
+  eq(G.save.parse(JSON.stringify(old)).data.guns.gun.shots, 9);
+  const w = WP.gun;
+  eq(G.combat.gunClean({ mag: 99, shots: 9999, life: 150 }, w).mag, w.mag);
+  eq(G.combat.gunClean({ mag: 99, shots: 9999, life: 150 }, w).shots, 149);
+  eq(G.combat.gunClean({ mag: 'x', shots: 1, life: 150 }, w), null);
+  eq(G.combat.gunClean('junk', w), null);
+});
+
+console.log('more guns and crafting categories');
+test('guns: Uzi, M16, Kalashnikov and sniper are complete, with ammo that exists and a recipe that makes them', () => {
+  const guns = Object.keys(WP).filter(k => WP[k].kind === 'gun');
+  eq(guns.length, 5);
+  for (const id of guns) {
+    const w = WP[id];
+    for (const f of ['dmg', 'range', 'cooldown', 'spread', 'mag', 'reload', 'life', 'noise', 'height']) if (!(w[f] > 0)) throw new Error(id + '.' + f);
+    if (!ITEMS[w.item] || !ITEMS[w.ammo]) throw new Error(id + ': item or ammo');
+    if (!G.data.recipes.some(r => r.out[0] === w.item)) throw new Error(id + ': nothing crafts it');
+    if (!G.data.weaponOrder.includes(id)) throw new Error(id + ' is not in the cycle order');
+  }
+  for (const k in G.data.weaponKeys) if (!G.data.weaponOrder.includes(G.data.weaponKeys[k])) throw new Error(k);
+  if (!(WP.uzi.cooldown < WP.gun.cooldown && WP.uzi.dmg < WP.gun.dmg)) throw new Error('uzi: fast and weak');
+  if (!(WP.sniper.dmg >= EN.types.shambler.hp && WP.sniper.cooldown > WP.gun.cooldown && WP.sniper.range > WP.m16.range)) throw new Error('sniper: one shot, slow, far');
+  eq(WP.sniper.auto, false);
+});
+test('crafting: every recipe has a real category, the first tab shows everything, the guns and ammo are in their own tabs', () => {
+  const ids = G.data.recipeCats.map(c => c.id);
+  eq(ids[0], 'all');
+  for (const r of G.data.recipes) if (r.cat === 'all' || !ids.includes(r.cat)) throw new Error(r.id + ': bad category ' + r.cat);
+  const wb = G.crafting.recipesFor('workbench');
+  eq(G.crafting.recipesFor('workbench', 'all').length, wb.length);
+  const names = (cat) => G.crafting.recipesFor('workbench', cat).map(r => r.out[0]);
+  for (const g of ['pistol', 'uzi', 'm16', 'ak47', 'sniper', 'club']) if (!names('weapons').includes(g)) throw new Error(g + ' not under weapons');
+  eq(names('ammo').sort().join(), ['ammo', 'ammo_556', 'ammo_762'].sort().join());
+  if (names('weapons').some(n => !(ITEMS[n].weapon))) throw new Error('a non-weapon under weapons');
+  eq(G.crafting.recipesFor('campfire', 'food').length, G.crafting.recipesFor('campfire').length);
+  eq(G.crafting.recipesFor('campfire', 'weapons').length, 0);
+});
+test('crafting a gun and its ammo takes materials from the backpack then the chest', () => {
+  const ctx = { bag: G.inventory.create(12), chest: G.inventory.fromList(24, G.data.inventory.start.chest, ITEMS), buildings: { workbench: 2 } };
+  eq(G.crafting.craft(ctx, 'ak47').ok, true); eq(G.inventory.count(ctx.bag, 'ak47'), 1);
+  eq(G.crafting.craft(ctx, 'ammo_762').ok, true); eq(G.inventory.count(ctx.bag, 'ammo_762'), 6);
+  eq(G.crafting.craft(ctx, 'sniper').ok, true); eq(G.crafting.craft(ctx, 'm16').ok, true); eq(G.crafting.craft(ctx, 'uzi').ok, true);
+  ctx.buildings.workbench = 1; eq(G.crafting.craft(ctx, 'uzi').reason, 'level');
+});
+test('sniper: one bullet goes through two enemies in a line (the second is hit softer, by the game), and stops at a wall', () => {
+  const p = rig(300, 700, 0), w = WP.sniper;
+  const a = mkEnemy('shambler', 700, 700), b = mkEnemy('shambler', 900, 700), c3 = mkEnemy('shambler', 1100, 700);
+  let r = G.combat.shoot(arena(), p, w, [c3, b, a], 0);
+  eq(r.hits.length, 2); eq(r.hits[0].enemy, a); eq(r.hits[1].enemy, b); eq(r.enemy, a);
+  if (!(r.dist > 560 && r.dist < 620)) throw new Error('the bullet should stop at the second one: ' + r.dist);
+  r = G.combat.shoot(arena([{ x: 800, y: 600, w: 20, h: 200, kind: 'iwall' }]), p, w, [a, b], 0);
+  eq(r.hits.length, 1); eq(r.hits[0].enemy, a);                                       // the wall is between the two
+  r = G.combat.shoot(arena(), p, WP.gun, [a, b], 0);
+  eq(r.hits.length, 1);                                                                // a pistol bullet stops in the first
+  r = G.combat.shoot(arena(), p, w, [mkEnemy('shambler', 1790, 700)], 0);              // a really long shot
+  eq(r.hits.length, 1);
+});
+test('every gun has its own magazine and wear (a pistol shot does not use up the rifle)', () => {
+  const g1 = G.combat.newGun(WP.gun, () => 0.5, true), g2 = G.combat.newGun(WP.m16, () => 0.5, true);
+  eq(g1.mag, 8); eq(g2.mag, 30); G.combat.gunFire(g1); eq(g2.mag, 30); eq(g2.shots, 0);
+  eq(g2.life, WP.m16.life);
+});
+
+// Extra test files: every tests/extra/*.js is run with these helpers in scope (so parallel work never edits this file).
+const extraDir = path.join(__dirname, 'extra');
+if (fs.existsSync(extraDir)) {
+  for (const f of fs.readdirSync(extraDir).sort()) {
+    if (!f.endsWith('.js')) continue;
+    console.log('extra: ' + f);
+    try {
+      new Function('G', 'test', 'eq', 'near', 'arena', 'rig', 'mkEnemy', 'thePlayer', 'stepFor', 'EN', 'WP', 'ITEMS', 'world', 'pc', 'mkState',
+        fs.readFileSync(path.join(extraDir, f), 'utf8'))(G, test, eq, near, arena, rig, mkEnemy, thePlayer, stepFor, EN, WP, ITEMS, world, pc, mkState);
+    } catch (e) { failed++; console.log('  FAIL ' + f + ' did not load\n       ' + e.message); }
+  }
+}
+
+console.log('backpack: stacks of 50 and the upgradable bag');
+test('stacks: everything that stacks holds 50, tools and weapons are single', () => {
+  for (const [id, it] of Object.entries(ITEMS)) {
+    if (it.tool || (G.data.weapons[id] && G.data.weapons[id].kind !== 'ammo' && !it.ammo)) { if (it.stack > 1 && ['axe', 'pickaxe', 'club', 'pistol'].includes(id)) throw new Error(id + ' stacks'); }
+  }
+  for (const id of ['wood', 'stone', 'plank', 'mushroom', 'water_clean']) eq(ITEMS[id].stack, 50, id + ' stack: ');
+  for (const id of ['axe', 'pickaxe', 'club', 'pistol']) eq(ITEMS[id].stack, 1, id + ' stack: ');
+  const inv = G.inventory.create(2);
+  eq(G.inventory.add(inv, 'wood', 50), 0); eq(G.inventory.usedSlots(inv), 1); eq(G.inventory.add(inv, 'wood', 51), 1);
+});
+test('bag: sizes per level are 12 / 18 / 24 / 32 and never below the starting size', () => {
+  const sizes = [1, 2, 3, 4].map(l => G.crafting.bagSlots({ bag: l }));
+  eq(sizes.join(','), '12,18,24,32');
+  eq(G.crafting.bagSlots({}), G.data.inventory.bagSlots); eq(G.crafting.bagSlots({ bag: 99 }), 32);
+});
+test('bag: upgrade costs are taken, each level grows the bag, the top is reached', () => {
+  const ctx = mkctx([['cloth', 30], ['wood', 30], ['plank', 30], ['nails', 30]], []);
+  ctx.buildings = G.crafting.startBuildings();
+  eq(ctx.buildings.bag, 1);
+  for (let lv = 2; lv <= 4; lv++) {
+    eq(G.crafting.build(ctx, 'bag').ok, true); eq(ctx.buildings.bag, lv);
+    G.inventory.resize(ctx.bag, G.crafting.bagSlots(ctx.buildings));
+    eq(ctx.bag.slots.length, [0, 12, 18, 24, 32][lv]);
+  }
+  eq(G.crafting.build(ctx, 'bag').reason, 'max');
+  const poor = mkctx([['cloth', 1]], []); poor.buildings = G.crafting.startBuildings();
+  eq(G.crafting.build(poor, 'bag').reason, 'cost');
+});
+test('bag: a saved game with a bigger bag keeps its slots and items', () => {
+  const st = { diff: G.data.difficulty.default, playTime: 5, needs: { health: 80, hunger: 60, thirst: 60, energy: 60 }, buildings: G.crafting.startBuildings(), tank: { amount: 0, t: 0 }, visits: {}, guns: {}, area: 'base', player: { x: 10, y: 10 } };
+  st.buildings.bag = 3;
+  st.bag = G.inventory.fromList(G.crafting.bagSlots(st.buildings), [['wood', 50], ['stone', 50]]);
+  st.chest = G.inventory.create(24);
+  const back = G.save.parse(JSON.stringify(G.save.snapshot(st, 1)));
+  eq(back.ok, true); eq(back.data.buildings.bag, 3); eq(back.data.bag.slots.length, 24);
+  eq(G.inventory.count(back.data.bag, 'wood'), 50); eq(G.inventory.count(back.data.bag, 'stone'), 50);
+});
+
+console.log('workbench levels and the drying rack');
+test('workbench: 3 levels, each more expensive, made of forest items only', () => {
+  const lv = BLD.workbench.levels;
+  eq(lv.length, 4);
+  const sum = (c) => Object.values(c.cost).reduce((a, b) => a + b, 0);
+  if (!(sum(lv[0]) < sum(lv[1]) && sum(lv[1]) < sum(lv[2]) && sum(lv[2]) < sum(lv[3]))) throw new Error('costs do not grow');
+  const forest = new Set(['wood', 'stone', 'plank']);
+  for (const l of lv.slice(0, 3)) for (const it of Object.keys(l.cost)) if (!forest.has(it)) throw new Error('workbench cost ' + it);
+});
+test('workbench: the whole line 1 -> 2 -> 3 can be built from forest materials, then the top is reached', () => {
+  const c = mkctx([['wood', 50], ['stone', 30], ['plank', 14]], [], {});
+  for (let l = 1; l <= 3; l++) { eq(G.crafting.build(c, 'workbench').level, l); }
+  eq(G.crafting.build(c, 'workbench').reason, 'cost');                // the 4th level needs nails and metal
+  eq(total(c, 'wood'), 50 - 6 - 8 - 14); eq(total(c, 'plank'), 0);
+});
+test('workbench: level 3 recipes are locked until the third level', () => {
+  const l3 = RECIPES.filter(r => r.station === 'workbench' && r.level === 3);
+  if (l3.length < 3) throw new Error('level 3 should unlock several recipes');
+  const c = mkctx([['wood', 20], ['metal', 6], ['cloth', 3], ['electronics', 2]], [], { workbench: 2 });
+  eq(G.crafting.craft(c, 'plank_bulk').reason, 'level');
+  c.buildings.workbench = 3;
+  eq(G.crafting.craft(c, 'plank_bulk').ok, true); eq(total(c, 'plank'), 10); eq(total(c, 'wood'), 14);
+  eq(G.crafting.craft(c, 'nails_bulk').ok, true); eq(total(c, 'nails'), 18);
+  eq(G.crafting.craft(c, 'lantern').ok, true); eq(total(c, 'lantern'), 1);
+});
+test('workbench: rope, first-aid kit, torch and crate can all be made along the way', () => {
+  let c = mkctx([['cloth', 10], ['bandage', 4], ['water_clean', 1], ['wood', 4]], [], { workbench: 1 });
+  eq(G.crafting.craft(c, 'rope').ok, true); eq(total(c, 'rope'), 1);
+  eq(G.crafting.craft(c, 'firstaid').reason, 'level');
+  c.buildings.workbench = 2;
+  eq(G.crafting.craft(c, 'firstaid').ok, true); eq(total(c, 'firstaid'), 1); eq(total(c, 'bandage'), 2);
+  eq(G.crafting.craft(c, 'torch').ok, true); eq(total(c, 'torch'), 1);
+  c = mkctx([['plank', 6], ['nails', 4], ['rope', 1]], [], { workbench: 3 });
+  eq(G.crafting.craft(c, 'crate').ok, true); eq(total(c, 'crate'), 1); eq(total(c, 'rope'), 0);
+});
+test('workbench: the first-aid kit heals more than a bandage', () => {
+  if (!(ITEMS.firstaid.use.health > ITEMS.bandage.use.health)) throw new Error('first-aid is not better');
+});
+test('rack: a built station with 4 levels and a free spot in the yard, listed in the build order', () => {
+  if (!G.data.buildingOrder.includes('rack')) throw new Error('rack is not in buildingOrder');
+  eq(BLD.rack.station, true); eq(BLD.rack.levels.length, 4); eq(BLD.rack.start, 0);
+  const s = BLD.rack.spot, a = G.base.layout.area;
+  if (!(s.x > a.x + 30 && s.x + s.w < a.x + a.w - 30 && s.y > a.y + 30 && s.y + s.h < a.y + a.h - 30)) throw new Error('rack outside the yard');
+  eq(G.crafting.startBuildings().rack, 0);
+});
+test('rack: becomes solid and usable with E only once built, and can be walked up to', () => {
+  const b = G.base.build(), s = BLD.rack.spot, p = G.player.create(s.x + s.w / 2, s.y + s.h + 24);
+  eq(G.base.nearStation(p, b), null);
+  G.base.setBuildings(b, Object.assign(G.crafting.startBuildings(), { rack: 1 }));
+  eq(b.solids.filter(r => r.kind === 'rack').length, 1);
+  eq(G.base.nearStation(p, b), 'rack');
+  const q = G.player.create(s.x + s.w / 2, s.y + s.h / 2); G.base.collide(q, b.solids);
+  if (q.x > s.x && q.x < s.x + s.w && q.y > s.y && q.y < s.y + s.h) throw new Error('inside the rack');
+});
+test('rack: drying recipes exist, need the rack, and make food that is safer and fuller than raw', () => {
+  const rr = G.crafting.recipesFor('rack');
+  if (rr.length < 2) throw new Error('too few drying recipes');
+  let c = mkctx([['mushroom', 6]], [], {});
+  eq(G.crafting.craft(c, 'dried_mushroom').reason, 'station');
+  c.buildings.rack = 1;
+  eq(G.crafting.craft(c, 'dried_mushroom').ok, true); eq(total(c, 'dried_mushroom'), 2); eq(total(c, 'mushroom'), 3);
+  eq(G.crafting.craft(c, 'ration').reason, 'level');
+  const raw = ITEMS.mushroom.use, dry = ITEMS.dried_mushroom.use;
+  if (!(dry.hunger > raw.hunger && !(dry.health < 0))) throw new Error('dried mushrooms are not better');
+  c = mkctx([['dried_mushroom', 3], ['cooked_food', 1]], [], { rack: 2 });
+  eq(G.crafting.craft(c, 'ration').ok, true); eq(total(c, 'ration'), 2); eq(total(c, 'dried_mushroom'), 0);
+  if (!(ITEMS.ration.use.hunger > ITEMS.cooked_food.use.hunger)) throw new Error('a ration should fill more than cooked food');
+});
+test('rack and workbench: every new item has a name, a stack (50, tools 1) and a drawn icon; recipes only use known items', () => {
+  const iconSrc = fs.readFileSync(path.join(ROOT, 'js', 'icons.js'), 'utf8');
+  for (const id of ['rope', 'crate', 'firstaid', 'torch', 'lantern', 'dried_mushroom', 'ration']) {
+    const it = ITEMS[id];
+    if (!it || !it.name) throw new Error(id + ' missing');
+    eq(it.stack, it.kind === 'tool' ? 1 : 50, id + ' stack: ');
+    if (!new RegExp('\\b' + id + ':\\s*function').test(iconSrc)) throw new Error(id + ' has no icon');
+  }
+  for (const r of RECIPES) if (r.station === 'rack' && r.cat !== 'food') throw new Error(r.id + ' should be a food recipe');
+});
+
+console.log('big base, three upgrades, fence materials, floor');
+test('yard is four times the first one, holds the cabin, chest, woodpile and every building spot', () => {
+  const a = G.base.layout.area, L = G.base.layout;
+  if (a.w * a.h < 4 * 800 * 520) throw new Error('yard too small');
+  for (const r of [L.cabin, L.chest, L.woodpile]) if (r.x < a.x || r.y < a.y || r.x + r.w > a.x + a.w || r.y + r.h > a.y + a.h) throw new Error('outside the yard');
+  for (const id of G.data.buildingOrder) { const sp = BLD[id].spot; if (sp && (sp.x < a.x || sp.y < a.y || sp.x + sp.w > a.x + a.w || sp.y + sp.h > a.y + a.h)) throw new Error(id + ' outside'); }
+  if (!(L.gate.x > a.x && L.gate.x + L.gate.w < a.x + a.w)) throw new Error('gate is not on the north fence');
+  if (!(L.trail.y < a.y && L.arrive.y < a.y)) throw new Error('trailhead must be north of the fence');
+});
+test('every structure has three upgrades after it is built', () => {
+  for (const id of ['workbench', 'rack', 'campfire', 'bed', 'tank', 'chest', 'fence']) if (BLD[id].levels.length < 4) throw new Error(id + ' has ' + BLD[id].levels.length + ' levels');
+  eq(G.crafting.chestSlots({ chest: 4 }), 60);
+});
+test('fence material: the cost follows the chosen material, an unknown one falls back to wood in a save', () => {
+  const b = G.crafting.startBuildings(), cWood = { bag: G.inventory.create(4), chest: G.inventory.create(4), buildings: b, fence: { material: 'wood' } };
+  eq(G.crafting.buildCost(cWood, 'fence').plank, 10);
+  const cSt = Object.assign({}, cWood, { fence: { material: 'stone' } }), st = G.crafting.buildCost(cSt, 'fence');
+  eq(st.plank, undefined); eq(st.stone, 20);
+  const cMe = Object.assign({}, cWood, { fence: { material: 'metal' } }), me = G.crafting.buildCost(cMe, 'fence');
+  eq(me.metal, 10);
+  eq(G.save.parse(JSON.stringify({ v: 1, fence: { material: 'gold' } })).data.fence.material, 'wood');
+  eq(G.save.parse(JSON.stringify({ v: 1, fence: { material: 'metal' } })).data.fence.material, 'metal');
+});
+test('placing: a structure goes anywhere free in the yard, as many as wanted, and the first copy sets the level', () => {
+  const P = G.placing, a = G.base.layout.area;
+  const base = G.base.build(), levels = G.crafting.startBuildings(), placed = [];
+  const r1 = P.rectAt('tank', a.x + 200, a.y + 700);               // far from the old spots, in the new part of the yard
+  eq(P.check(base, r1), null);
+  const ctx = mkctx([['wood', 30], ['plank', 30], ['stone', 30]], [], levels); ctx.placed = placed; ctx.buildings = levels;
+  eq(G.crafting.place(ctx, 'tank').ok, true); eq(levels.tank, 1); placed.push({ id: 'tank', x: r1.x, y: r1.y });
+  G.base.setBuildings(base, levels, placed);
+  eq(base.solids.filter(s => s.kind === 'tank').length, 1);
+  eq(P.check(base, r1), 'blocked');                                  // the same place is taken now
+  const r2 = P.rectAt('tank', a.x + 500, a.y + 700);
+  eq(G.crafting.place(ctx, 'tank').ok, true); placed.push({ id: 'tank', x: r2.x, y: r2.y });
+  G.base.setBuildings(base, levels, placed);
+  eq(base.solids.filter(s => s.kind === 'tank').length, 2); eq(levels.tank, 1);
+  const gate = P.rectAt('bed', G.base.layout.gate.x + 40, a.y + 60);
+  eq(P.check(base, gate), 'gate');
+  const inside = P.rectAt('bed', a.x, a.y);                         // clamped inside the fence
+  if (inside.x <= a.x + 12 || inside.y <= a.y + 12) throw new Error('not clamped inside the fence');
+  eq(P.indexAt(placed, 'tank', r1.x + 5, r1.y + 5), 0);
+  eq(G.base.nearStation({ x: r2.x + 20, y: r2.y + 60, radius: 18 }, base), 'tank');
+});
+test('placing: a built structure is saved where it stands, old saves get the old spots, bad entries are dropped', () => {
+  const levels = G.crafting.startBuildings(); levels.campfire = 2; levels.bed = 1;
+  const a = G.base.layout.area;
+  const clean = G.placing.clean([{ id: 'campfire', x: a.x + 100, y: a.y + 300 }, { id: 'nope', x: 1, y: 1 }, { id: 'bed', x: 'x', y: 1 }, { id: 'tank', x: a.x + 100, y: a.y + 400 }], levels);
+  eq(clean.length, 1); eq(clean[0].id, 'campfire');             // the tank is not built (level 0), the rest is junk
+  const legacy = G.placing.clean(undefined, levels);
+  eq(legacy.length, 2); eq(legacy.map(p => p.id).sort().join(), 'bed,campfire');
+});
+test('floor blocks: cost per block, only inside the yard, saved and cleaned', () => {
+  const P = G.placing, a = G.base.layout.area, f = P.createFloor();
+  eq(P.cellAt(a.x - 5, a.y - 5), null);
+  const c = P.cellAt(a.x + 300, a.y + 300), g = P.grid();
+  eq(c.w, P.CELL); eq((c.x - g.x0) % P.CELL, 0);
+  if (P.CELL < 100) throw new Error('floor blocks should be big');
+  if (g.x0 < a.x || g.x0 + g.cols * P.CELL > a.x + a.w) throw new Error('grid sticks out of the yard');
+  const ctx = mkctx([['plank', G.data.floorMaterials.wood.cost.plank]], [], G.crafting.startBuildings());
+  eq(G.crafting.spend(ctx, G.data.floorMaterials.wood.cost), null); f.cells[c.key] = 'wood';
+  eq(G.crafting.spend(ctx, G.data.floorMaterials.wood.cost), 'cost');        // no more planks
+  G.crafting.refund(ctx, G.data.floorMaterials.wood.cost); eq(total(ctx, 'plank'), G.data.floorMaterials.wood.cost.plank);
+  const dirty = P.cleanFloor({ cell: P.CELL, cells: { [c.key]: 'wood', 'x,y': 'wood', '99,99': 'tile', '1,1': 'gold' } });
+  eq(Object.keys(dirty.cells).join(), c.key);
+  eq(Object.keys(P.cleanFloor({ cell: 40, cells: { [c.key]: 'wood' } }).cells).length, 0);        // blocks of the old size are dropped
+  const fl = { cells: { '1,1': 'wood', '2,1': 'wood', '5,5': 'tile' } };
+  eq(P.group(fl, '1,1').sort().join(' '), '1,1 2,1');                                            // the connected floor moves together
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

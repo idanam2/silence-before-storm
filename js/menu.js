@@ -4,7 +4,9 @@
   'use strict';
   var G = root.G;
 
-  var screen = 'main';          // 'main' | 'diff' | 'pause' | 'bye' | null (hidden)
+  var screen = 'main';          // 'main' | 'diff' | 'pause' | 'settings' | 'bye' | null (hidden)
+  var escBack = false;          // this Esc already closed the settings screen (the game must not also unpause)
+  var back = 'main';            // where the settings screen returns to (main menu or pause)
   var picked = null;            // difficulty id chosen on the difficulty screen
   var els = {};
 
@@ -32,15 +34,26 @@
 
   function show(name) {
     screen = name;
-    ['main', 'diff', 'pause', 'bye'].forEach(function (s) { els[s].classList.toggle('on', s === name); });
+    ['main', 'diff', 'pause', 'settings', 'bye'].forEach(function (s) { els[s].classList.toggle('on', s === name); });
     els.layer.classList.toggle('on', !!name);
-    els.layer.classList.toggle('pausing', name === 'pause');
+    els.layer.classList.toggle('pausing', name === 'pause' || (name === 'settings' && back === 'pause'));
+    if (name === 'settings') refreshVols();
     if (name === 'main') refreshMain();
     if (name === 'diff') refreshDiff();
     if (name === 'pause') els.pauseNote.textContent = '';
     var first = name === 'main' ? (els.cont.disabled ? els.newBtn : els.cont) : (name === 'diff' ? els.start : (name === 'pause' ? els.resume : null));
     if (first) root.setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }, 0);
   }
+
+  // Volume sliders: 0..100 % of the default mix for each bus (G.audio.user).
+  var VOLS = ['music', 'amb', 'sfx'];
+  function refreshVols() {
+    VOLS.forEach(function (b) {
+      var v = G.audio ? Math.round(G.audio.user[b] * 100) : 100;
+      els['vol_' + b].value = v; els['voln_' + b].textContent = v + '%';
+    });
+  }
+  function openSettings(from) { back = from; show('settings'); }
 
   function refreshMain() {
     var r = G.save.read();
@@ -79,6 +92,24 @@
       els.start = document.getElementById('mb-start');
       els.resume = document.getElementById('mb-resume');
       els.pauseNote = document.getElementById('pause-note');
+      els.settings = document.getElementById('ms-settings');
+      VOLS.forEach(function (b) {
+        els['vol_' + b] = document.getElementById('vol-' + b);
+        els['voln_' + b] = document.getElementById('vol-' + b + '-n');
+        els['vol_' + b].addEventListener('input', function () {
+          var v = +this.value;
+          els['voln_' + b].textContent = v + '%';
+          if (G.audio) G.audio.setVolume(b, v / 100);
+        });
+        els['vol_' + b].addEventListener('change', function () {   // a short sample so the new level can be heard
+          if (!G.audio) return;
+          G.audio.unlock();
+          if (b === 'sfx') G.audio.play('ui');
+        });
+      });
+      document.getElementById('mb-settings').addEventListener('click', function () { openSettings('main'); });
+      document.getElementById('mb-psettings').addEventListener('click', function () { openSettings('pause'); });
+      document.getElementById('mb-set-back').addEventListener('click', function () { show(back); });
 
       var D = G.data.difficulty, html = '';
       D.order.forEach(function (id) {
@@ -111,6 +142,7 @@
       document.getElementById('mb-bye-back').addEventListener('click', function () { show('main'); });
       root.addEventListener('keydown', function (e) {
         if (e.code === 'Escape' && screen === 'diff') show('main');
+        else if (e.code === 'Escape' && screen === 'settings') { escBack = back === 'pause'; show(back); }
       });
     },
 
@@ -120,6 +152,7 @@
     hide: function () { show(null); },
     isOpen: function () { return !!screen; },
     screen: function () { return screen; },
+    takeEscBack: function () { var v = escBack; escBack = false; return v; },
     pick: pick,
     picked: function () { return picked; },
     summaryText: summaryText

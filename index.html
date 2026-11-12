@@ -18,11 +18,14 @@
     <span><kbd>WASD</kbd>תנועה</span>
     <span><kbd>Shift</kbd>ריצה</span>
     <span><kbd>עכבר</kbd>כיוון</span>
-    <span><kbd>לחיצה</kbd>הנפה</span>
-    <span><kbd>1-5</kbd>מה ביד</span>
+    <span><kbd>לחיצה</kbd>תקיפה / ירי</span>
+    <span><kbd>1-9</kbd>נשק</span>
+    <span><kbd>Q</kbd>נשק הבא</span>
+    <span><kbd>R</kbd>טעינה</span>
     <span><kbd>E</kbd>פעולה · החזקה לאיסוף</span>
     <span><kbd>I</kbd>תיק</span>
     <span><kbd>B</kbd>בנייה</span>
+    <span><kbd>M</kbd>צליל</span>
     <span><kbd>Esc</kbd>תפריט</span>
   </div>
 
@@ -32,6 +35,12 @@
     <span class="label">תיק</span>
     <span class="meter"><i id="bag-hud-fill"></i></span>
     <span id="bag-hud-count" class="num"></span>
+  </div>
+
+  <div id="weapon-hud" class="hud weaponhud">
+    <span class="label">ביד</span>
+    <b id="weapon-name"></b>
+    <span id="weapon-ammo" class="num"></span>
   </div>
 
   <div id="prompt" class="prompt"></div>
@@ -46,6 +55,7 @@
       </section>
       <section id="craft-panel" class="panel wide hidden">
         <header><h2 id="craft-title">שולחן עבודה</h2><span id="craft-level" class="cap"></span></header>
+        <div id="craft-tabs" class="tabs"></div>
         <div id="craft-list" class="rows"></div>
       </section>
       <section id="build-panel" class="panel wide hidden">
@@ -77,6 +87,7 @@
       <div class="mbtns">
         <button id="mb-continue" class="mbtn">המשך<small id="mb-continue-sub"></small></button>
         <button id="mb-new" class="mbtn">משחק חדש</button>
+        <button id="mb-settings" class="mbtn">הגדרות</button>
         <button id="mb-exit" class="mbtn quiet">יציאה</button>
       </div>
       <p id="mm-note" class="mnote"></p>
@@ -97,9 +108,21 @@
       <div class="mbtns">
         <button id="mb-resume" class="mbtn">חזרה למשחק</button>
         <button id="mb-save" class="mbtn">שמירה עכשיו</button>
+        <button id="mb-psettings" class="mbtn">הגדרות</button>
         <button id="mb-tomenu" class="mbtn quiet">לתפריט הראשי</button>
       </div>
       <p id="pause-note" class="mnote"></p>
+    </section>
+
+    <section id="ms-settings" class="mscreen">
+      <h2 class="mhead">הגדרות צליל</h2>
+      <div class="vols">
+        <label class="vol"><span>מוזיקת רקע</span><input type="range" id="vol-music" min="0" max="100" step="5"><b id="vol-music-n" class="num"></b></label>
+        <label class="vol"><span>אווירה (רוח, ציפורים, גלים)</span><input type="range" id="vol-amb" min="0" max="100" step="5"><b id="vol-amb-n" class="num"></b></label>
+        <label class="vol"><span>צלילי פעולות (צעדים, מכות, ירי)</span><input type="range" id="vol-sfx" min="0" max="100" step="5"><b id="vol-sfx-n" class="num"></b></label>
+      </div>
+      <p class="mnote">M במשחק משתיק את הכול.</p>
+      <div class="mbtns"><button id="mb-set-back" class="mbtn quiet">חזרה</button></div>
     </section>
 
     <section id="ms-bye" class="mscreen">
@@ -114,12 +137,20 @@
   <script src="data/items.js"></script>
   <script src="data/resources.js"></script>
   <script src="data/areas.js"></script>
+  <script src="data/places/port.js"></script>
+  <script src="data/places/town.js"></script>
+  <script src="data/places/hospmil.js"></script>
+  <script src="data/places/airport.js"></script>
+  <script src="data/places/rural.js"></script>
+  <script src="data/places/forest.js"></script>
   <script src="data/interiors.js"></script>
   <script src="data/recipes.js"></script>
   <script src="data/buildings.js"></script>
   <script src="data/difficulty.js"></script>
   <script src="data/needs.js"></script>
   <script src="data/world.js"></script>
+  <script src="data/weapons.js"></script>
+  <script src="data/enemies.js"></script>
   <script src="js/input.js"></script>
   <script src="js/inventory.js"></script>
   <script src="js/crafting.js"></script>
@@ -129,14 +160,33 @@
   <script src="js/save.js"></script>
   <script src="js/player.js"></script>
   <script src="js/base.js"></script>
+  <script src="js/placing.js"></script>
   <script src="js/area.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/enemies.js"></script>
+  <script src="data/loot.js"></script>
+  <script src="js/loot.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/forestart.js"></script>
   <script src="js/placeart.js"></script>
+  <script src="js/art/port.js"></script>
+  <script src="js/art/town.js"></script>
+  <script src="js/art/hospmil.js"></script>
+  <script src="js/art/airport.js"></script>
+  <script src="js/art/rural.js"></script>
+  <script src="js/art/forest.js"></script>
+  <script src="js/art/interior.js"></script>
   <script src="js/mapart.js"></script>
   <script src="js/baseart.js"></script>
+  <script src="js/feel.js"></script>
+  <script src="js/combatart.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/sfx.js"></script>
+  <script src="js/ambience.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/menu.js"></script>
+  <script src="data/defense.js"></script>
+  <script src="js/defense.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

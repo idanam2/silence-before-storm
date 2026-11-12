@@ -42,6 +42,9 @@
     isExhausted: function (n) { return n.energy < D().exhausted.below; },
     speedMult: function (n) { return needs.isExhausted(n) ? D().exhausted.speed : 1; },
     gatherMult: function (n) { return needs.isExhausted(n) ? D().exhausted.gather : 1; },
+    attackMult: function (n) { return needs.isExhausted(n) ? D().exhausted.attack : 1; },
+    // Energy spent on a swing or a shot (scaled by the difficulty, never below 0).
+    spend: function (n, amount, diff) { n.energy = clamp(n.energy - amount * (diff ? diff.energy : 1)); },
     canRun: function (n) { return !needs.isExhausted(n); },
     isLow: function (n, key) { return n[key] < D().low; },
 

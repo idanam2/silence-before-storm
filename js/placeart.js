@@ -962,6 +962,7 @@
     sofa: '#4c3a34', safe: '#2e3230', podium: '#4a3e30', rail: '#5d625e'
   };
   function drawFurn(ctx, s, c) {
+    if (EXT.furn[s.style]) return EXT.furn[s.style](ctx, s, c, HELP);            // furniture styles added by js/art/*.js
     var col = FURN[s.style] || '#4a4a44', st = s.style, i, n;
     if (st === 'bunk') {                                                                              // bed frame, mattress, a second bunk above on tall ones
       var bb = box(ctx, s, 0, Math.min(s.k, 0.03), c, '#3e4240', '#5f5a4c');
@@ -1405,19 +1406,25 @@
 
   // Structures whose base is south of the player are drawn after the player; ships, boats and cranes have
   // fixed layers (water below everything, cranes above everything). Tall things over the player fade.
-  function drawStructures(ctx, area, st, vr, time, py, front) {
+  // Range mode (lo/hi given): draws the structures whose base is in (lo, hi], so the game can interleave them
+  // with every figure (the player and the infected) by depth. `realPy` is the player's depth for the see-through fade.
+  function drawStructures(ctx, area, st, vr, time, py, front, lo, hi, realPy) {
     var T = prepare(area), c = { x: (vr.x0 + vr.x1) / 2, y: (vr.y0 + vr.y1) / 2 + VIEW.tilt / VIEW.persp };
     var px = st.player ? st.player.x : 0, dt = T.last === undefined ? 0 : Math.max(0, Math.min(0.1, time - T.last));
+    var ranged = lo !== undefined, ply = realPy === undefined ? py : realPy;
     if (front) T.last = time;
     for (var i = 0; i < T.order.length; i++) {
-      var s = T.order[i], wet = s.kind === 'ship' || s.kind === 'boat';
-      var isFront = s.kind === 'crane' ? true : (wet ? false : s.y + s.h > py);
-      if (isFront !== front) continue;
+      var s = T.order[i], wet = s.kind === 'ship' || s.kind === 'boat', base = s.y + s.h;
+      if (ranged) { if (wet || s.kind === 'crane' || base <= lo || base > hi) continue; }
+      else {
+        var isFront = s.kind === 'crane' ? true : (wet ? false : base > py);
+        if (isFront !== front) continue;
+      }
       var reach = s.k * 900 + 40;
       if (s.x + s.w < vr.x0 - reach || s.x > vr.x1 + reach || s.y + s.h < vr.y0 - 60 || s.y - (s.boom || 0) > vr.y1 + reach) continue;
-      var a = 1;
-      if (front && s.k > 0.09) {                                                                     // see-through when it hides the player
-        var hide = px > s.x - 40 && px < s.x + s.w + 40 && py < s.y + s.h + (s.kind === 'crane' ? 40 : 0) && py > s.y - s.k * 700 - (s.boom || 0);
+      var a = 1, covers = ranged ? base > ply : front;
+      if (covers && s.k > 0.09) {                                                                    // see-through when it hides the player
+        var hide = px > s.x - 40 && px < s.x + s.w + 40 && ply < s.y + s.h + (s.kind === 'crane' ? 40 : 0) && ply > s.y - s.k * 700 - (s.boom || 0);
         var f = T.fade[i] === undefined ? 1 : T.fade[i], want = hide ? (s.kind === 'crane' ? 0.45 : 0.4) : 1;
         f += (want - f) * (1 - Math.exp(-7 * dt));
         T.fade[i] = f; a = f;
@@ -1451,9 +1458,19 @@
       else if (s.kind === 'vending') drawVending(ctx, s, c);
       else if (s.kind === 'bars') drawBars(ctx, s, c);
       else if (s.kind === 'stairs') drawStairs(ctx, s, c);
+      else if (EXT.kinds[s.kind]) EXT.kinds[s.kind](ctx, s, c, time, HELP);     // kinds added by js/art/*.js
     }
     ctx.globalAlpha = 1;
+    if (front && EXT.overlays[area.id]) EXT.overlays[area.id].forEach(function (fn) { fn(ctx, area, vr, time, HELP); });
   }
+
+  var EXT = { kinds: {}, furn: {}, sprites: [], overlays: {}, ready: false };
+  // shared drawing helpers for extensions
+  var HELP = {
+    lift: lift, mix: mix, poly: poly, line: line, tone: tone, hash: hash, prism: prism, box: box, rectPts: rectPts, onFace: onFace,
+    cone: function () { return cone.apply(null, arguments); }, cylinder: function () { return drawCylinder.apply(null, arguments); },
+    gable: function () { return gable.apply(null, arguments); }, faceLight: faceLight, kit: function () { return K; }, TAU: TAU
+  };
 
   G.placeArt = {
     init: function (ctx, dpr) {
@@ -1461,7 +1478,18 @@
       mainCtx = ctx;
       K = G.forestArt.kit();
       buildSprites();
+      EXT.sprites.forEach(function (sp) { K.SP[sp.name] = variants(sp.n, sp.seed, function (r, i) { return K.mk(sp.w, sp.h, function (g) { sp.draw(g, r, i, HELP); }); }); });
+      EXT.ready = true;
     },
+    // Extension points for js/art/*.js (one file per place / theme, so parallel work never touches this file):
+    //   register(kind, fn(ctx, s, c, time, H))  draws a new structure kind; furn(style, fn(ctx, s, c, H)) a new furniture style;
+    //   sprite(name, n, seed, w, h, draw(g, rand, i, H)) a sprite list for a new resource type (K.SP[name]);
+    //   overlay(areaId, fn(ctx, area, vr, time, H)) extra drawing after the front structures (ambient effects, no flashing).
+    register: function (kind, fn) { EXT.kinds[kind] = fn; },
+    furn: function (style, fn) { EXT.furn[style] = fn; },
+    sprite: function (name, n, seed, w, h, draw) { EXT.sprites.push({ name: name, n: n, seed: seed, w: w, h: h, draw: draw }); },
+    overlay: function (areaId, fn) { (EXT.overlays[areaId] = EXT.overlays[areaId] || []).push(fn); },
+    helpers: function () { return HELP; },
     has: function (area) { return !!(area && ((area.structures && area.structures.length) || (area.water && area.water.length))); },
     ground: function (kind) {
       if (!grounds[kind]) grounds[kind] = kind === 'tiles' ? buildTiles(mainCtx) : buildConcrete(mainCtx, kind);

@@ -6,14 +6,14 @@
 
   var T = 12; // fence thickness
   var layout = {
-    area:  { x: 1200, y: 740, w: 800, h: 520 },   // fenced yard
+    area:  { x: 800, y: 480, w: 1600, h: 1040 },   // fenced yard (4x the first version, same centre)
     gate:  { x: 1560, w: 90 },                     // gap in the north fence (leads to the forest)
     cabin: { x: 1250, y: 780, w: 230, h: 130 },
-    chest: { x: 1770, y: 790, w: 52, h: 36 },
+    chest: { x: 1770, y: 790, w: 52, h: 36 },       // the storage chest (the player can move it: setChest)
     woodpile: { x: 1486, y: 800, w: 34, h: 82 },    // stacked against the cabin's east wall
     spawn: { x: 1600, y: 1060 },
-    trail: { x: 1605, y: 610, r: 74 },             // trailhead north of the gate: travel to the forest
-    arrive: { x: 1605, y: 668 },                   // where the player stands when coming back
+    trail: { x: 1605, y: 350, r: 74 },             // trailhead north of the gate: travel to the forest
+    arrive: { x: 1605, y: 408 },                   // where the player stands when coming back
     interactRange: 36,                             // extra reach beyond the chest edge
     trees: { seed: 8121, count: 78, gap: 128, clear: 135, trunk: 22, borderStep: 84, borderDepth: 80 }
   };
@@ -74,14 +74,17 @@
   }
 
   // Applies the built structures ({ id: level }) to the base: built ones become solid rects.
-  function setBuildings(b, levels) {
-    var defs = G.data.buildings, s = b.fixed.slice();
+  // `placed` = [{ id, x, y }] copies put down by the player (js/placing.js); without it every built structure sits on its old fixed spot.
+  function setBuildings(b, levels, placed) {
+    var defs = G.data.buildings, s = b.fixed.filter(function (r) { return r.kind !== 'chest'; });
+    s.push(rect(layout.chest.x, layout.chest.y, layout.chest.w, layout.chest.h, 'chest'));
     b.levels = levels;
-    for (var id in defs) {
-      var spot = defs[id].spot;
-      if (!spot || !(levels[id] > 0)) continue;
-      var r = rect(spot.x, spot.y, spot.w, spot.h, id);
-      r.level = levels[id];
+    placed = placed || G.placing.legacy(levels);
+    for (var i = 0; i < placed.length; i++) {
+      var p = placed[i], d = defs[p.id];
+      if (!d || !d.spot || !(levels[p.id] > 0)) continue;
+      var r = rect(p.x, p.y, d.spot.w, d.spot.h, p.id);
+      r.level = levels[p.id];
       s.push(r);
     }
     b.solids = s;
@@ -136,12 +139,14 @@
   // Id of the closest usable structure within reach ('chest' | 'workbench' | 'campfire' | 'bed' | 'tank'), or null.
   function nearStation(p, b) {
     var defs = G.data.buildings, best = null, bestD = Infinity, reach = p.radius + layout.interactRange;
-    for (var id in defs) {
-      if (!defs[id].station && !defs[id].use) continue;
-      var r = stationRect(b, id);
-      if (!r) continue;
-      var c = closest(r, p.x, p.y), dx = p.x - c.x, dy = p.y - c.y, d2 = dx * dx + dy * dy;
-      if (d2 <= reach * reach && d2 < bestD) { best = id; bestD = d2; }
+    var rs = [{ id: 'chest', r: layout.chest }], i;
+    for (i = 0; i < b.solids.length; i++) {
+      var k = b.solids[i].kind, d = defs[k];
+      if (d && d.spot && (d.station || d.use)) rs.push({ id: k, r: b.solids[i] });
+    }
+    for (i = 0; i < rs.length; i++) {
+      var c = closest(rs[i].r, p.x, p.y), dx = p.x - c.x, dy = p.y - c.y, d2 = dx * dx + dy * dy;
+      if (d2 <= reach * reach && d2 < bestD) { best = rs[i].id; bestD = d2; }
     }
     return best;
   }
@@ -151,7 +156,16 @@
     return dx * dx + dy * dy <= layout.trail.r * layout.trail.r;
   }
 
+  var CHEST0 = { x: layout.chest.x, y: layout.chest.y };
+  // Moves the chest (null = back to its first place). Call applyBuildings afterwards so the collision follows.
+  function setChest(at) {
+    var a = layout.area, t = 20, x = at ? at.x : CHEST0.x, y = at ? at.y : CHEST0.y;
+    layout.chest.x = Math.max(a.x + t, Math.min(x, a.x + a.w - t - layout.chest.w));
+    layout.chest.y = Math.max(a.y + t, Math.min(y, a.y + a.h - t - layout.chest.h));
+  }
+
   G.base = {
+    setChest: setChest,
     layout: layout, build: build, setBuildings: setBuildings, collide: collide,
     nearChest: nearChest, nearStation: nearStation, nearTrail: nearTrail
   };

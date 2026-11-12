@@ -11,44 +11,85 @@
   var G = root.G;
   G.data = G.data || {};
 
-  G.data.buildingOrder = ['workbench', 'campfire', 'bed', 'tank', 'chest', 'fence'];
+  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'bed', 'tank', 'bag', 'chest', 'fence'];
+
+  // Fence materials the player chooses between (state: G.state.fence.material). `swap` replaces cost items: the fence
+  // levels are priced in planks and stone; stone fences use stone instead of planks, metal fences metal (half as much, rounded up).
+  // `hp` is the strength factor for the defense (js/defense.js). Colours and look: js/baseart.js (drawFence).
+  G.data.fenceMaterials = {
+    wood:  { name: 'עץ',   swap: {}, hp: 1 },
+    stone: { name: 'אבן',  swap: { plank: 'stone' }, hp: 1.5 },
+    metal: { name: 'מתכת', swap: { plank: 'metal', stone: 'metal' }, half: true, hp: 2.2 }
+  };
+  G.data.fenceMaterialOrder = ['wood', 'stone', 'metal'];
+
+  // Floor blocks the player lays one by one (B menu, "רצפה"): the material and what one big block (G.placing.CELL px, about a room tile) costs.
+  G.data.floorMaterials = {
+    wood:  { name: 'קרשים',        cost: { plank: 3 } },
+    stone: { name: 'אבן',          cost: { stone: 5 } },
+    tile:  { name: 'אריחים',       cost: { stone: 4, plank: 2 } }
+  };
+  G.data.floorMaterialOrder = ['wood', 'stone', 'tile'];
 
   G.data.buildings = {
+    // The backpack: not a place in the yard, only a size. levels[].bagSlots = slots in the bag (see G.crafting.bagSlots).
+    // Levels may be more than 2 (cost: cloth + planks + nails: cloth and metal come from the places beyond the forest).
+    bag: {
+      name: 'תיק', start: 1, station: false, spot: null,
+      desc: 'תיק גדול יותר: 12 משבצות, ואז 18, 24 ו-32. כל משבצת מחזיקה עד 50 מאותו סוג.',
+      levels: [
+        { cost: {}, bagSlots: 12 },
+        { cost: { cloth: 4, wood: 6 }, bagSlots: 18 },
+        { cost: { cloth: 8, plank: 6, nails: 6 }, bagSlots: 24 },
+        { cost: { cloth: 12, plank: 10, nails: 10 }, bagSlots: 32 }
+      ]
+    },
     workbench: {
       name: 'שולחן עבודה', start: 0, station: true, spot: { x: 1690, y: 905, w: 92, h: 46 },
-      desc: 'יצירת כלים וחומרים. רמה 2 פותחת מתכונים נוספים.',
-      levels: [{ cost: { wood: 6, stone: 4 } }, { cost: { wood: 8, stone: 8, plank: 4 } }]
+      desc: 'יצירת כלים וחומרים. רמה 2: נשקים, תחמושת, ערכת עזרה ראשונה ולפיד. רמה 3: מסור וקידוח משופרים (קרשים ומסמרים בכמות), פנס וארגז.',
+      levels: [{ cost: { wood: 6, stone: 4 } }, { cost: { wood: 8, stone: 8, plank: 4 } }, { cost: { wood: 14, stone: 12, plank: 10 } },
+        { cost: { plank: 14, stone: 10, nails: 12, metal: 6 } }]
+    },
+    // The drying rack (levels may be more than 2). Recipes with station 'rack' are in data/recipes.js.
+    rack: {
+      name: 'מתלה ייבוש', start: 0, station: true, spot: { x: 1390, y: 1150, w: 112, h: 30 },
+      desc: 'מייבשים פטריות ואוכל כדי שיחזיקו יותר ויהיו בטוחים לאכילה. רמה 2: מנות שדה מזינות.',
+      levels: [{ cost: { wood: 5, stone: 2 } }, { cost: { wood: 6, plank: 4, stone: 4 } }, { cost: { plank: 8, stone: 8 } }, { cost: { plank: 10, nails: 10, cloth: 4 } }]
     },
     campfire: {
       name: 'מדורה', start: 0, station: true, spot: { x: 1290, y: 1040, w: 56, h: 56 },
       desc: 'בישול אוכל וטיהור מים. רמה 2 מוסיפה סיר ומרק.',
-      levels: [{ cost: { wood: 4, stone: 6 } }, { cost: { stone: 10, plank: 2 } }]
+      levels: [{ cost: { wood: 4, stone: 6 } }, { cost: { stone: 10, plank: 2 } }, { cost: { stone: 14, plank: 6 } }, { cost: { stone: 16, plank: 8, metal: 4 } }]
     },
     bed: {
       name: 'מיטה', start: 0, station: false, use: 'sleep', spot: { x: 1780, y: 1090, w: 56, h: 98 },
-      desc: 'שינה (E): האנרגיה מתמלאת, אבל רעב וצמא עולים קצת. רמה 2 מרפאת יותר.',
+      desc: 'שינה (E): האנרגיה מתמלאת, אבל רעב וצמא עולים קצת. כל רמה מרפאת יותר.',
       levels: [
         { cost: { wood: 6, plank: 4 }, sleep: { energy: 100, health: 10, hunger: 12, thirst: 16 } },
-        { cost: { plank: 8, stone: 4 }, sleep: { energy: 100, health: 35, hunger: 10, thirst: 13 } }
+        { cost: { plank: 8, stone: 4 }, sleep: { energy: 100, health: 35, hunger: 10, thirst: 13 } },
+        { cost: { plank: 10, stone: 6, }, sleep: { energy: 100, health: 60, hunger: 9, thirst: 11 } },
+        { cost: { plank: 12, cloth: 8, nails: 8 }, sleep: { energy: 100, health: 100, hunger: 8, thirst: 10 } }
       ]
     },
     tank: {
       name: 'מיכל מי גשם', start: 0, station: false, use: 'tank', spot: { x: 1880, y: 900, w: 56, h: 56 },
-      desc: 'אוסף מי גשם נקיים לאורך זמן (E לאיסוף). רמה 2: מכיל יותר ומתמלא מהר יותר.',
+      desc: 'אוסף מי גשם נקיים לאורך זמן (E לאיסוף). כל רמה מכילה יותר ומתמלאת מהר יותר.',
       levels: [
         { cost: { wood: 6, plank: 4, stone: 3 }, tank: { cap: 3, secs: 150 } },
-        { cost: { plank: 6, stone: 8 }, tank: { cap: 6, secs: 80 } }
+        { cost: { plank: 6, stone: 8 }, tank: { cap: 6, secs: 80 } },
+        { cost: { plank: 8, stone: 12 }, tank: { cap: 10, secs: 55 } },
+        { cost: { plank: 10, stone: 14, metal: 6, nails: 6 }, tank: { cap: 16, secs: 35 } }
       ]
     },
     chest: {
       name: 'מחסן', start: 1, station: true, spot: null,
-      desc: 'רמה 2 מגדילה את המחסן מ-24 ל-36 משבצות.',
-      levels: [{ cost: {}, chestSlots: 24 }, { cost: { wood: 10, plank: 6 }, chestSlots: 36 }]
+      desc: 'מגדילים את המחסן: 24, 36, 48 ובסוף 60 משבצות.',
+      levels: [{ cost: {}, chestSlots: 24 }, { cost: { wood: 10, plank: 6 }, chestSlots: 36 }, { cost: { wood: 14, plank: 10 }, chestSlots: 48 }, { cost: { plank: 14, nails: 10, metal: 4 }, chestSlots: 60 }]
     },
     fence: {
       name: 'גדר', start: 1, station: false, spot: null,
-      desc: 'גדר גבוהה וחזקה יותר (ההגנה עצמה מגיעה עם הקרב).',
-      levels: [{ cost: {} }, { cost: { plank: 10, stone: 10 } }]
+      desc: 'גדר גבוהה וחזקה יותר, עד שלוש רמות שדרוג. אפשר לבחור ממה היא בנויה (עץ, אבן, מתכת).',
+      levels: [{ cost: {} }, { cost: { plank: 10, stone: 10 } }, { cost: { plank: 14, stone: 16 } }, { cost: { plank: 16, stone: 20, nails: 14, metal: 8 } }]
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

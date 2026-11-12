@@ -712,10 +712,12 @@
 
   // Trunks are sorted against the player: those rooted north of the feet (`front` false) go under the player,
   // the rest over. Crowns always come later, so the order between trees never changes while walking.
-  function drawTreeTrunks(ctx, nodes, vr, py, front) {
+  // front=true/false: the trunks south / north of py. With lo/hi: the trunks whose roots are in (lo, hi] (depth-sorted drawing).
+  function drawTreeTrunks(ctx, nodes, vr, py, front, lo, hi) {
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
-      if (!n.canopy || (n.y > py) !== front || !seen(vr, n.x, n.y, n.canopy * 1.5 + 80)) continue;
+      if (!n.canopy || !seen(vr, n.x, n.y, n.canopy * 1.5 + 80)) continue;
+      if (lo !== undefined ? (n.y <= lo || n.y > hi) : (n.y > py) !== front) continue;
       var a = n.fade, o = treeLean(n, vr);
       if (n.dead) {
         var f = n.deadT / 0.55;
@@ -768,7 +770,7 @@
   function nodeAlpha(n) { return n.dead ? Math.max(0, 1 - n.deadT / 0.3) : 1; }
 
   // Ground, water, decor, resources. Drawn before the player.
-  function drawBelow(ctx, area, st, vr, time, py) {
+  function drawBelow(ctx, area, st, vr, time, py, sorted) {
     var T = prepare(area), i, n, a, PA = G.placeArt && G.placeArt.has(area) ? G.placeArt : null;
     ctx.fillStyle = PA && area.theme.ground ? PA.ground(area.theme.ground) : groundPattern;
     ctx.fillRect(vr.x0, vr.y0, vr.x1 - vr.x0, vr.y1 - vr.y0);
@@ -812,20 +814,28 @@
       if (a <= 0) continue;
       ctx.globalAlpha = a;
       var list = SP[n.type];
+      if (!list || !list.length) continue;                 // a resource without a sprite is skipped, never a crash
       blit(ctx, list[n.variant % list.length], n.x + ox, n.y, n.type === 'boulder' ? n.scale : 1);
     }
     ctx.globalAlpha = 1;
-    if (PA) PA.drawStructures(ctx, area, st, vr, time, py, false);
-    drawTreeTrunks(ctx, area.nodes, vr, py, false);
+    if (PA) PA.drawStructures(ctx, area, st, vr, time, sorted ? -Infinity : py, false);   // sorted: only the ships and boats on the water
+    if (!sorted) drawTreeTrunks(ctx, area.nodes, vr, py, false);
+  }
+
+  // Depth-sorted mode (sorted=true): drawBelow / drawAbove leave out the trunks and structures that stand on the ground,
+  // and the game draws them between the figures with drawRange, so something behind a building is hidden by it.
+  function drawRange(ctx, area, st, vr, time, lo, hi, py) {
+    drawTreeTrunks(ctx, area.nodes, vr, py, false, lo, hi);
+    if (G.placeArt && G.placeArt.has(area)) G.placeArt.drawStructures(ctx, area, st, vr, time, py, false, lo, hi, py);
   }
 
   // Tree crowns, drifting spores, mist, target ring. Drawn after the player.
-  function drawAbove(ctx, area, st, vr, time, py) {
+  function drawAbove(ctx, area, st, vr, time, py, sorted) {
     var T = prepare(area), i, n;
     var g = st.gather, shake = 0;
     if (g && g.node && g.t > 0) shake = Math.exp(-((g.t % G.area.HIT) / G.area.HIT) * 5) * 3;
-    drawTreeTrunks(ctx, area.nodes, vr, py, true);
-    if (G.placeArt && G.placeArt.has(area)) G.placeArt.drawStructures(ctx, area, st, vr, time, py, true);
+    if (!sorted) drawTreeTrunks(ctx, area.nodes, vr, py, true);
+    if (G.placeArt && G.placeArt.has(area)) G.placeArt.drawStructures(ctx, area, st, vr, time, sorted ? Infinity : py, true, undefined, undefined, py);
     drawTreeTops(ctx, area.nodes, vr, time, g ? g.node : null, shake);
 
     for (i = 0; i < T.spores.length; i++) {               // drifting spores / dust in the air
@@ -870,7 +880,10 @@
     spore: ['#b5a88e', '#8a6a4e', '#d0c6aa'],
     water: ['#9fc4c0', '#6f9a98', '#c8e0dc'],
     metal: ['#7d8582', '#5a4a3c', '#a4aaa6'],
-    cloth: ['#6e6a5c', '#4f5a5c', '#8a8470']
+    cloth: ['#6e6a5c', '#4f5a5c', '#8a8470'],
+    blood: ['#5a2a24', '#3e1c18', '#6e3630', '#33402c'],          // the infected: dark blood with a green-grey tinge
+    spark: ['#f0e2a8', '#e0c66e', '#fff4cc'],                      // a bullet hitting a wall or a trunk
+    smoke: ['#8a8c88', '#6e706c', '#a4a6a0']                       // muzzle smoke
   };
   function spawnFx(list, kind, x, y, count, rand) {
     var cols = FX[kind] || FX.wood;
@@ -906,7 +919,7 @@
         ctx.strokeText(txt, f.x + 14, y); ctx.fillText(txt, f.x + 14, y);
       } else {
         ctx.direction = 'rtl';
-        ctx.fillStyle = '#d2a878';
+        ctx.fillStyle = f.color || '#d2a878';
         ctx.strokeText(f.text, f.x, y); ctx.fillText(f.text, f.x, y);
       }
     }
@@ -926,6 +939,7 @@
     },
     drawBelow: drawBelow,
     drawAbove: drawAbove,
+    drawRange: drawRange,
     drawExit: drawExit,
     spawnFx: spawnFx,
     drawParticles: drawParticles,

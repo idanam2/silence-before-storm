@@ -5,7 +5,7 @@
 
   var input = {
     keys: {},
-    mouse: { x: 0, y: 0, inside: false, down: false, clicked: false },
+    mouse: { x: 0, y: 0, inside: false, down: false, clicked: false, rdown: false, rclicked: false },
     pressed: {},          // keys pressed since last consumeFrame()
 
     keyDown: function (code) {
@@ -16,11 +16,11 @@
     clear: function () {   // on window blur, so keys never get "stuck"
       input.keys = {};
       input.pressed = {};
-      input.mouse.down = false;
+      input.mouse.down = false; input.mouse.rdown = false;
     },
     isDown: function (code) { return !!input.keys[code]; },
     wasPressed: function (code) { return !!input.pressed[code]; },
-    consumeFrame: function () { input.pressed = {}; input.mouse.clicked = false; },
+    consumeFrame: function () { input.pressed = {}; input.mouse.clicked = false; input.mouse.rclicked = false; },
 
     // Movement intent in screen axes: x right, y down. Not normalized here.
     getMove: function () {
@@ -31,7 +31,7 @@
     },
 
     attach: function (canvas) {
-      var gameKeys = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, KeyE: 1, KeyI: 1, KeyB: 1, Tab: 1, Escape: 1, Space: 1,
+      var gameKeys = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, KeyE: 1, KeyI: 1, KeyB: 1, KeyT: 1, Tab: 1, Escape: 1, Space: 1,
         ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1 };
       root.addEventListener('keydown', function (e) {
         if (gameKeys[e.code]) e.preventDefault(); // no page scroll
@@ -48,8 +48,9 @@
       canvas.addEventListener('mouseleave', function () { input.mouse.inside = false; });
       canvas.addEventListener('mousedown', function (e) {
         if (e.button === 0) { input.mouse.down = true; input.mouse.clicked = true; }
+        if (e.button === 2) { input.mouse.rdown = true; input.mouse.rclicked = true; }
       });
-      root.addEventListener('mouseup', function (e) { if (e.button === 0) input.mouse.down = false; });
+      root.addEventListener('mouseup', function (e) { if (e.button === 0) input.mouse.down = false; if (e.button === 2) input.mouse.rdown = false; });
       canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     }
   };

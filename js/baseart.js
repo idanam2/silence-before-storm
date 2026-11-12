@@ -51,9 +51,18 @@
   var WOOD2 = { n: '#474b41', w: '#444839', s: '#272a21', e: '#1f221a', top: '#575c4d' };   // reinforced fence
   var POST2 = { n: '#50554a', w: '#4d5146', s: '#2d3027', e: '#25281f', top: '#6a7064' };
 
+  // Fence palettes by material (wood keeps the original look; the reinforced wood palette is used from level 2).
+  var FENCE_PAL = {
+    stone: { w: { n: '#5b5e58', w: '#585b55', s: '#34362f', e: '#2b2d27', top: '#6e716a' }, p: { n: '#666963', w: '#63665f', s: '#3b3d36', e: '#31332d', top: '#7b7e77' } },
+    metal: { w: { n: '#4a5764', w: '#475461', s: '#262e37', e: '#1e252d', top: '#60707f' }, p: { n: '#566471', w: '#53616e', s: '#2d353e', e: '#252c34', top: '#74858f' } }
+  };
+  var FENCE_H = [0, 1, 1.55, 1.85, 2.15];       // fence height factor by level (1 = the first low fence)
+
   function drawFence(ctx, r, c, gate, lvl) {
     var horiz = r.w >= r.h, len = horiz ? r.w : r.h, o, up = lvl >= 2;
-    var bx = box(ctx, r, 0, up ? H.fence * 1.55 : H.fence, c, up ? WOOD2 : WOOD, up ? 3 : 2);
+    var fm = G.state && G.state.fence && FENCE_PAL[G.state.fence.material];
+    var wal = fm ? fm.w : (up ? WOOD2 : WOOD), pst = fm ? fm.p : (up ? POST2 : POST), hk = FENCE_H[Math.min(4, Math.max(1, lvl))];
+    var bx = box(ctx, r, 0, H.fence * hk, c, wal, up ? 3 : 2);
     ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1;                 // plank gaps on the top face
     for (o = 16; o < len; o += 16) {
       var u = o / len;
@@ -68,7 +77,7 @@
       var pr = horiz ? { x: r.x + off, y: r.y - 3, w: 10, h: r.h + 6 } : { x: r.x - 3, y: r.y + off, w: r.w + 6, h: 10 };
       var isGate = gate && horiz && (Math.abs(pr.x - gate.x) < 14 || Math.abs(pr.x + pr.w - gate.x - gate.w) < 14 || Math.abs(pr.x + pr.w - gate.x) < 14 || Math.abs(pr.x - gate.x - gate.w) < 14);
       var ph = isGate || tall ? H.gatePost : H.post;
-      var pb = box(ctx, pr, 0, up ? ph * 1.4 : ph, c, up ? POST2 : POST);
+      var pb = box(ctx, pr, 0, ph * (1 + (hk - 1) * 0.7), c, pst);
       ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; poly(ctx, pb.t, up ? '#737a74' : null, 'rgba(0,0,0,0.45)');   // iron cap
     }
   }
@@ -220,6 +229,43 @@
     }
     if (near) { ctx.strokeStyle = 'rgba(170,185,150,0.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(cx, cy, R + 8, R + 7, 0, 0, TAU); ctx.stroke(); }
     return { x: fb[0], y: fb[1] - 30 };
+  }
+
+  // Drying rack: four posts, a top pole with strings of drying mushrooms; level 2 adds a lower bar with
+  // hanging wrapped rations and a small cloth canopy over the north half.
+  function drawRack(ctx, r, c, near, lvl, time) {
+    var up = lvl >= 2, ym = r.y + r.h / 2, i, top = up ? 0.084 : 0.07, PO = up ? POST2 : POST;
+    [[r.x + 1, r.y + 1], [r.x + r.w - 8, r.y + 1]].forEach(function (p) { box(ctx, { x: p[0], y: p[1], w: 7, h: 7 }, 0, top, c, PO); });
+    var pole = box(ctx, { x: r.x + 1, y: ym - 2, w: r.w - 2, h: 4 }, top - 0.01, top, c, { n: '#5a4c36', w: '#54472f', s: '#35291c', e: '#2c2218', top: '#6e5e44' });
+    if (up) box(ctx, { x: r.x + 1, y: ym - 2, w: r.w - 2, h: 4 }, 0.046, 0.054, c, { n: '#52472f', w: '#4c4230', s: '#30281b', e: '#282017', top: '#665a40' });
+    function hang(x, k0, len, kind, sway) {                                 // a string from height k0 down by len, ending in a dried piece
+      var a = lift(x, ym, k0, c), b = lift(x + sway, ym, k0 - len, c);
+      ctx.strokeStyle = '#8a7a58'; ctx.lineWidth = 1.2; line(ctx, a, b);
+      if (kind === 'ration') {                                              // wrapped pack
+        ctx.fillStyle = '#6e5e3c'; ctx.fillRect(b[0] - 4, b[1], 8, 9);
+        ctx.fillStyle = '#c8bca0'; ctx.fillRect(b[0] - 2.5, b[1] + 3, 5, 4);
+        ctx.strokeStyle = 'rgba(20,14,8,0.7)'; ctx.lineWidth = 1; ctx.strokeRect(b[0] - 4, b[1], 8, 9);
+      } else {                                                              // a small dried cap
+        ctx.fillStyle = '#9a8460';
+        ctx.beginPath(); ctx.moveTo(b[0] - 5, b[1] + 5); ctx.quadraticCurveTo(b[0], b[1] - 3, b[0] + 5, b[1] + 5); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(30,22,12,0.7)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = '#6a5a40'; ctx.fillRect(b[0] - 0.8, b[1] + 5, 1.6, 3);
+      }
+    }
+    var n = 8;
+    for (i = 0; i < n; i++) {
+      var x = r.x + 12 + i * (r.w - 24) / (n - 1), sw = Math.sin(time * 1.1 + i * 1.7) * 0.8;
+      hang(x, top - 0.006, 0.02 + (i % 3) * 0.006, 'cap', sw);
+    }
+    if (up) for (i = 0; i < 5; i++) hang(r.x + 18 + i * (r.w - 36) / 4, 0.05, 0.022 + (i % 2) * 0.006, 'ration', Math.sin(time * 0.9 + i * 2.3) * 0.7);
+    [[r.x + 1, r.y + r.h - 8], [r.x + r.w - 8, r.y + r.h - 8]].forEach(function (p) { box(ctx, { x: p[0], y: p[1], w: 7, h: 7 }, 0, top, c, PO); });
+    if (up) {                                                               // cloth canopy over the north half
+      poly(ctx, [lift(r.x - 3, r.y - 4, top + 0.012, c), lift(r.x + r.w + 3, r.y - 4, top + 0.012, c), lift(r.x + r.w + 3, ym + 1, top + 0.002, c), lift(r.x - 3, ym + 1, top + 0.002, c)],
+        'rgba(88,92,76,0.94)', 'rgba(14,14,10,0.55)');
+      ctx.strokeStyle = 'rgba(20,20,14,0.3)'; ctx.lineWidth = 1;
+      for (i = 1; i < 5; i++) line(ctx, lift(r.x - 3 + (r.w + 6) * i / 5, r.y - 4, top + 0.012, c), lift(r.x - 3 + (r.w + 6) * i / 5, ym + 1, top + 0.002, c));
+    }
+    if (near) outline(ctx, pole.t, true);
   }
 
   function drawBed(ctx, r, c, lvl, near) {
@@ -378,6 +424,49 @@
 
   // ---- static terrain ------------------------------------------------------------------------------
 
+  // ---- floor: blocks the player lays one by one (st.floor.cells['cx,cy'] = material), flat on the ground -------------------
+  var FLOOR_LOOK = { wood: { base: '#6e583c', line: 'rgba(30,20,10,0.5)' }, stone: { base: '#66685f', line: 'rgba(20,22,18,0.55)' }, tile: { base: '#85867f', line: 'rgba(235,235,225,0.3)' } };
+
+  function drawFloorCells(ctx, floor, vr) {
+    if (!floor) return;
+    var P = G.placing, C = P.CELL, gd = P.grid();
+    var cx0 = Math.max(0, Math.floor((vr.x0 - gd.x0) / C)), cx1 = Math.min(gd.cols - 1, Math.floor((vr.x1 - gd.x0) / C));
+    var cy0 = Math.max(0, Math.floor((vr.y0 - gd.y0) / C)), cy1 = Math.min(gd.rows - 1, Math.floor((vr.y1 - gd.y0) / C));
+    ctx.lineWidth = 1.4;
+    for (var cy = cy0; cy <= cy1; cy++) for (var cx = cx0; cx <= cx1; cx++) {
+      var m = floor.cells[cx + ',' + cy];
+      if (!m) continue;
+      var L = FLOOR_LOOK[m], x = gd.x0 + cx * C, y = gd.y0 + cy * C, v = ((cx * 7 + cy * 13) % 5) / 5;
+      ctx.fillStyle = L.base; ctx.fillRect(x, y, C, C);
+      ctx.fillStyle = v < 0.5 ? 'rgba(0,0,0,' + (0.05 + v * 0.1).toFixed(3) + ')' : 'rgba(255,240,210,' + ((v - 0.5) * 0.1).toFixed(3) + ')'; ctx.fillRect(x, y, C, C);
+      ctx.strokeStyle = L.line;
+      if (m === 'wood') { for (var k = 16; k < C; k += 16) { ctx.beginPath(); ctx.moveTo(x, y + k); ctx.lineTo(x + C, y + k); ctx.stroke(); } }
+      else { ctx.strokeRect(x + 0.5, y + 0.5, C - 1, C - 1); }
+      if (m === 'tile') { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x + 4, y + 4, C / 2 - 6, C / 2 - 6); ctx.strokeRect(x + C / 2, y + 0.5, 0.01, C - 1); ctx.strokeRect(x + 0.5, y + C / 2, C - 1, 0.01); }
+    }
+  }
+
+  // The preview while placing: a green / red outline (and a floor cell highlight) under the mouse.
+  function drawGhost(ctx, g, time) {
+    if (!g) return;
+    var rs = g.cells || [g.rect || g.cell], pulse = 0.5 + 0.5 * Math.sin(time * 5);
+    ctx.save();
+    ctx.fillStyle = g.ok ? 'rgba(150,190,120,' + (0.16 + 0.08 * pulse).toFixed(3) + ')' : 'rgba(200,80,70,0.28)';
+    ctx.strokeStyle = g.ok ? 'rgba(190,220,160,0.9)' : 'rgba(230,110,100,0.95)';
+    ctx.setLineDash([9, 6]); ctx.lineWidth = 2;
+    var r = rs[0];
+    for (var gi = 0; gi < rs.length; gi++) {
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(rs[gi].x, rs[gi].y, rs[gi].w, rs[gi].h, g.rect ? 8 : 2); else ctx.rect(rs[gi].x, rs[gi].y, rs[gi].w, rs[gi].h);
+      ctx.fill(); ctx.stroke();
+    }
+    if (g.label) {
+      ctx.setLineDash([]); ctx.fillStyle = 'rgba(235,235,220,0.9)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = 'rtl';
+      ctx.font = '13px "Segoe UI", Arial, sans-serif'; ctx.fillText(g.label, r.x + r.w / 2, r.y + r.h / 2);
+    }
+    ctx.restore();
+  }
+
   function buildMacro(b) {
     var k = 0.25, rand = G.util.rng(3301), W = b.width, Hh = b.height, L = b.layout, a = L.area, i;
     var c = document.createElement('canvas');
@@ -435,7 +524,7 @@
   // One blurred layer with the cast shadows of every structure (they never move).
   function buildShadows(b) {
     var a = b.layout.area, M = 150, x0 = a.x - M, y0 = a.y - M, w = a.w + M * 2, h = a.h + M * 2;
-    var heights = { fence: 15, chest: 20, woodpile: 24, cabin: 62, workbench: 15, campfire: 8, bed: 9, tank: 26 };
+    var heights = { fence: 15, chest: 20, woodpile: 24, cabin: 62, workbench: 15, campfire: 8, bed: 9, tank: 26, rack: 16 };
     var sp = K.mk(w, h, function (g) {
       g.translate(-(x0 + w / 2), -(y0 + h / 2));
       try { g.filter = 'blur(5px)'; } catch (e) { /* sharp shadows */ }
@@ -523,7 +612,7 @@
       if (K.seen(vr, d.x, d.y, 60)) ctx.drawImage(d.sp.c, d.x - d.sp.w / 2, d.y - d.sp.h / 2, d.sp.w, d.sp.h);
     }
 
-    if (opts.spots) drawSpots(ctx, b, time);
+    drawFloorCells(ctx, opts.floor, vr);
 
     ctx.globalAlpha = 0.5;
     K.blit(ctx, T.shadows.sp, T.shadows.x, T.shadows.y);
@@ -531,8 +620,9 @@
     K.treeShadows(ctx, b.trees, vr);
     K.treeBases(ctx, b.trees, vr);
 
-    var cf = G.data.buildings.campfire.spot;
-    if (b.levels.campfire > 0) {                                           // firelight on the ground (flickers gently)
+    for (var fi = 0; fi < b.solids.length; fi++) {
+      var cf = b.solids[fi];
+      if (cf.kind !== 'campfire') continue;                                           // firelight on the ground (flickers gently)
       var fl = 0.8 + 0.1 * Math.sin(time * 9.1) + 0.06 * Math.sin(time * 15.3 + 1), cx = cf.x + cf.w / 2, cy = cf.y + cf.h / 2;
       var gr = ctx.createRadialGradient(cx, cy, 10, cx, cy, 190);
       gr.addColorStop(0, 'rgba(230,140,56,' + (0.3 * fl).toFixed(3) + ')'); gr.addColorStop(0.45, 'rgba(190,100,40,' + (0.1 * fl).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(190,100,40,0)');
@@ -557,6 +647,7 @@
       else if (r.kind === 'woodpile') drawWoodpile(ctx, r, c);
       else if (r.kind === 'workbench') drawWorkbench(ctx, r, c, opts.near === 'workbench', lv);
       else if (r.kind === 'campfire') T.fireAt = drawCampfire(ctx, r, c, time, opts.near === 'campfire', lv);
+      else if (r.kind === 'rack') drawRack(ctx, r, c, opts.near === 'rack', lv, time);
       else if (r.kind === 'bed') drawBed(ctx, r, c, lv, opts.near === 'bed');
       else if (r.kind === 'tank') drawTank(ctx, r, c, opts.near === 'tank', time, lv);
     }
@@ -583,7 +674,26 @@
       ctx.drawImage(K.SP.mist.c, vr.x0 + mx - 300, vr.y0 + my - 190, 600, 380);
     }
     ctx.globalAlpha = 1;
+    drawGhost(ctx, opts.ghost, time);
   }
 
-  G.baseArt = { prepare: prepare, refresh: refresh, drawBelow: drawBelow, drawAbove: drawAbove };
+  // The shut north gate during a raid (fence level 2): reinforced planks that crack as it takes damage (frac = hp left, 0..1)
+  // and a thin health bar. Drawn by game.js among the figures (js/defense.js decides when it exists).
+  function drawGate(ctx, b, vr, frac, time) {
+    var g = b.layout.gate, a = b.layout.area;
+    var c = { x: (vr.x0 + vr.x1) / 2, y: (vr.y0 + vr.y1) / 2 + VIEW.tilt / VIEW.persp };
+    var r = { x: g.x + 4, y: a.y, w: g.w - 8, h: 12 }, k1 = H.fence * 1.55, i;
+    var bx = box(ctx, r, 0, k1, c, WOOD2, 5);
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5;
+    var cracks = Math.floor((1 - frac) * 6);
+    for (i = 0; i < cracks; i++) {
+      var u = (i + 0.5) / 6, p0 = mix(bx.b[3], bx.b[2], u), p1 = mix(bx.t[3], bx.t[2], u);
+      line(ctx, [p0[0] + (i % 2 ? 3 : -3), p0[1]], [p1[0] + (i % 2 ? -4 : 4), p1[1]]);
+    }
+    var top = lift(r.x + r.w / 2, r.y, k1, c), bw = 46;
+    ctx.fillStyle = 'rgba(10,10,8,0.7)'; ctx.fillRect(top[0] - bw / 2 - 1, top[1] - 17, bw + 2, 6);
+    ctx.fillStyle = frac > 0.35 ? '#a8b08a' : '#c98a6a'; ctx.fillRect(top[0] - bw / 2, top[1] - 16, bw * Math.max(0, frac), 4);
+  }
+
+  G.baseArt = { prepare: prepare, refresh: refresh, drawBelow: drawBelow, drawAbove: drawAbove, drawGate: drawGate };
 })(typeof window !== 'undefined' ? window : globalThis);

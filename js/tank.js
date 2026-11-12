@@ -14,12 +14,13 @@
   var tank = {
     ITEM: ITEM,
     create: function () { return { amount: 0, t: 0 }; },
-    cap: function (level) { return level > 0 ? spec(level).cap : 0; },
+    // `count` = number of tanks standing in the yard: each adds its capacity and fills on its own.
+    cap: function (level, count) { return level > 0 ? spec(level).cap * (count || 1) : 0; },
 
     // Time passes. level 0 = not built (nothing happens).
-    step: function (tk, level, dt) {
+    step: function (tk, level, dt, count) {
       if (!(level > 0)) return tk;
-      var s = spec(level);
+      var n = Math.max(1, count || 1), s = { cap: spec(level).cap * n, secs: spec(level).secs / n };
       if (tk.amount >= s.cap) { tk.amount = s.cap; tk.t = 0; return tk; }
       tk.t += dt;
       while (tk.t >= s.secs && tk.amount < s.cap) { tk.t -= s.secs; tk.amount++; }

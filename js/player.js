@@ -6,9 +6,23 @@
   var G = root.G;
   var clamp = G.util.clamp, lerp = G.util.lerp, TAU = Math.PI * 2;
 
-  var SWING = 0.46;                                     // seconds for one melee swing
-  var HELD = { hands: 1, axe: 1, pickaxe: 1, club: 1, gun: 1, crate: 1 };
+  var SWING = 0.46;                                     // seconds for one melee swing (the default)
+  var DUR = { hands: 0.34, axe: 0.46, club: 0.5, pickaxe: 0.52 };   // per held item: a shove is quick, a club is slower
+  var HELD = { hands: 1, axe: 1, pickaxe: 1, club: 1, gun: 1, uzi: 1, m16: 1, ak: 1, sniper: 1, crate: 1 };
   var MELEE = { axe: 1, pickaxe: 1, club: 1 };
+  // Guns share one aiming pose (both hands out in front). ext: how far the front hand reaches along the gun, muzzle: how far
+  // ahead of the feet the bullet leaves (px). parts of a long gun are [fromAlong, fromUp, toAlong, toUp, thickness, colour]
+  // in body units, measured from the right hand (along = where it points, up = above the hand).
+  var GUNS = { gun: { ext: 0, muzzle: 26 }, uzi: { ext: 1, muzzle: 31 }, m16: { ext: 5, muzzle: 43 }, ak: { ext: 4.5, muzzle: 41 }, sniper: { ext: 7, muzzle: 53 } };
+  var LONG = {
+    uzi: [[-2.4, 1.7, 7.8, 1.7, 3.8, '#2b2e31'], [7.8, 1.9, 10.6, 1.9, 1.8, '#1c1e20'], [1.6, -0.4, 1.4, -6.2, 2.2, '#26282a'], [-1.8, -0.6, -2.4, -3.4, 2.4, '#2c2a26']],
+    m16: [[-10.5, 0.6, -3.2, 1.6, 3.2, '#25282a'], [-3.2, 1.7, 8.4, 1.8, 3.6, '#2a2d30'], [8.4, 1.8, 14.5, 1.8, 3.8, '#24272a'], [14.5, 1.8, 18.6, 1.9, 1.6, '#1b1d1f'],
+      [-1.8, 3.8, 6.0, 3.8, 1.2, '#33373a'], [2.4, 0.2, 2.8, -5.4, 2.4, '#202326'], [-3.4, 0.4, -4, -2.8, 2.4, '#25272a']],
+    ak: [[-10.5, 0.4, -3.2, 1.5, 3.2, '#6b4a2c'], [-3.2, 1.7, 7.4, 1.8, 3.4, '#2d2f30'], [7.4, 1.8, 13, 1.7, 3.8, '#7a5430'], [13, 1.9, 18, 1.9, 1.6, '#1d1f21'],
+      [2.6, 0.2, 4.4, -5.2, 2.6, '#5a3a22'], [-3.4, 0.5, -4, -2.8, 2.4, '#5a3a22']],
+    sniper: [[-11.5, 0.4, -3.2, 1.7, 3.4, '#3a3f34'], [-3.2, 1.8, 9.5, 1.9, 3.2, '#2a2d2b'], [9.5, 1.9, 23, 2.0, 1.7, '#1e2123'], [0.8, 3.9, 8.8, 3.9, 2.4, '#1a1c1e'],
+      [2.2, 0.4, 2.2, -3.0, 2.2, '#25272a'], [-3.4, 0.6, -4, -2.6, 2.4, '#2a2c2a']]
+  };
 
   function angDiff(a, b) { var d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; }
   function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
@@ -20,11 +34,52 @@
   var FOOT = 1.6;        // sole thickness: joints sit this much above the ground
   var SUN = { x: 0.62, y: 0.78 };                       // same light as js/baseart.js (shadows fall south-east)
   var R = { hipW: 4.4, shW: 8.2, thigh: 10.8, shin: 10.6, torso: 14.5, upper: 8.6, fore: 8.4, neck: 7.8, headR: 6.4 };
-  var PAL = {
-    line: '#141615',
-    jacket: [[77, 85, 80], [112, 122, 112]], pants: [[45, 50, 54], [72, 78, 82]], pack: [[82, 68, 46], [122, 103, 76]],
-    skin: [[160, 136, 112], [203, 177, 149]], boot: '#2b2622', hair: '#4a3d33', strap: '#3a3024'
+  // Palettes. The same rig draws the player and the infected (p.look): only colors, posture and face change.
+  var PALS = {
+    player: {
+      line: '#141615',
+      jacket: [[77, 85, 80], [112, 122, 112]], pants: [[45, 50, 54], [72, 78, 82]], pack: [[82, 68, 46], [122, 103, 76]],
+      skin: [[160, 136, 112], [203, 177, 149]], boot: '#2b2622', hair: '#4a3d33', strap: '#3a3024'
+    },
+    // the infected: grey-green skin, worn clothes in a few variants (chosen by p.variant), no backpack, hollow eyes
+    shambler: {
+      line: '#121413', dead: true,
+      jackets: [[[70, 64, 52], [104, 96, 80]], [[58, 66, 70], [88, 100, 104]], [[74, 58, 54], [108, 88, 82]]],
+      pants: [[40, 42, 40], [62, 64, 60]], skin: [[110, 126, 102], [152, 170, 140]], boot: '#26231f', hair: '#34302b'
+    },
+    runner: {
+      line: '#121413', dead: true,
+      jackets: [[[96, 92, 84], [134, 128, 116]], [[86, 70, 66], [122, 100, 92]], [[70, 82, 90], [102, 116, 126]]],
+      pants: [[52, 54, 56], [80, 82, 84]], skin: [[120, 136, 108], [164, 182, 150]], boot: '#2a2622', hair: '#3c362f'
+    },
+    // brute: bloated, darker and redder flesh, heavy torn dark clothes
+    brute: {
+      line: '#110f0e', dead: true,
+      jackets: [[[52, 46, 42], [82, 72, 64]], [[44, 50, 48], [70, 78, 74]], [[62, 44, 40], [96, 70, 62]]],
+      pants: [[34, 33, 31], [54, 52, 48]], skin: [[128, 112, 96], [172, 150, 128]], boot: '#201c19', hair: '#2a2622'
+    },
+    // crawler: muddy, dirty rags close to the ground, sickly olive skin
+    crawler: {
+      line: '#121413', dead: true,
+      jackets: [[[62, 58, 44], [92, 86, 66]], [[50, 56, 50], [78, 86, 76]], [[66, 54, 46], [98, 82, 70]]],
+      pants: [[46, 42, 36], [70, 64, 54]], skin: [[104, 118, 84], [146, 162, 120]], boot: '#2a251f', hair: '#2f2b24'
+    },
+    // screamer: pale, bleached, thin pale clothes: stands out from far away
+    screamer: {
+      line: '#171918', dead: true,
+      jackets: [[[128, 126, 120], [176, 174, 166]], [[112, 118, 124], [160, 168, 176]], [[130, 118, 112], [180, 166, 158]]],
+      pants: [[70, 72, 74], [104, 106, 108]], skin: [[150, 156, 138], [200, 206, 186]], boot: '#2c2926', hair: '#4a4640'
+    }
   };
+  var PAL = PALS.player;
+  function palFor(p) {
+    var b = PALS[p.look] || PALS.player;
+    if (!b.jackets) return b;
+    var o = {}, k;
+    for (k in b) o[k] = b[k];
+    o.jacket = b.jackets[(p.variant || 0) % b.jackets.length];
+    return o;
+  }
 
   function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
   function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -84,8 +139,63 @@
     return { rh: [11 + s, 3.6, -15.5 - s * 0.4], lh: [11 - s, -3.6, -15.5 + s * 0.4], wd: [0, 0, 1], twist: 0, lean: 0.6, crouch: 0.75 };
   }
 
+  // Unarmed shove: both hands pulled in, then thrust straight out.
+  var SHOVE_BACK = { rh: [4, 5.5, -4], lh: [4, -5.5, -4], wd: [0, 0, 1], twist: 0.18, lean: -0.05, crouch: 0 };
+  var SHOVE_HIT = { rh: [15.5, 2.6, -1.8], lh: [15.5, -2.6, -1.8], wd: [0, 0, 1], twist: 0, lean: 0.3, crouch: 0.1 };
+  function shovePose(u, ready) {
+    if (u < 0.36) return lerpPose(ready, SHOVE_BACK, smooth(u / 0.36));
+    if (u < 0.5) { var t = (u - 0.36) / 0.14; return lerpPose(SHOVE_BACK, SHOVE_HIT, t * t); }
+    if (u < 0.66) return SHOVE_HIT;
+    return lerpPose(SHOVE_HIT, ready, smooth((u - 0.66) / 0.34));
+  }
+
+  // The infected: arms held out in front, hunched. A runner keeps the normal arm swing but leans far forward.
+  var ATK_UP = { rh: [1, 6, 7], lh: [1, -6, 7], wd: [0, 0, 1], twist: 0.2, lean: -0.14, crouch: 0 };
+  var ATK_HIT = { rh: [12, 3.5, -9], lh: [12, -3.5, -9], wd: [0, 0, 1], twist: -0.1, lean: 0.44, crouch: 0.15 };
+  var STAGGER = { rh: [-3, 9, 6], lh: [-3, -9, 6], wd: [0, 0, 1], twist: 0.25, lean: -0.34, crouch: 0.05 };
+  function hostilePose(p, base, gait, ph, idle, time) {
+    var v = (p.variant || 0) * 0.37;
+    if (p.look === 'runner') return { rh: base.rh, lh: base.lh, wd: base.wd, twist: base.twist, lean: base.lean + 0.3, crouch: 0.08 };
+    if (p.look === 'crawler') {                                // nearly on all fours: low, far forward, hands reaching for the ground
+      var cs = Math.sin(ph) * 2.2 * gait;
+      return { rh: [11 + cs, 6.5, -11.5], lh: [11 - cs, -6.5, -11.5], wd: [0, 0, 1],
+        twist: 0.3 * gait * Math.sin(ph) + 0.1 * Math.sin(time * 1.4 + v) * (1 - gait), lean: 0.78 + 0.05 * Math.sin(time * 1.7 + v), crouch: 0.9 };
+    }
+    if (p.look === 'brute') {                                  // heavy and hunched, arms hanging wide, a slow rolling sway
+      var bs = Math.sin(ph) * 1.2 * gait;
+      return { rh: [6 + bs, 8.6, -6.5 + 0.5 * idle], lh: [6 - bs, -8.6, -7 + 0.5 * idle], wd: [0, 0, 1],
+        twist: 0.28 * gait * Math.sin(ph) + 0.1 * Math.sin(time * 0.7 + v) * (1 - gait), lean: 0.3 + 0.04 * Math.sin(time * 0.9 + v), crouch: 0.04 };
+    }
+    if (p.look === 'screamer') {                               // thin, arms drawn up to the chest, head tilted back
+      var ss = Math.sin(ph) * 1.4 * gait;
+      return { rh: [7 + ss, 4.4, 1.5 + 0.6 * idle], lh: [7 - ss, -4.4, 1.2 + 0.6 * idle], wd: [0, 0, 1],
+        twist: 0.16 * gait * Math.sin(ph) + 0.2 * Math.sin(time * 1.6 + v) * (1 - gait), lean: 0.06 + 0.05 * Math.sin(time * 1.3 + v), crouch: 0 };
+    }
+    var sw = Math.sin(ph) * 1.8 * gait;
+    return { rh: [9 + sw, 5.5, -2.5 + 0.6 * idle], lh: [9 - sw, -5.5, -3.2 + 0.6 * idle], wd: [0, 0, 1],
+      twist: 0.2 * gait * Math.sin(ph) + 0.14 * Math.sin(time * 0.9 + v) * (1 - gait), lean: 0.22 + 0.06 * Math.sin(time * 1.2 + v), crouch: 0 };
+  }
+  // One attack of the infected: arms up, a heavy slam at u = hu, back to the shuffle.
+  var SCREAM = { rh: [4, 8.4, 9], lh: [4, -8.4, 9], wd: [0, 0, 1], twist: 0, lean: -0.42, crouch: 0 };        // head thrown back, arms flung up
+  var CRAWL_UP = { rh: [8, 6, -9], lh: [8, -6, -9], wd: [0, 0, 1], twist: 0.2, lean: 0.6, crouch: 0.85 };
+  var CRAWL_HIT = { rh: [17, 3, -13], lh: [17, -3, -13], wd: [0, 0, 1], twist: -0.2, lean: 0.95, crouch: 0.95 };   // a low snap at the legs
+  // look 'scream' (p.screaming): the scream is not a blow but a held pose (atk runs over the scream's length).
+  function atkPose(u, hu, from, look) {
+    if (look === 'scream') {
+      if (u < 0.2) return lerpPose(from, SCREAM, smooth(u / 0.2));
+      if (u < 0.82) return SCREAM;
+      return lerpPose(SCREAM, from, smooth((u - 0.82) / 0.18));
+    }
+    var up = ATK_UP, hit = ATK_HIT;
+    if (look === 'crawler') { up = CRAWL_UP; hit = CRAWL_HIT; }
+    var a = hu * 0.78;
+    if (u < a) return lerpPose(from, up, smooth(u / a));
+    if (u < hu) { var t = (u - a) / (hu - a); return lerpPose(up, hit, t * t); }
+    return lerpPose(hit, from, smooth((u - hu) / Math.max(0.05, 1 - hu)));
+  }
+
   // Builds the posed skeleton in body space (x forward, y to the right hand, z up; origin on the ground between the feet).
-  function build(p, face, stride, swingU, workPh, time) {
+  function build(p, face, stride, swingU, workPh, time, atkU) {
     var gait = p.gait, run = p.runK * gait, ph = stride, held = p.held;
     var idle = (1 - gait) * Math.sin(time * 1.9);
     var armAmp = gait * (0.55 + 0.45 * p.runK), reach = 16.2 - 3.8 * run, aR = -armAmp * Math.sin(ph);
@@ -100,16 +210,25 @@
       hp = { rh: [READY.rh[0] + base.rh[0] * 0.25, READY.rh[1], READY.rh[2] + 0.6 * idle], lh: base.lh, wd: READY.wd,
         twist: base.twist, lean: base.lean, crouch: 0 };
       if (swingU >= 0) hp = swingPose(swingU, hp);
-    } else if (held === 'gun') {
+    } else if (GUNS[held]) {
       var d = clamp(angDiff(p.angle, face), -1.2, 1.2);            // the arms point exactly where the player aims
-      var aim = { rh: [15.2, 1.2, 0.6 + 0.3 * idle], lh: [14, -0.9, -0.7 + 0.3 * idle], wd: [1, 0, 0], twist: d, lean: 0.05, crouch: 0 };
+      var kick = p.kick || 0, ext = GUNS[held].ext;                 // recoil: arms thrown back and up a little; ext: a long gun's front hand reaches further
+      var aim = { rh: [15.2 - 3.4 * kick, 1.2, 0.6 + 0.3 * idle + 1.8 * kick], lh: [14 + ext - 3.2 * kick, -0.9, -0.7 + 0.3 * idle + 1.6 * kick], wd: norm([1, 0, 0.18 * kick]), twist: d, lean: 0.05 - 0.07 * kick, crouch: 0 };
       var low = { rh: [7.5, 2.6, -8], lh: [7, -1, -8.6], wd: norm([0.75, -0.1, -0.65]), twist: base.twist, lean: base.lean, crouch: 0 };
-      hp = lerpPose(aim, low, smooth(run));                        // lowered while running
+      var rl = p.reload > 0 ? Math.sin(Math.PI * Math.min(1, p.reload)) : 0;   // reloading: the gun drops to the chest and comes back up
+      hp = lerpPose(aim, low, smooth(Math.max(run, rl)));          // lowered while running
     } else if (held === 'crate') {
       var bob = 0.5 * gait * Math.sin(ph * 2);
       hp = { rh: [8.6, 6, -9.6 + bob], lh: [8.6, -6, -9.6 + bob], wd: [0, 0, 1], twist: base.twist * 0.3, lean: base.lean * 0.4 - 0.07, crouch: 0 };
     }
+    if (held === 'hands' && swingU >= 0) hp = shovePose(swingU, base);
+    var hostile = !!p.look && p.look !== 'player';
+    if (hostile) hp = hostilePose(p, base, gait, ph, idle, time);
     var pose = lerpPose(base, hp, smooth(p.heldK));
+    if (hostile) {
+      if (atkU >= 0) pose = atkPose(atkU, p.atkHit || 0.6, pose, p.screaming ? 'scream' : p.look);
+      if (p.hurtK > 0) pose = lerpPose(pose, STAGGER, smooth(p.hurtK));
+    }
     var w = smooth(p.work);
     if (w > 0) pose = lerpPose(pose, p.workTool ? chopPose(workPh) : grabPose(workPh), w);
 
@@ -179,8 +298,13 @@
         face: -Math.PI / 2, pFace: -Math.PI / 2,        // where the body points: follows `angle` smoothly
         gait: 0, runK: 0,                               // 0..1 blends: standing -> walking, walking -> running
         held: 'hands', heldK: 1,                        // what is in the hands, and the blend into that pose
-        swing: -1, pSwing: -1,                          // seconds into a melee swing, -1 = none
-        work: 0, workTool: null, workPh: 0, pWorkPh: 0  // gathering: blend, tool id (null = bare hands), loop phase 0..1
+        swing: -1, pSwing: -1, swingDur: SWING,         // seconds into a melee swing, -1 = none; how long that swing lasts
+        work: 0, workTool: null, workPh: 0, pWorkPh: 0, // gathering: blend, tool id (null = bare hands), loop phase 0..1
+        kick: 0,                                        // gun recoil 1..0
+        reload: 0,                                      // reload progress 0..1 (0 = not reloading)
+        // used by the infected (js/enemies.js) that reuse this body: look = palette, atk = progress of an attack
+        // (-1 = none, atkHit = where in it the blow lands), hurtK = stagger 1..0, fall = collapse 0..1 (fallDir: back / forward)
+        look: 'player', variant: 0, scale: 1, atk: -1, patk: -1, atkHit: 0.6, hurtK: 0, fall: 0, fallDir: 1
       };
     },
 
@@ -198,7 +322,7 @@
         var speed = c.walkSpeed * (p.running ? c.runMult : 1);
         p.x += (move.x / len) * speed * dt;
         p.y += (move.y / len) * speed * dt;
-        p.stride += dt * (p.running ? 15 : 10.5);
+        p.stride += dt * (p.running ? 15 : 10.5) * (c.strideMult || 1);     // slower legs for slower walkers
       }
       // the legs ease in and out of the walk instead of snapping to a standing pose
       p.gait += ((p.moving ? 1 : 0) - p.gait) * (1 - Math.exp(-14 * dt));
@@ -222,8 +346,9 @@
       p.pSwing = p.swing;
       if (p.swing >= 0) {
         p.swing += dt;
-        if (p.swing >= SWING || work) p.swing = p.pSwing = -1;
+        if (p.swing >= p.swingDur || work) p.swing = p.pSwing = -1;
       }
+      if (p.kick > 0) p.kick = Math.max(0, p.kick - dt * 6.5);
       p.heldK = Math.min(1, p.heldK + dt * 7);
       p.work += ((work ? 1 : 0) - p.work) * (1 - Math.exp(-12 * dt));
       if (p.work < 0.004) p.work = 0;
@@ -241,8 +366,31 @@
     // Starts a melee swing if a melee tool is held and none is running. Returns true when it started.
     swing: function (p) {
       if (!MELEE[p.held] || p.swing >= 0 || p.work > 0.05) return false;
-      p.swing = p.pSwing = 0;
+      p.swing = p.pSwing = 0; p.swingDur = DUR[p.held] || SWING;
       return true;
+    },
+
+    // Unarmed shove (only with empty hands). Same timers as a swing, a shorter one.
+    shove: function (p) {
+      if (p.held !== 'hands' || p.swing >= 0 || p.work > 0.05) return false;
+      p.swing = p.pSwing = 0; p.swingDur = DUR.hands;
+      return true;
+    },
+
+    // True on the one step where the running swing / shove passes `u` (0..1) of its length: that is when the blow lands.
+    swingHit: function (p, u) {
+      if (p.swing < 0 || p.pSwing < 0) return false;
+      var d = p.swingDur || SWING;
+      return p.pSwing / d < u && p.swing / d >= u;
+    },
+
+    // A shot was fired: the arms kick back (drawn only).
+    recoil: function (p) { p.kick = 1; },
+
+    // Where the shot leaves the gun, seen from the ground plane: a point in front of the player; `height` above the ground.
+    muzzle: function (p) {
+      var m = GUNS[p.held] ? GUNS[p.held].muzzle : 26;
+      return { x: p.x + Math.cos(p.angle) * m, y: p.y + Math.sin(p.angle) * m, height: 16 };
     },
 
     // Snaps the animation to a standing pose facing `angle` (after a teleport).
@@ -250,21 +398,27 @@
       p.angle = p.prevAngle = p.face = p.pFace = angle;
       p.moving = p.running = false;
       p.stride = p.pStride = 0; p.gait = 0; p.runK = 0;
-      p.swing = p.pSwing = -1; p.work = 0;
+      p.swing = p.pSwing = -1; p.work = 0; p.kick = 0; p.reload = 0; p.atk = p.patk = -1; p.hurtK = 0;
     },
 
     draw: function (ctx, p, alpha, time) {
       var x = lerp(p.prevX, p.x, alpha), y = lerp(p.prevY, p.y, alpha);
       var face = p.pFace + angDiff(p.face, p.pFace) * alpha;
       var stride = lerp(p.pStride, p.stride, alpha);
-      var swingU = p.swing < 0 ? -1 : clamp(lerp(Math.max(0, p.pSwing), p.swing, alpha) / SWING, 0, 1);
+      var swingU = p.swing < 0 ? -1 : clamp(lerp(Math.max(0, p.pSwing), p.swing, alpha) / (p.swingDur || SWING), 0, 1);
+      var atkU = p.atk < 0 ? -1 : clamp(lerp(Math.max(0, p.patk), p.atk, alpha), 0, 1);
       var w0 = p.pWorkPh > p.workPh ? p.pWorkPh - 1 : p.pWorkPh, workPh = ((lerp(w0, p.workPh, alpha) % 1) + 1) % 1;
-      var S = build(p, face, stride, swingU, workPh, time || 0);
+      PAL = palFor(p); SC = p.scale || 1;
+      var S = build(p, face, stride, swingU, workPh, time || 0, atkU);
       var ca = Math.cos(face), sa = Math.sin(face), parts = [], shade = [];
+      // a collapsing body is the whole rig tipped over about the feet (backward or forward), lying flat when fall = 1
+      var fa = (p.fall || 0) * 1.5 * (p.fallDir || 1), fc = Math.cos(fa), fs = Math.sin(fa), lying = Math.abs(fa) > 0.01;
 
       function P(v) {                                   // body space -> screen, with a depth key (larger = nearer the camera)
-        var gx = v[0] * ca - v[1] * sa, gy = v[0] * sa + v[1] * ca;
-        return { x: x + gx * SC, y: y + (gy * GY - v[2] - FOOT) * SC, k: gy + v[2] * 0.5, gx: gx, gy: gy, z: v[2] };
+        var vx = v[0], vz = v[2];
+        if (lying) { var nx = vx * fc - vz * fs, nz = vx * fs + vz * fc; vx = nx; vz = Math.max(nz, 1.2 + 1.6 * Math.abs(fs)); }
+        var gx = vx * ca - v[1] * sa, gy = vx * sa + v[1] * ca;
+        return { x: x + gx * SC, y: y + (gy * GY - vz - FOOT) * SC, k: gy + vz * 0.5, gx: gx, gy: gy, z: vz };
       }
       function lit(side) {                              // 0..1: how much a part on that side faces the light (north-west)
         return 0.5 + 0.5 * side * (sa * 0.6 - ca * 0.8);
@@ -280,12 +434,14 @@
 
       // backpack
       var pk0 = P(S.toBody([-5.8, 0, -12.2])), pk1 = P(S.toBody([-5.8, 0, -2.6]));
-      shade.push({ p: [pk0, pk1], w: 10.5 });
-      part((pk0.k + pk1.k) / 2, function () {
-        tube(ctx, [pk0, pk1], 10.5, tone(PAL.pack, 0.25 + 0.5 * lit(0) + 0.25 * (-sa)));
-        var f0 = P(S.toBody([-6.2, -3.4, -5.4])), f1 = P(S.toBody([-6.2, 3.4, -5.4]));
-        ctx.beginPath(); ctx.moveTo(f0.x, f0.y); ctx.lineTo(f1.x, f1.y); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(20,16,10,0.55)'; ctx.stroke();
-      });
+      if (!PAL.dead) {                                  // the infected carry nothing
+        shade.push({ p: [pk0, pk1], w: 10.5 });
+        part((pk0.k + pk1.k) / 2, function () {
+          tube(ctx, [pk0, pk1], 10.5, tone(PAL.pack, 0.25 + 0.5 * lit(0) + 0.25 * (-sa)));
+          var f0 = P(S.toBody([-6.2, -3.4, -5.4])), f1 = P(S.toBody([-6.2, 3.4, -5.4]));
+          ctx.beginPath(); ctx.moveTo(f0.x, f0.y); ctx.lineTo(f1.x, f1.y); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(20,16,10,0.55)'; ctx.stroke();
+        });
+      }
 
       // torso
       var q = [P(S.shL), P(S.shR), P(S.hipR), P(S.hipL)], cK = P(S.chest).k - 2;
@@ -297,7 +453,7 @@
         ctx.fillStyle = col; ctx.fill();
         ctx.lineWidth = 6.5 * SC; ctx.strokeStyle = col; ctx.stroke();
         var front = Math.sin(face + S.twist) * 0.67 + 0.2;                    // pack straps, only seen from the front
-        if (front > 0) {
+        if (front > 0 && !PAL.dead) {
           ctx.globalAlpha = clamp(front * 4, 0, 1); ctx.lineWidth = 1.7; ctx.strokeStyle = PAL.strap;
           [1, -1].forEach(function (sg) {
             var a = P(S.toBody([3.2, sg * 5, 0.8])), b = P(S.toBody([3.4, sg * 4.6, -9]));
@@ -351,6 +507,24 @@
           return;
         }
         var blade = cross(side, wd), up = cross(wd, side), butt, tip;
+        if (LONG[id]) {                                                    // uzi, M16, Kalashnikov, sniper rifle: parts along the gun
+          var ps = LONG[id].map(function (q) {
+            return [P(add(hand, add(mul(up, q[1]), mul(wd, q[0])))), P(add(hand, add(mul(up, q[3]), mul(wd, q[2]))))];
+          });
+          var bar = ps[{ uzi: 1, m16: 3, ak: 3, sniper: 2 }[id]][1];       // the muzzle end
+          shade.push({ p: [ps[0][0], bar], w: 3 });
+          part((ps[0][0].k + bar.k) / 2 + 1.5, function () {
+            ctx.globalAlpha = a;
+            for (var li = 0; li < ps.length; li++) tube(ctx, [ps[li][0], ps[li][1]], LONG[id][li][4], LONG[id][li][5]);
+            if (id === 'sniper') {                                         // the scope's lens
+              dotAt(ctx, ps[3][1], 1.6, 'rgba(120,170,190,0.8)');
+            }
+            ctx.beginPath(); ctx.moveTo(ps[1][0].x, ps[1][0].y - 0.9); ctx.lineTo(ps[1][1].x, ps[1][1].y - 0.9); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(150,160,164,0.5)'; ctx.stroke();
+            dotAt(ctx, P(hand), 2.3, tone(PAL.skin, 0.3 + lit(1) * 0.7));
+            ctx.globalAlpha = 1;
+          });
+          return;
+        }
         if (id === 'gun') {
           var g0 = P(add(hand, add(mul(up, 1.7), mul(wd, -1.6)))), g1 = P(add(hand, add(mul(up, 1.7), mul(wd, 8.6))));
           var gr = P(add(hand, add(mul(up, -3), mul(wd, -1.9)))), gm = P(add(hand, add(mul(up, 1.2), mul(wd, -0.4))));
@@ -457,13 +631,21 @@
         var eyeR = Math.max(0.8, hr * 0.095);
         [-1, 1].forEach(function (sd) {
           seg(sd * 0.18, 0.44, sd * 0.52, 0.4, Math.max(1, hr * 0.11), PAL.hair);                  // brows
-          dot(sd * 0.34, 0.24, eyeR * 1.25, 'rgba(214,204,186,0.75)');                            // eye white
-          dot(sd * 0.34, 0.24, eyeR, '#1d1712');                                                   // pupil
+          if (PAL.dead) {                                                                          // hollow eyes with a faint glint
+            dot(sd * 0.34, 0.24, eyeR * 1.7, 'rgba(14,18,12,0.85)');
+            dot(sd * 0.34, 0.24, eyeR * 0.7, 'rgba(196,188,110,0.7)');
+          } else {
+            dot(sd * 0.34, 0.24, eyeR * 1.25, 'rgba(214,204,186,0.75)');                           // eye white
+            dot(sd * 0.34, 0.24, eyeR, '#1d1712');                                                 // pupil
+          }
         });
         seg(0.02, 0.16, 0.06, -0.06, Math.max(1, hr * 0.1), tone(PAL.skin, 0.32));                  // nose
-        seg(-0.18, -0.28, 0.18, -0.28, Math.max(1, hr * 0.1), 'rgba(96,52,44,0.9)');                 // mouth
-        seg(-0.48, -0.2, -0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');              // stubble along the jaw
-        seg(0.48, -0.2, 0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');
+        if (PAL.dead) seg(-0.2, -0.3, 0.2, -0.3, Math.max(1.4, hr * 0.26), 'rgba(28,10,8,0.95)');   // open mouth
+        else seg(-0.18, -0.28, 0.18, -0.28, Math.max(1, hr * 0.1), 'rgba(96,52,44,0.9)');           // mouth
+        if (!PAL.dead) {
+          seg(-0.48, -0.2, -0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');            // stubble along the jaw
+          seg(0.48, -0.2, 0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');
+        }
         ctx.beginPath(); ctx.arc(hc.x - hr * 0.3, hc.y - hr * 0.35, hr * 0.42, 0, TAU);            // soft light on the hair
         ctx.fillStyle = 'rgba(190,170,140,0.13)'; ctx.fill();
       });
@@ -498,6 +680,7 @@
       parts.sort(function (a, b) { return a.k - b.k; });
       for (var i = 0; i < parts.length; i++) parts[i].fn();
       ctx.restore();
+      PAL = PALS.player; SC = 1;
     }
   };
 

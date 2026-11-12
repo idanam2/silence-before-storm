@@ -47,9 +47,9 @@
     have: function (ctx, id) { return have(invs(ctx), id); },
     recipe: recipeById,
 
-    // Recipes of one station, in data order.
-    recipesFor: function (station) {
-      return G.data.recipes.filter(function (r) { return r.station === station; });
+    // Recipes of one station, in data order; with a category id (not 'all') only that tab's recipes.
+    recipesFor: function (station, cat) {
+      return G.data.recipes.filter(function (r) { return r.station === station && (!cat || cat === 'all' || r.cat === cat); });
     },
 
     // Why a recipe cannot be crafted right now: 'station' | 'level' | 'cost' | null (ok).
@@ -81,9 +81,19 @@
       var cur = levelOf(ctx, id);
       return d && cur < d.levels.length ? cur + 1 : 0;
     },
+    // The fence is priced in the material the player chose (ctx.fence.material, see G.data.fenceMaterials).
     buildCost: function (ctx, id) {
       var next = crafting.nextLevel(ctx, id);
-      return next ? G.data.buildings[id].levels[next - 1].cost : null;
+      if (!next) return null;
+      var cost = G.data.buildings[id].levels[next - 1].cost;
+      var m = id === 'fence' && ctx.fence && G.data.fenceMaterials[ctx.fence.material];
+      if (!m) return cost;
+      var out = {};
+      for (var it in cost) {
+        var to = m.swap[it] || it, n = m.half && to !== it ? Math.ceil(cost[it] / 2) : cost[it];
+        out[to] = (out[to] || 0) + n;
+      }
+      return out;
     },
 
     // 'max' | 'cost' | null (ok).
@@ -104,9 +114,36 @@
       return { ok: true, level: level };
     },
 
+    // ---- free placement (see js/placing.js): the first copy of a structure costs level 1 and sets the level, more copies cost
+    // the same again. Paid when the copy is put down. 'max' | 'cost' | null.
+    placeStatus: function (ctx, id) {
+      var d = G.data.buildings[id];
+      if (!d || !d.spot) return 'unknown';
+      if (ctx.placed && G.placing.count(ctx.placed, id) >= G.placing.MAX_EACH) return 'max';
+      return missing(invs(ctx), d.levels[0].cost) ? 'cost' : null;
+    },
+    place: function (ctx, id) {
+      var why = crafting.placeStatus(ctx, id);
+      if (why) return { ok: false, reason: why };
+      pay(invs(ctx), G.data.buildings[id].levels[0].cost);
+      if (levelOf(ctx, id) < 1) ctx.buildings[id] = 1;
+      return { ok: true };
+    },
+    // Takes / returns a cost (floor blocks). spend: null when paid, else 'cost'. refund: bag first, then chest, lost if full.
+    spend: function (ctx, cost) { if (missing(invs(ctx), cost)) return 'cost'; pay(invs(ctx), cost); return null; },
+    refund: function (ctx, cost) {
+      for (var id in cost) { var left = cost[id]; for (var i = 0; i < 2 && left > 0; i++) left = G.inventory.add(invs(ctx)[i], id, left); }
+    },
+
     chestSlots: function (buildings) {
       var d = G.data.buildings.chest, lv = Math.max(1, (buildings && buildings.chest) || 1);
       return d.levels[lv - 1].chestSlots;
+    },
+
+    // Backpack size for the bag level (building 'bag'); never below the starting size.
+    bagSlots: function (buildings) {
+      var d = G.data.buildings.bag, lv = Math.min(d.levels.length, Math.max(1, (buildings && buildings.bag) || 1));
+      return Math.max(G.data.inventory.bagSlots, d.levels[lv - 1].bagSlots);
     },
 
     startBuildings: function () {

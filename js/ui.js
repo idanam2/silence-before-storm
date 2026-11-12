@@ -5,10 +5,12 @@
   var G = root.G;
 
   var mode = 'none';           // 'none' | 'bag' | 'chest' | 'craft' | 'build' | 'map'
+  function snd(name, o) { if (G.audio) G.audio.play(name, o); }
   var station = null;          // 'workbench' | 'campfire' while mode === 'craft'
+  var craftCat = 'all';        // the open category tab of the crafting panel
   var mapSel = null;           // selected destination on the map
   var dirty = true, promptShown = false, msgTimer = 0, toastTimer = 0, noteTimer = 0, chestChanged = false;
-  var els = {}, needEls = {}, needLast = {}, statusLast = '';
+  var els = {}, needEls = {}, needLast = {}, statusLast = '', weaponLast = {};
 
   var REASON = {
     cost: 'חסרים חומרים', space: 'אין מקום בתיק ובמחסן', station: 'אין תחנה כזו בבסיס',
@@ -16,7 +18,7 @@
   };
 
   function items() { return G.data.items; }
-  function ctx() { var s = G.state; return { bag: s.bag, chest: s.chest, buildings: s.buildings }; }
+  function ctx() { var s = G.state; return { bag: s.bag, chest: s.chest, buildings: s.buildings, fence: s.fence, placed: s.placed }; }
 
   // "שובע +30 · בריאות -3" for an item that can be used.
   function useText(d) {
@@ -59,8 +61,21 @@
     return '<span class="pips ' + (cls || '') + '" title="' + (label || 'רמה') + ' ' + level + ' מתוך ' + max + '">' + h + '</span>';
   }
 
+  // Category tabs of the crafting panel: "all" first, then only the categories this station has recipes in.
+  function craftTabsHtml() {
+    var all = G.crafting.recipesFor(station), h = '';
+    var kinds = G.data.recipeCats.filter(function (cat) { return cat.id !== 'all' && all.some(function (r) { return r.cat === cat.id; }); });
+    if (kinds.length < 2) { craftCat = 'all'; return ''; }          // one category only (the campfire): tabs would add nothing
+    G.data.recipeCats.forEach(function (cat) {
+      var n = cat.id === 'all' ? all.length : all.filter(function (r) { return r.cat === cat.id; }).length;
+      if (!n) return;
+      h += '<button class="tab' + (cat.id === craftCat ? ' on' : '') + '" data-cat="' + cat.id + '" tabindex="-1">' + cat.name + '<em>' + n + '</em></button>';
+    });
+    return h;
+  }
+
   function craftHtml() {
-    var c = ctx(), h = '', list = G.crafting.recipesFor(station), lv = G.crafting.levelOf(c, station);
+    var c = ctx(), h = '', list = G.crafting.recipesFor(station, craftCat), lv = G.crafting.levelOf(c, station);
     list.forEach(function (r) {
       var d = items()[r.out[0]], why = G.crafting.recipeStatus(c, r);
       var qty = r.out[1] > 1 ? ' ×' + r.out[1] : '';
@@ -74,20 +89,53 @@
     return { html: h, level: 'רמה ' + lv };
   }
 
+  // Material choice under the fence row: the look changes at once, the next level is priced in that material.
+  function fenceMatHtml() {
+    var cur = G.state.fence && G.state.fence.material, FM = G.data.fenceMaterials, h = '<div class="mats">';
+    G.data.fenceMaterialOrder.forEach(function (m) {
+      h += '<button class="act mat' + (m === cur ? ' sel' : '') + '" data-act="fenceMat" data-id="' + m + '" tabindex="-1">' + FM[m].name + '</button>';
+    });
+    return h + '</div>';
+  }
+
+  // The floor row: pick a material, then lay blocks one by one in the yard.
+  function floorRowHtml() {
+    var M = G.data.floorMaterials, h = '<div class="row"><span class="badge">▦</span><div class="info"><div class="rname">רצפה (בלוק אחרי בלוק)</div>' +
+      '<div class="desc">בוחרים חומר ומניחים בלוקים בכל מקום בחצר. לחיצה מניחה, קליק ימני מסיר ומחזיר את החומרים.</div><div class="mats">';
+    G.data.floorMaterialOrder.forEach(function (m) {
+      h += '<button class="act mat" data-act="floorMat" data-id="' + m + '" tabindex="-1">' + M[m].name + ' · ' +
+        Object.keys(M[m].cost).map(function (k) { return M[m].cost[k] + ' ' + G.data.items[k].name; }).join(' + ') + '</button>';
+    });
+    return h + '</div></div></div>';
+  }
+
+  function moveRowHtml() {
+    return '<div class="row"><span class="badge">✥</span><div class="info"><div class="rname">הזזה (מקש T)</div>' +
+      '<div class="desc">תופסים מבנה, מחסן או בלוק רצפה ומניחים במקום אחר, בחינם. Shift: מזיזים את כל הרצפה כיחידה אחת.</div></div>' +
+      '<div class="btns"><button class="act" data-act="move" tabindex="-1">הזזה</button></div></div>';
+  }
+
   function buildHtml() {
     var c = ctx(), h = '';
     G.data.buildingOrder.forEach(function (id) {
       var d = G.data.buildings[id], lv = G.crafting.levelOf(c, id), next = G.crafting.nextLevel(c, id);
       var why = G.crafting.buildStatus(c, id);
       var label = !next ? 'מקסימום' : (lv === 0 ? 'בנה' : 'שדרג');
+      var free = !!d.spot, n = free ? G.placing.count(c.placed, id) : 0, pwhy = free ? G.crafting.placeStatus(c, id) : null;
+      var btns = free && lv === 0
+        ? '<button class="act" data-act="place" data-id="' + id + '" tabindex="-1"' + (pwhy ? ' disabled' : '') + '>בנה והצב</button>'
+        : (free ? '<button class="act" data-act="place" data-id="' + id + '" tabindex="-1"' + (pwhy ? ' disabled' : '') + '>הצב עוד</button>' : '') +
+          '<button class="act" data-act="build" data-id="' + id + '" tabindex="-1"' + (why ? ' disabled' : '') + '>' + label + '</button>';
+      if (free && lv === 0) why = pwhy;
       h += '<div class="row' + (why ? ' off' : '') + '">' +
         '<span class="badge">' + pips(lv, d.levels.length) + '</span>' +
-        '<div class="info"><div class="rname">' + d.name + (lv ? '' : '<em>לא נבנה</em>') + '</div>' +
+        '<div class="info"><div class="rname">' + d.name + (lv ? (n > 1 ? ' ×' + n : '') : '<em>לא נבנה</em>') + '</div>' +
         '<div class="desc">' + d.desc + '</div>' +
-        '<div class="costs">' + (next ? costHtml(d.levels[next - 1].cost) : '<span class="cost ok">רמה מלאה</span>') + '</div></div>' +
-        '<button class="act" data-act="build" data-id="' + id + '" tabindex="-1"' + (why ? ' disabled' : '') + '>' + label + '</button></div>';
+        (id === 'fence' ? fenceMatHtml() : '') +
+        '<div class="costs">' + (free && lv === 0 ? costHtml(d.levels[0].cost) : (next ? costHtml(G.crafting.buildCost(c, id)) : '<span class="cost ok">רמה מלאה</span>')) + '</div></div>' +
+        '<div class="btns">' + btns + '</div></div>';
     });
-    return h;
+    return h + floorRowHtml() + moveRowHtml();
   }
 
   // ---- world map ----------------------------------------------------------------------------------
@@ -138,6 +186,7 @@
     els.hudFill.style.transform = 'scaleX(' + (used / size) + ')';
     els.hud.classList.toggle('full', used >= size);
     if (mode === 'craft') {
+      els.craftTabs.innerHTML = craftTabsHtml();          // first: it may fall back to the "all" tab
       var cr = craftHtml();
       fill(els.craftList, cr.html);
       els.craftLevel.textContent = cr.level;
@@ -199,6 +248,7 @@
       els.craftTitle = document.getElementById('craft-title');
       els.craftLevel = document.getElementById('craft-level');
       els.craftList = document.getElementById('craft-list');
+      els.craftTabs = document.getElementById('craft-tabs');
       els.buildPanel = document.getElementById('build-panel');
       els.buildList = document.getElementById('build-list');
       els.mapPanel = document.getElementById('map-panel');
@@ -217,6 +267,8 @@
       els.hudCount = document.getElementById('bag-hud-count');
       els.hudFill = document.getElementById('bag-hud-fill');
       els.area = document.getElementById('area-name');
+      els.weaponName = document.getElementById('weapon-name');
+      els.weaponAmmo = document.getElementById('weapon-ammo');
 
       // needs bars, built from data/needs.js
       var nh = document.getElementById('needs-hud'), html = '';
@@ -232,6 +284,12 @@
       els.status = nh.querySelector('.status');
 
       function handle(e, amount) {
+        var tab = e.target.closest ? e.target.closest('.tab') : null;
+        if (tab) {                                    // a category tab of the crafting panel
+          e.preventDefault();
+          if (amount === Infinity && mode === 'craft') { craftCat = tab.getAttribute('data-cat'); dirty = true; }
+          return;
+        }
         var act = e.target.closest ? e.target.closest('.act') : null;
         if (act) {
           e.preventDefault();
@@ -239,6 +297,10 @@
             var what = act.getAttribute('data-act'), id = act.getAttribute('data-id');
             if (what === 'craft') ui.craft(id);
             else if (what === 'build') ui.build(id);
+            else if (what === 'fenceMat') ui.fenceMat(id);
+            else if (what === 'place') ui.place(id);
+            else if (what === 'move') { ui.close(); G.game.startPlacing({ kind: 'move', carry: null }); }
+            else if (what === 'floorMat') ui.floorMat(id);
             else if (what === 'go') ui.depart(id);
           }
           return;
@@ -269,18 +331,19 @@
     isOpen: function () { return mode !== 'none'; },
     mode: function () { return mode; },
     station: function () { return station; },
-    openChest: function () { mode = 'chest'; station = null; chestChanged = false; applyMode(); },
-    openBag: function () { mode = 'bag'; station = null; applyMode(); },
-    openCraft: function (id) { mode = 'craft'; station = id; applyMode(); },
-    openBuild: function () { mode = 'build'; station = null; applyMode(); },
+    openChest: function () { mode = 'chest'; station = null; chestChanged = false; applyMode(); snd('open'); },
+    openBag: function () { mode = 'bag'; station = null; applyMode(); snd('pickup', { vol: 0.6 }); },
+    openCraft: function (id) { mode = 'craft'; station = id; craftCat = 'all'; applyMode(); snd('ui'); },
+    openBuild: function () { mode = 'build'; station = null; applyMode(); snd('ui'); },
     openMap: function () {
-      mode = 'map'; station = null;
+      mode = 'map'; station = null; snd('ui');
       if (!mapSel || !G.world.has(mapSel)) mapSel = G.data.world.order[0];
       applyMode();
     },
     close: function () {
       if (mode === 'none') return;
       var wasChest = mode === 'chest' && chestChanged;
+      snd(mode === 'chest' ? 'close' : 'ui', { vol: 0.7 });
       mode = 'none'; station = null; chestChanged = false; applyMode();
       if (wasChest) game('save', 'chest');
     },
@@ -292,6 +355,7 @@
 
     selectDest: function (id) {
       if (mode !== 'map' || !G.world.has(id)) return;
+      if (mapSel !== id) snd('ui', { vol: 0.6 });
       mapSel = id; dirty = true;
     },
 
@@ -307,7 +371,7 @@
       var from = owner === 'bag' ? st.bag : st.chest;
       var to = owner === 'bag' ? st.chest : st.bag;
       var moved = G.inventory.move(from, idx, to, amount);
-      if (moved) { dirty = true; chestChanged = true; }
+      if (moved) { dirty = true; chestChanged = true; snd('pickup', { gap: 0.06 }); }
       return moved;
     },
 
@@ -319,20 +383,44 @@
       if (r.ok) {
         s.n--;
         if (s.n <= 0) st.bag.slots[idx] = null;
+        snd(d.kind === 'drink' ? 'drink' : (d.kind === 'food' ? 'eat' : 'bandage'));
         say(d.name + ' · ' + useText(d));
         dirty = true;
         game('save', 'use');
-      } else say(r.reason === 'full' ? 'אין בזה צורך כרגע' : 'אי אפשר להשתמש בזה');
+      } else { snd('uiBad'); say(r.reason === 'full' ? 'אין בזה צורך כרגע' : 'אי אפשר להשתמש בזה'); }
       return r;
     },
 
     craft: function (recipeId) {
       if (mode !== 'craft') return null;
       var r = G.crafting.craft(ctx(), recipeId);
-      if (r.ok) { say('נוצר: ' + items()[r.out[0]].name + (r.out[1] > 1 ? ' ×' + r.out[1] : '')); game('save', 'craft'); }
-      else say(REASON[r.reason] || REASON.unknown);
+      if (r.ok) { snd(station === 'campfire' ? 'cook' : 'craft'); say('נוצר: ' + items()[r.out[0]].name + (r.out[1] > 1 ? ' ×' + r.out[1] : '')); game('save', 'craft'); }
+      else { snd('uiBad'); say(REASON[r.reason] || REASON.unknown); }
       dirty = true;
       return r;
+    },
+
+    place: function (id) {
+      if (mode !== 'build') return;
+      var why = G.crafting.placeStatus(ctx(), id);
+      if (why) { snd('uiBad'); say(why === 'max' ? 'הגעתם למקסימום' : REASON[why] || REASON.unknown); dirty = true; return; }
+      ui.close();
+      G.game.startPlacing({ kind: 'struct', id: id, carry: null });
+    },
+
+    floorMat: function (id) {
+      if (mode !== 'build' || !G.data.floorMaterials[id]) return;
+      ui.close();
+      G.game.startPlacing({ kind: 'floor', mat: id });
+    },
+
+    fenceMat: function (id) {
+      if (mode !== 'build' || !G.data.fenceMaterials[id]) return;
+      G.state.fence = { material: id };
+      G.game.applyBuildings();
+      snd('ui'); say('חומר הגדר: ' + G.data.fenceMaterials[id].name);
+      game('save', 'fence');
+      dirty = true;
     },
 
     build: function (id) {
@@ -340,9 +428,10 @@
       var r = G.crafting.build(ctx(), id);
       if (r.ok) {
         G.game.applyBuildings();
+        snd('build');
         say((r.level === 1 ? 'נבנה: ' : 'שודרג: ') + G.data.buildings[id].name);
         game('save', 'build');
-      } else say(REASON[r.reason] || REASON.unknown);
+      } else { snd('uiBad'); say(REASON[r.reason] || REASON.unknown); }
       dirty = true;
       return r;
     },
@@ -382,6 +471,16 @@
       var text = n.hunger <= 0 ? 'מורעבים: הבריאות יורדת' : (n.thirst <= 0 ? 'מיובשים: הבריאות יורדת'
         : (G.needs.isExhausted(n) ? 'מותשים: איטיים וחלשים' : ''));
       if (text !== statusLast) { statusLast = text; els.status.textContent = text; }
+    },
+
+    // Held weapon and, for the gun, a line "magazine · spare rounds · condition". Writes to the DOM only when the text changes.
+    setWeapon: function (name, text, empty) {
+      var txt = text || '';
+      if (weaponLast.name !== name) { weaponLast.name = name; els.weaponName.textContent = name; }
+      if (weaponLast.ammo !== txt || weaponLast.empty !== !!empty) {
+        weaponLast.ammo = txt; weaponLast.empty = !!empty; els.weaponAmmo.textContent = txt;
+        els.weaponAmmo.classList.toggle('empty', !!empty);
+      }
     },
 
     update: function () { if (dirty) render(); }

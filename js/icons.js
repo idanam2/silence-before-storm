@@ -18,6 +18,33 @@
     g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU); g.fill();
   }
 
+  // A gun lying along +x from a list of parts: [x, y, w, h, fill, radius]; drawn in order with a dark outline.
+  function gunParts(g, parts, extra) {
+    shadow(g, 32, 54, 24, 4);
+    g.save(); g.translate(0, 2); g.rotate(-0.06);
+    parts.forEach(function (p) {
+      g.fillStyle = p[4]; rr(g, p[0], p[1], p[2], p[3], p[5] === undefined ? 2 : p[5]); g.fill();
+      g.strokeStyle = '#111314'; g.lineWidth = 1.4; g.stroke();
+    });
+    if (extra) extra(g);
+    g.strokeStyle = 'rgba(215,222,218,0.35)'; g.lineWidth = 1.1;               // light along the top of the receiver
+    g.beginPath(); g.moveTo(16, parts[1][1] + 1.6); g.lineTo(parts[1][0] + parts[1][2] - 3, parts[1][1] + 1.6); g.stroke();
+    g.restore();
+  }
+  // A few cartridges: case colour, tip colour, case length, case width.
+  function cartridges(g, c0, c1, c2, tip, len, w) {
+    shadow(g, 32, 53, 22, 4);
+    [[17, 40], [26, 42], [35, 41], [44, 39], [22, 29], [31, 30], [40, 28]].forEach(function (b, i) {
+      g.save(); g.translate(b[0], b[1]); g.rotate(-0.12 + (i % 3) * 0.1);
+      var gr = g.createLinearGradient(-w / 2, 0, w / 2, 0);
+      gr.addColorStop(0, c0); gr.addColorStop(0.45, c1); gr.addColorStop(1, c2);
+      g.fillStyle = gr; rr(g, -w / 2, -2, w, len, 1.2); g.fill();
+      g.strokeStyle = '#1e1a12'; g.lineWidth = 1; g.stroke();
+      g.fillStyle = tip; g.beginPath(); g.moveTo(-w / 2, -2); g.quadraticCurveTo(0, -12, w / 2, -2); g.closePath(); g.fill(); g.stroke();
+      g.restore();
+    });
+  }
+
   // A log lying along +x, centered on (0,0).
   function logShape(g, len, w) {
     var gr = g.createLinearGradient(0, -w / 2, 0, w / 2);
@@ -159,8 +186,126 @@
       for (var y = 14; y < 24; y += 3) { g.beginPath(); g.moveTo(-3, y); g.lineTo(3, y + 1.5); g.stroke(); }
       g.restore();
     },
+    pistol: function (g) {
+      shadow(g, 32, 54, 21, 4);
+      g.save(); g.translate(31, 33); g.rotate(-0.12);
+      var gr = g.createLinearGradient(0, -12, 0, 6);                       // slide
+      gr.addColorStop(0, '#6d767a'); gr.addColorStop(1, '#2f3538');
+      g.fillStyle = gr; rr(g, -22, -11, 44, 12, 2.5); g.fill();
+      g.strokeStyle = '#121516'; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = '#3a4144'; rr(g, -19, 1, 31, 6, 2); g.fill(); g.stroke();   // frame under the slide
+      g.fillStyle = '#34292a'; g.beginPath(); g.moveTo(-14, 6); g.lineTo(-3, 6); g.lineTo(-6, 24); g.lineTo(-17, 24); g.closePath(); g.fill();   // grip
+      g.strokeStyle = '#121516'; g.stroke();
+      g.strokeStyle = 'rgba(160,150,140,0.3)'; g.lineWidth = 1;
+      for (var i = 0; i < 4; i++) { g.beginPath(); g.moveTo(-15 + i * 0.4, 10 + i * 3.4); g.lineTo(-6 + i * 0.4, 10 + i * 3.4); g.stroke(); }
+      g.strokeStyle = '#1b1e20'; g.lineWidth = 1.6;                        // trigger guard
+      g.beginPath(); g.moveTo(-2, 7); g.quadraticCurveTo(0, 15, 6, 11); g.lineTo(8, 7); g.stroke();
+      g.strokeStyle = 'rgba(210,218,214,0.5)'; g.lineWidth = 1.2;           // light on the slide
+      g.beginPath(); g.moveTo(-18, -8.5); g.lineTo(17, -8.5); g.stroke();
+      g.restore();
+    },
+    ammo: function (g) {
+      shadow(g, 32, 53, 22, 4);
+      [[17, 40], [26, 42], [35, 41], [44, 39], [22, 30], [31, 31], [40, 29]].forEach(function (b, i) {
+        g.save(); g.translate(b[0], b[1]); g.rotate(-0.12 + (i % 3) * 0.1);
+        var gr = g.createLinearGradient(-3, 0, 3, 0);
+        gr.addColorStop(0, '#8a6a34'); gr.addColorStop(0.45, '#d2ad5c'); gr.addColorStop(1, '#6e5228');
+        g.fillStyle = gr; rr(g, -3.4, -2, 6.8, 15, 1.4); g.fill();         // case
+        g.strokeStyle = '#2a1f10'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#9a6a3a'; g.beginPath(); g.moveTo(-3, -2); g.quadraticCurveTo(0, -11, 3, -2); g.closePath(); g.fill(); g.stroke();   // bullet
+        g.restore();
+      });
+    },
+    ammo_556: function (g) { cartridges(g, '#9a9a90', '#d6d6cc', '#6a6a62', '#b44a38', 17, 5.6); },     // slim, silver case, red-tipped bullets
+    ammo_762: function (g) { cartridges(g, '#7e5f2c', '#c79a48', '#5e4720', '#2c2a28', 19, 7.2); },     // fat, long brass case, dark bullets
+    uzi: function (g) {
+      gunParts(g, [[34, 25, 14, 4, '#1c1e20', 1], [13, 23, 33, 13, '#33383b', 2.5], [20, 35, 8, 17, '#26292b', 1.5], [14, 34, 9, 12, '#3a2f2c', 2], [5, 25, 10, 3, '#222527', 1]],
+        function (g2) { g2.strokeStyle = '#15171a'; g2.lineWidth = 1.6; g2.beginPath(); g2.moveTo(30, 36); g2.quadraticCurveTo(33, 43, 38, 38); g2.stroke(); });
+    },
+    m16: function (g) {
+      gunParts(g, [[3, 28, 15, 9, '#25282a', 3], [17, 26, 26, 10, '#2f3336', 2], [43, 27, 13, 8, '#232628', 2], [55, 29, 7, 3, '#1b1d1f', 1],
+        [21, 21, 19, 4, '#3a3f42', 2], [29, 35, 6, 14, '#202326', 1.5], [17, 35, 6, 11, '#25272a', 2]]);
+    },
+    ak47: function (g) {
+      gunParts(g, [[3, 28, 16, 9, '#6b4a2c', 3], [18, 27, 24, 8, '#2d2f30', 2], [42, 27, 13, 8, '#7a5430', 2], [54, 29, 8, 3, '#1d1f21', 1],
+        [18, 35, 6, 11, '#5a3a22', 2], [30, 35, 6, 15, '#5a3a22', 2.5], [14, 26, 7, 3, '#25272a', 1]]);
+    },
+    sniper: function (g) {
+      gunParts(g, [[2, 29, 17, 9, '#3a3f34', 3], [18, 29, 24, 7, '#2a2d2b', 2], [42, 31, 21, 3, '#1e2123', 1], [20, 21, 25, 6, '#1a1c1e', 3],
+        [26, 35, 5, 7, '#25272a', 1.5], [16, 35, 6, 9, '#2a2c2a', 2]],
+        function (g2) { g2.fillStyle = 'rgba(120,170,190,0.65)'; g2.beginPath(); g2.arc(45, 24, 2.6, 0, TAU); g2.fill(); g2.strokeStyle = '#15171a'; g2.lineWidth = 1.4; g2.beginPath(); g2.moveTo(51, 34); g2.lineTo(47, 45); g2.moveTo(55, 34); g2.lineTo(59, 45); g2.stroke(); });
+    },
     cooked_food: function (g) { bowl(g, '#5a3f28', '#9a6a3c', 3); },
     stew: function (g) { bowl(g, '#6e5a30', '#7d6a50', 2); },
+    rope: function (g) {                                   // a coil of rope
+      shadow(g, 32, 53, 22, 5);
+      for (var i = 0; i < 4; i++) {
+        var gr = g.createLinearGradient(0, 22 + i * 6, 0, 36 + i * 6);
+        gr.addColorStop(0, '#b09a70'); gr.addColorStop(1, '#6a5a3c');
+        g.strokeStyle = '#2a2218'; g.lineWidth = 9; g.beginPath(); g.ellipse(32, 34 + (i - 1.5) * 2, 20 - i * 3, 12 - i * 2, 0, 0, TAU); g.stroke();
+        g.strokeStyle = gr; g.lineWidth = 6.4; g.beginPath(); g.ellipse(32, 34 + (i - 1.5) * 2, 20 - i * 3, 12 - i * 2, 0, 0, TAU); g.stroke();
+      }
+      g.strokeStyle = 'rgba(40,30,18,0.5)'; g.lineWidth = 1;
+      for (var k = 0; k < 14; k++) { var a = k / 14 * TAU; g.beginPath(); g.moveTo(32 + Math.cos(a) * 15, 34 + Math.sin(a) * 9); g.lineTo(32 + Math.cos(a + 0.18) * 18, 34 + Math.sin(a + 0.18) * 11); g.stroke(); }
+      g.strokeStyle = '#8a7a58'; g.lineWidth = 3.4; g.beginPath(); g.moveTo(50, 36); g.quadraticCurveTo(58, 44, 54, 52); g.stroke();
+    },
+    crate: function (g) {                                  // a wooden crate with a slatted lid
+      shadow(g, 32, 54, 24, 5);
+      g.fillStyle = '#5a4a32'; rr(g, 12, 22, 40, 30, 2); g.fill(); g.strokeStyle = '#1e1810'; g.lineWidth = 1.5; g.stroke();
+      var tp = g.createLinearGradient(0, 14, 0, 26); tp.addColorStop(0, '#8d7752'); tp.addColorStop(1, '#6a5638');
+      g.fillStyle = tp; g.beginPath(); g.moveTo(12, 22); g.lineTo(19, 14); g.lineTo(57, 14); g.lineTo(52, 22); g.closePath(); g.fill(); g.stroke();
+      g.strokeStyle = 'rgba(30,22,12,0.55)'; g.lineWidth = 1.2;
+      [31, 40, 48].forEach(function (y) { g.beginPath(); g.moveTo(12, y); g.lineTo(52, y); g.stroke(); });
+      g.fillStyle = '#4a4034'; g.fillRect(12, 22, 4, 30); g.fillRect(48, 22, 4, 30);
+      g.fillStyle = '#9aa3a5'; [[14, 26], [14, 48], [50, 26], [50, 48]].forEach(function (p) { g.beginPath(); g.arc(p[0], p[1], 1.4, 0, TAU); g.fill(); });
+    },
+    firstaid: function (g) {                               // a small case with a cross
+      shadow(g, 32, 54, 22, 4);
+      var gr = g.createLinearGradient(0, 18, 0, 52); gr.addColorStop(0, '#9a6058'); gr.addColorStop(1, '#6a3a36');
+      g.fillStyle = gr; rr(g, 11, 20, 42, 32, 5); g.fill(); g.strokeStyle = '#2a1614'; g.lineWidth = 1.6; g.stroke();
+      g.fillStyle = '#4a2a28'; rr(g, 25, 14, 14, 8, 3); g.fill(); g.stroke();                  // handle
+      g.fillStyle = '#e0d8c8'; rr(g, 27, 26, 10, 20, 1.5); g.fill(); rr(g, 22, 31, 20, 10, 1.5); g.fill();
+      g.strokeStyle = 'rgba(235,225,205,0.3)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(15, 23); g.lineTo(49, 23); g.stroke();
+    },
+    torch: function (g) {                                  // a stick wrapped in cloth with a small flame
+      shadow(g, 32, 55, 14, 3);
+      g.save(); g.translate(32, 36); g.rotate(0.35);
+      var gr = g.createLinearGradient(-4, 0, 4, 0); gr.addColorStop(0, '#4a3b2b'); gr.addColorStop(0.5, '#8d7556'); gr.addColorStop(1, '#3d3024');
+      g.fillStyle = gr; rr(g, -3.5, -6, 7, 34, 2.5); g.fill(); g.strokeStyle = '#1e1811'; g.lineWidth = 1.3; g.stroke();
+      g.fillStyle = '#6e6660'; rr(g, -5.5, -12, 11, 11, 3); g.fill(); g.stroke();
+      g.fillStyle = 'rgba(168,67,28,0.95)'; g.beginPath(); g.moveTo(-6, -10); g.quadraticCurveTo(-8, -24, 0, -32); g.quadraticCurveTo(8, -24, 6, -10); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(240,184,84,0.95)'; g.beginPath(); g.moveTo(-3, -11); g.quadraticCurveTo(-4, -20, 0, -25); g.quadraticCurveTo(4, -20, 3, -11); g.closePath(); g.fill();
+      g.restore();
+    },
+    lantern: function (g) {                                // a metal lantern with a glowing pane
+      shadow(g, 32, 55, 17, 4);
+      g.strokeStyle = '#5a6266'; g.lineWidth = 2.4; g.beginPath(); g.arc(32, 14, 8, Math.PI, TAU); g.stroke();
+      g.fillStyle = '#4a5256'; rr(g, 18, 14, 28, 6, 2); g.fill(); g.strokeStyle = '#14171a'; g.lineWidth = 1.4; g.stroke();
+      g.fillStyle = '#3c4346'; rr(g, 18, 48, 28, 6, 2); g.fill(); g.stroke();
+      var gl = g.createLinearGradient(0, 20, 0, 48); gl.addColorStop(0, '#d8a85a'); gl.addColorStop(1, '#8a5a2c');
+      g.fillStyle = gl; g.fillRect(21, 20, 22, 28);
+      g.fillStyle = 'rgba(255,230,160,0.7)'; g.beginPath(); g.ellipse(32, 36, 4, 7, 0, 0, TAU); g.fill();
+      g.strokeStyle = '#14171a'; g.lineWidth = 1.5; g.strokeRect(21, 20, 22, 28); g.beginPath(); g.moveTo(32, 20); g.lineTo(32, 48); g.stroke();
+    },
+    dried_mushroom: function (g) {                         // a string of small dried caps
+      shadow(g, 32, 54, 20, 3);
+      g.strokeStyle = '#8a7a58'; g.lineWidth = 2; g.beginPath(); g.moveTo(8, 18); g.quadraticCurveTo(32, 30, 56, 18); g.stroke();
+      [[17, 23, 0.6], [32, 27, 0.8], [47, 23, 0.65]].forEach(function (m) {
+        g.fillStyle = '#6a5a40'; g.fillRect(m[0] - 1, m[1], 2, 10 * m[2] / 0.6);
+        g.fillStyle = '#9a8460'; g.beginPath(); g.moveTo(m[0] - 10 * m[2] / 0.6 * 0.8, m[1] + 12 * m[2] / 0.6);
+        g.quadraticCurveTo(m[0], m[1] - 2, m[0] + 10 * m[2] / 0.6 * 0.8, m[1] + 12 * m[2] / 0.6); g.closePath(); g.fill();
+        g.strokeStyle = '#2a2218'; g.lineWidth = 1.1; g.stroke();
+        g.fillStyle = 'rgba(210,196,160,0.35)'; g.fillRect(m[0] - 4, m[1] + 5, 3, 2);
+      });
+    },
+    ration: function (g) {                                 // a wrapped pack of dried food
+      shadow(g, 32, 54, 22, 4);
+      g.fillStyle = '#6e5e3c'; rr(g, 12, 22, 40, 28, 4); g.fill(); g.strokeStyle = '#2a2014'; g.lineWidth = 1.6; g.stroke();
+      g.fillStyle = '#8a7a56'; g.beginPath(); g.moveTo(10, 24); g.lineTo(14, 18); g.lineTo(50, 18); g.lineTo(54, 24); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#c8bca0'; rr(g, 19, 28, 26, 14, 2); g.fill();
+      g.fillStyle = '#5a4a30'; g.fillRect(22, 32, 14, 2); g.fillRect(22, 36, 9, 2);
+      g.strokeStyle = 'rgba(40,30,18,0.45)'; g.lineWidth = 1; g.beginPath(); g.moveTo(32, 18); g.lineTo(32, 24); g.stroke();
+    },
     wood: function (g) {
       shadow(g, 32, 52, 24, 5);
       g.save(); g.translate(24, 42); g.rotate(-0.12); logShape(g, 40, 14); g.restore();

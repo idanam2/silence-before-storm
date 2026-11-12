@@ -14,12 +14,12 @@
     levels: {
       easy: {
         id: 'easy', name: 'קל',
-        desc: 'הרעב, הצמא והאנרגיה יורדים לאט מאוד והנזק שאתם סופגים נמוך. בנפילה תאבדו חצי מהתיק.',
+        desc: 'הרעב, הצמא והאנרגיה יורדים לאט מאוד והנזק שאתם סופגים נמוך. בנפילה תאבדו חצי מהתיק, והנשק שבידכם נשמר.',
         hunger: 0.4, thirst: 0.4, energy: 0.5, damage: 0.5, deathLoss: 0.5, loseWeapons: false
       },
       normal: {
         id: 'normal', name: 'בינוני',
-        desc: 'הקצב הרגיל. בנפילה תאבדו את כל מה שבתיק.',
+        desc: 'הקצב הרגיל. בנפילה תאבדו את כל מה שבתיק, מלבד הנשק שבידכם.',
         hunger: 1, thirst: 1, energy: 1, damage: 1, deathLoss: 1, loseWeapons: false
       },
       hard: {
