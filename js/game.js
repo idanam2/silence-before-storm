@@ -12,6 +12,7 @@
   var FADE = 0.38;             // seconds for each half of the travel fade
   var SLEEP_FADE = 1.0;        // and for the slower, darker fade of a night's sleep
   var FAINT_FADE = 0.9;
+  var DOOR_FADE = 0.26;        // quicker fade through a door / up the stairs
   var AUTOSAVE = 30;           // seconds between automatic saves
   var ZERO = { x: 0, y: 0, run: false };
   var HOLD = { Digit1: ['hands', 'ידיים ריקות'], Digit2: ['axe', 'גרזן'], Digit3: ['club', 'אלה'], Digit4: ['gun', 'אקדח'], Digit5: ['crate', 'ארגז'] };
@@ -24,7 +25,7 @@
     scene: 'menu',           // 'menu' (main menu over the base) | 'play'
     paused: false,
     player: null, cam: cam, view: view, frames: 0, ticks: 0, time: 0,
-    area: 'base', world: cfg.world, zone: null, visits: {},
+    area: 'base', world: cfg.world, zone: null, visits: {}, trip: {},
     gather: G.area.newGather(), gathering: false, target: null, targetBlock: null,
     floaters: [], particles: [], fade: null, fullNoteAt: -10,
     diff: 'normal', needs: null, tank: null, playTime: 0, sinceSave: 0, low: {}, saveWarned: false
@@ -81,7 +82,7 @@
 
   // Generates a destination for a given visit number (the same visit always gives the same area) and puts the
   // player there: at its entrance, or at `pos` when a save is loaded.
-  function enterZone(id, visit, delta, pos) {
+  function enterZone(id, visit, delta, pos, face) {
     var def = G.data.areas[id];
     clearScene();
     st.visits[id] = visit;
@@ -94,6 +95,8 @@
     if (pos) {
       st.player.x = st.player.prevX = G.util.clamp(pos.x, 40, st.zone.width - 40);
       st.player.y = st.player.prevY = G.util.clamp(pos.y, 40, st.zone.height - 40);
+      if (face !== undefined) st.player.angle = st.player.prevAngle = face;
+      G.player.settle && G.player.settle(st.player, st.player.angle);
       G.area.collide(st.player, st.zone);
       var t = cameraTarget(); cam.x = t.x; cam.y = t.y;
     }
@@ -102,6 +105,7 @@
 
   // Instant switch (the fade around it is handled in tick). Every trip to a destination re-rolls its loose resources.
   function setArea(id) {
+    st.trip = {};                                    // a new trip (or back home): building floors start fresh
     if (id === 'base' || !G.world.has(id)) {
       clearScene();
       st.zone = null;
@@ -120,6 +124,16 @@
     G.ui.close();
     st.fade = { t: 0, dur: dur, mid: mid, done: done, swapped: false };
     return true;
+  }
+
+  // Through a door or up / down the stairs: another area of the same trip (a building's floor). What was taken
+  // on each floor is kept for the rest of the trip (st.trip), so nothing refills by walking in and out.
+  function goThrough(door) {
+    if (!G.data.areas[door.to]) return false;
+    return startFade(DOOR_FADE, function () {
+      st.trip[st.zone.id] = G.area.delta(st.zone);
+      enterZone(door.to, st.zone.visit, st.trip[door.to] || null, door.at, door.face);
+    }, function () { save('arrive'); });
   }
 
   // Back to the base (from an exit point).
@@ -232,6 +246,7 @@
     st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings;
     st.tank = d.tank; st.visits = d.visits; st.playTime = d.playTime;
     applyBuildings();
+    st.trip = d.trip || {};
     if (d.zone) enterZone(d.zone.id, d.zone.visit, d.zone.delta, d.pos);
     else {
       setArea('base');
@@ -318,6 +333,7 @@
     if (inp.wasPressed('KeyE') && !st.fade) {
       if (ui.isOpen()) ui.close();
       else if (target && target.kind === 'exit') travel('base');
+      else if (target && target.kind === 'door') goThrough(target.door);
     }
     frozen = frozen || ui.isOpen() || !!st.fade;
 
@@ -348,6 +364,7 @@
     var text = null;
     if (st.target) {
       if (target.kind === 'exit') text = 'E · חזרה לבסיס';
+      else if (target.kind === 'door') text = 'E · ' + target.door.label;
       else {
         st.targetBlock = G.area.check(target, st.bag, res, items);
         if (st.targetBlock === 'tool') text = def.action + ' · דרוש ' + items[def.tool].name;
@@ -520,6 +537,7 @@
       resize();
       root.addEventListener('resize', resize);
       G.forestArt.init(ctx, view.dpr);
+      G.placeArt.init(ctx, view.dpr);
       // Paint the forest terrain now, so the first trip does not hitch during the fade.
       G.forestArt.prepare(G.area.generate(G.data.areas.forest, G.data.resources, 0));
       st.buildings = G.crafting.startBuildings();

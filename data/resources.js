@@ -16,6 +16,17 @@
     stones:    { action: 'איסוף אבנים',   item: 'stone', yield: [2, 3], time: 0.6,  tool: null,      r: 15, solid: 0,  fx: 'stone' },
     boulder:   { action: 'חציבת סלע',     item: 'stone', yield: [5, 8], time: 2.4,  tool: 'pickaxe', r: 34, solid: 30, scale: [0.8, 1.2], fx: 'stone' },
     mushrooms: { action: 'קטיף פטריות',   item: 'mushroom', yield: [1, 3], time: 0.45, tool: null,   r: 13, solid: 0,  fx: 'spore' },
+    // salvage in built-up places (the port first). Hand-placed at sensible spots, see `loot` in data/areas.js.
+    crate:     { action: 'פירוק ארגז מטען', item: 'plank',   yield: [2, 3], time: 1.5, tool: 'axe', r: 22, solid: 0, fx: 'wood' },
+    pallet:    { action: 'פירוק משטח עץ',   item: 'wood',    yield: [2, 4], time: 1.0, tool: null,  r: 24, solid: 0, fx: 'wood' },
+    scrap:     { action: 'איסוף גרוטאות',   item: 'metal',   yield: [1, 3], time: 1.2, tool: null,  r: 18, solid: 0, fx: 'metal' },
+    tarp:      { action: 'חיתוך ברזנט וחבלים', item: 'cloth', yield: [1, 3], time: 0.9, tool: null, r: 20, solid: 0, fx: 'cloth' },
+    cargo:     { action: 'חיפוש במטען',     item: 'canned_food', yield: [1, 2], time: 1.3, tool: null, r: 20, solid: 0, fx: 'metal' },
+    medkit:    { action: 'פתיחת ערכת עזרה ראשונה', item: 'bandage', yield: [1, 2], time: 1.1, tool: null, r: 16, solid: 0, fx: 'cloth' },
+    radio:     { action: 'פירוק מכשיר קשר', item: 'electronics', yield: [1, 2], time: 1.6, tool: null, r: 16, solid: 0, fx: 'metal' },
+    vend_snack: { action: 'שבירת מכונת החטיפים', item: 'canned_food', yield: [1, 3], time: 1.4, tool: null, r: 18, solid: 0, fx: 'metal' },
+    vend_drink: { action: 'שבירת מכונת השתייה', item: 'water_clean', yield: [1, 3], time: 1.4, tool: null, r: 18, solid: 0, fx: 'water' },
+    barrel:    { action: 'מילוי מחבית גשם', item: 'water_dirty', yield: [2, 3], time: 0.9, tool: null, r: 16, solid: 0, fx: 'water' },
     water:     { action: 'מילוי מים',     item: 'water_dirty', yield: [1, 1], time: 0.9, tool: null, r: 0,  solid: 0,  infinite: true, fx: 'water' }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

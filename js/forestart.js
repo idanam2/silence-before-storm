@@ -568,9 +568,10 @@
       var t = tones[Math.floor(rand() * tones.length)];
       blob(rand() * W, rand() * H, 140 + rand() * 330, t[0], t[1] * (0.5 + rand() * 0.5));
     }
-    blob(area.spawn.x, area.spawn.y - 40, 330, '112,92,62', 0.13);              // trodden clearing at the trailhead
+    var trail = !(area.theme && area.theme.trail === false);                  // built places draw roads instead
+    if (trail) blob(area.spawn.x, area.spawn.y - 40, 330, '112,92,62', 0.13);   // trodden clearing at the trailhead
     g.lineCap = 'round'; g.lineJoin = 'round';
-    [[130, 0.05], [92, 0.07], [58, 0.09], [30, 0.06]].forEach(function (p) {    // worn trails, soft edges
+    if (trail) [[130, 0.05], [92, 0.07], [58, 0.09], [30, 0.06]].forEach(function (p) {    // worn trails, soft edges
       g.strokeStyle = 'rgba(118,98,68,' + p[1] + ')'; g.lineWidth = p[0];
       area.paths.forEach(function (path) {
         g.beginPath(); g.moveTo(path[0][0], path[0][1]);
@@ -595,12 +596,19 @@
   }
 
   function buildDecor(area, seed) {
-    var rand = G.util.rng(seed), out = [];
+    var rand = G.util.rng(seed), out = [], built = !!(area.structures && area.structures.length);
+    function within(list, x, y, pad) {
+      for (var i = 0; list && i < list.length; i++) { var r = list[i]; if (x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad) return true; }
+      return false;
+    }
+    function onDeck(x, y, pad) { return within(area.decks, x, y, pad + 4); }
+    function onRoad(x, y) { return within(area.roads, x, y, 0); }
     function scatter(kind, count, opts) {
       var list = SP[kind], tries = count * 6, placed = 0;
       while (placed < count && tries-- > 0) {
         var x = Math.round(20 + rand() * (area.width - 40)), y = Math.round(20 + rand() * (area.height - 40));
         if (G.area.inWater(area, x, y, opts.pad)) continue;
+        if (built && (G.area.inSolid(area, x, y, opts.pad + 6) || onDeck(x, y, opts.pad) || (onRoad(x, y) && rand() > 0.12))) continue;
         if (opts.offPath && G.area.pathDist(area.paths, x, y) < opts.offPath) continue;
         if (opts.clear) {
           var hit = false;
@@ -615,6 +623,12 @@
         out.push({ sp: list[Math.floor(rand() * list.length)], x: x, y: y });
         placed++;
       }
+    }
+    var plan = area.theme && area.theme.decor;
+    if (plan) {
+      var PAD = { leaves: 4, pebbles: 4, grass: 6, flowers: 10, fern: 26, bush: 44, papers: 6 };
+      plan.forEach(function (d) { scatter(d[0], d[1], { pad: PAD[d[0]] || 6, clear: d[0] === 'bush' ? 40 : 0 }); });
+      return out;
     }
     scatter('leaves', 300, { pad: 4 });
     scatter('pebbles', 170, { pad: 4 });
@@ -755,11 +769,12 @@
 
   // Ground, water, decor, resources. Drawn before the player.
   function drawBelow(ctx, area, st, vr, time, py) {
-    var T = prepare(area), i, n, a;
-    ctx.fillStyle = groundPattern;
+    var T = prepare(area), i, n, a, PA = G.placeArt && G.placeArt.has(area) ? G.placeArt : null;
+    ctx.fillStyle = PA && area.theme.ground ? PA.ground(area.theme.ground) : groundPattern;
     ctx.fillRect(vr.x0, vr.y0, vr.x1 - vr.x0, vr.y1 - vr.y0);
     var k = T.macro.k;
     var sx = Math.max(0, vr.x0), sy = Math.max(0, vr.y0), ex = Math.min(area.width, vr.x1), ey = Math.min(area.height, vr.y1);
+    if (PA) PA.drawGround(ctx, area, vr, time);
     if (ex > sx && ey > sy) ctx.drawImage(T.macro.c, sx * k, sy * k, (ex - sx) * k, (ey - sy) * k, sx, sy, ex - sx, ey - sy);
 
     for (i = 0; i < T.ponds.length; i++) {
@@ -781,7 +796,7 @@
       if (seen(vr, d.x, d.y, 60)) ctx.drawImage(d.sp.c, d.x - d.sp.w / 2, d.y - d.sp.h / 2, d.sp.w, d.sp.h);
     }
 
-    drawExit(ctx, area.exit.x, area.exit.y, area.exit.r, time, 1);
+    if (area.exit) drawExit(ctx, area.exit.x, area.exit.y, area.exit.r, time, 1);
 
     drawTreeShadows(ctx, area.nodes, vr);
     drawTreeBases(ctx, area.nodes, vr);
@@ -800,6 +815,7 @@
       blit(ctx, list[n.variant % list.length], n.x + ox, n.y, n.type === 'boulder' ? n.scale : 1);
     }
     ctx.globalAlpha = 1;
+    if (PA) PA.drawStructures(ctx, area, st, vr, time, py, false);
     drawTreeTrunks(ctx, area.nodes, vr, py, false);
   }
 
@@ -809,6 +825,7 @@
     var g = st.gather, shake = 0;
     if (g && g.node && g.t > 0) shake = Math.exp(-((g.t % G.area.HIT) / G.area.HIT) * 5) * 3;
     drawTreeTrunks(ctx, area.nodes, vr, py, true);
+    if (G.placeArt && G.placeArt.has(area)) G.placeArt.drawStructures(ctx, area, st, vr, time, py, true);
     drawTreeTops(ctx, area.nodes, vr, time, g ? g.node : null, shake);
 
     for (i = 0; i < T.spores.length; i++) {               // drifting spores / dust in the air
@@ -851,7 +868,9 @@
     wood:  ['#9a8158', '#6b5a44', '#b09a74'],
     stone: ['#858b87', '#5c625e', '#a3a9a4'],
     spore: ['#b5a88e', '#8a6a4e', '#d0c6aa'],
-    water: ['#9fc4c0', '#6f9a98', '#c8e0dc']
+    water: ['#9fc4c0', '#6f9a98', '#c8e0dc'],
+    metal: ['#7d8582', '#5a4a3c', '#a4aaa6'],
+    cloth: ['#6e6a5c', '#4f5a5c', '#8a8470']
   };
   function spawnFx(list, kind, x, y, count, rand) {
     var cols = FX[kind] || FX.wood;

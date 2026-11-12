@@ -434,6 +434,36 @@
         }
         ctx.closePath();
         ctx.fillStyle = tone(PAL.skin, 0.55 + 0.45 * lit(0)); ctx.fill();
+        // face features: points on the sphere around the facing direction, shown only while turned to the camera
+        var up = [-e2[0], -e2[1], -e2[2]];
+        function fp(a, b) {
+          var v = norm([n[0] + e1[0] * a + up[0] * b, n[1] + e1[1] * a + up[1] * b, n[2] + e1[2] * a + up[2] * b]);
+          return { x: hc.x + v[0] * hr, y: hc.y + (v[1] * vz - v[2] * vy) * hr, d: v[1] * vy + v[2] * vz };
+        }
+        function seg(a0, b0, a1, b1, w, col) {
+          var p0 = fp(a0, b0), p1 = fp(a1, b1), vis = Math.min(p0.d, p1.d);
+          if (vis <= 0.05) return;
+          ctx.globalAlpha = Math.min(1, (vis - 0.05) * 5);
+          ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineWidth = w; ctx.strokeStyle = col; ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        function dot(a, b0, r, col) {
+          var q2 = fp(a, b0);
+          if (q2.d <= 0.05) return;
+          ctx.globalAlpha = Math.min(1, (q2.d - 0.05) * 5);
+          ctx.beginPath(); ctx.arc(q2.x, q2.y, r, 0, TAU); ctx.fillStyle = col; ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        var eyeR = Math.max(0.8, hr * 0.095);
+        [-1, 1].forEach(function (sd) {
+          seg(sd * 0.18, 0.44, sd * 0.52, 0.4, Math.max(1, hr * 0.11), PAL.hair);                  // brows
+          dot(sd * 0.34, 0.24, eyeR * 1.25, 'rgba(214,204,186,0.75)');                            // eye white
+          dot(sd * 0.34, 0.24, eyeR, '#1d1712');                                                   // pupil
+        });
+        seg(0.02, 0.16, 0.06, -0.06, Math.max(1, hr * 0.1), tone(PAL.skin, 0.32));                  // nose
+        seg(-0.18, -0.28, 0.18, -0.28, Math.max(1, hr * 0.1), 'rgba(96,52,44,0.9)');                 // mouth
+        seg(-0.48, -0.2, -0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');              // stubble along the jaw
+        seg(0.48, -0.2, 0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');
         ctx.beginPath(); ctx.arc(hc.x - hr * 0.3, hc.y - hr * 0.35, hr * 0.42, 0, TAU);            // soft light on the hair
         ctx.fillStyle = 'rgba(190,170,140,0.13)'; ctx.fill();
       });

@@ -46,7 +46,10 @@
       area: st.area,
       pos: { x: Math.round(st.player.x), y: Math.round(st.player.y) }
     };
-    if (st.area !== 'base' && st.zone) o.zone = { id: st.zone.id, visit: st.zone.visit, delta: G.area.delta(st.zone) };
+    if (st.area !== 'base' && st.zone) {
+      o.zone = { id: st.zone.id, visit: st.zone.visit, delta: G.area.delta(st.zone) };
+      o.trip = JSON.parse(JSON.stringify(st.trip || {}));     // other floors of the same building, already searched
+    }
     return o;
   }
 
@@ -61,6 +64,21 @@
     }
     while (slots.length < minSize) slots.push(null);
     return { slots: slots };
+  }
+
+  function cleanDelta(list) {
+    var delta = [];
+    if (!Array.isArray(list)) return delta;
+    for (var i = 0; i < list.length && i < 5000; i++) {
+      var e = list[i];
+      if (Array.isArray(e) && isFinite(e[0]) && isFinite(e[1]) && e[0] >= 0) delta.push([Math.floor(e[0]), Math.max(0, Math.floor(e[1]))]);
+    }
+    return delta;
+  }
+  // A destination, or a floor / inside of one (an area with a `parent` destination).
+  function placeOk(id) {
+    var a = typeof id === 'string' && G.data.areas.hasOwnProperty(id) ? G.data.areas[id] : null;
+    return !!a && (G.world.has(id) || (!!a.parent && G.world.has(a.parent)));
   }
 
   // Raw object -> a safe, complete state (missing or invalid parts fall back to defaults).
@@ -96,17 +114,14 @@
     d.area = 'base'; d.zone = null; d.pos = null;
     if (o.pos && typeof o.pos === 'object' && isFinite(o.pos.x) && isFinite(o.pos.y)) d.pos = { x: o.pos.x, y: o.pos.y };
     var z = o.zone;
-    if (o.area !== 'base' && z && typeof z === 'object' && G.world.has(z.id)) {
-      var delta = [];
-      if (Array.isArray(z.delta)) {
-        for (i = 0; i < z.delta.length && i < 5000; i++) {
-          var e = z.delta[i];
-          if (Array.isArray(e) && isFinite(e[0]) && isFinite(e[1]) && e[0] >= 0) delta.push([Math.floor(e[0]), Math.max(0, Math.floor(e[1]))]);
-        }
-      }
+    d.trip = {};
+    if (o.area !== 'base' && z && typeof z === 'object' && placeOk(z.id)) {
       d.area = z.id;
-      d.zone = { id: z.id, visit: Math.max(1, Math.floor(num(z.visit, 1, 1, 1e6))), delta: delta };
-      d.visits[z.id] = Math.max(d.visits[z.id], d.zone.visit);
+      d.zone = { id: z.id, visit: Math.max(1, Math.floor(num(z.visit, 1, 1, 1e6))), delta: cleanDelta(z.delta) };
+      var root = G.data.areas[z.id].parent || z.id;
+      d.visits[root] = Math.max(d.visits[root] || 0, d.zone.visit);
+      var tr = o.trip && typeof o.trip === 'object' ? o.trip : {};
+      for (k in tr) if (placeOk(k)) d.trip[k] = cleanDelta(tr[k]);
     }
     return d;
   }

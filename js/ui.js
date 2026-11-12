@@ -95,13 +95,17 @@
   function mapParts() {
     var W = G.data.world, st = G.state, diff = G.game.diff(), energy = Math.floor(st.needs.energy);
     var lines = '', nodes = '', i;
+    var route = mapSel && W.geo && W.geo.routes[mapSel];
+    if (route) {                                     // the selected road, drawn over the painted map
+      var pts = route.map(function (p) { return p[0] + ',' + p[1]; }).join(' ');
+      lines = '<polyline class="glow" points="' + pts + '"/><polyline class="sel" points="' + pts + '"/>';
+    }
     for (i = 0; i < W.order.length; i++) {
       var id = W.order[i], d = W.destinations[id], sel = id === mapSel;
-      lines += '<line class="' + (sel ? 'sel' : '') + '" x1="' + W.base.pos.x + '" y1="' + W.base.pos.y + '" x2="' + d.pos.x + '" y2="' + d.pos.y + '"/>';
       nodes += '<button class="mnode risk' + d.risk + (sel ? ' sel' : '') + '" data-dest="' + id + '" tabindex="-1" style="left:' + d.pos.x + '%;top:' + d.pos.y + '%">' +
-        '<i></i><span>' + G.world.name(id) + '</span></button>';
+        '<i>' + G.mapArt.icon(id) + '</i><span>' + G.world.name(id) + '</span></button>';
     }
-    nodes += '<div class="mhome" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i></i><span>' + W.base.name + '</span></div>';
+    nodes += '<div class="mhome" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i>' + G.mapArt.icon('base') + '</i><span>' + W.base.name + '</span></div>';
 
     var info = '';
     if (mapSel && W.destinations[mapSel]) {
@@ -145,6 +149,7 @@
       els.mapLines.innerHTML = mp.lines;
       els.mapNodes.innerHTML = mp.nodes;
       els.mapInfo.innerHTML = mp.info;
+      G.mapArt.paint(els.mapArt);
       els.mapEnergy.textContent = mp.energy;
     }
     dirty = false;
@@ -168,6 +173,7 @@
     els.hint.textContent = hintFor();
     els.msg.textContent = '';
     els.msg.classList.remove('show');
+    if (mode === 'map') G.mapArt.paint(els.mapArt);   // painted once per size, the panel is visible now
     dirty = true;
   }
 
@@ -198,6 +204,8 @@
       els.mapPanel = document.getElementById('map-panel');
       els.mapLines = document.getElementById('map-lines');
       els.mapNodes = document.getElementById('map-nodes');
+      els.mapArt = document.getElementById('map-art');
+      root.addEventListener('resize', function () { if (mode === 'map') { G.mapArt.paint(els.mapArt); } });
       els.mapInfo = document.getElementById('map-info');
       els.mapEnergy = document.getElementById('map-energy');
       els.hint = document.getElementById('inv-hint');

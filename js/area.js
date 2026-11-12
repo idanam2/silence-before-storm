@@ -27,8 +27,35 @@
     return best;
   }
 
-  // True when (x, y) is in a pond, or closer than `pad` to its shore.
+  function inRect(r, x, y, pad) { return x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad; }
+
+  // Open water of a hand-built place (sea rects minus the piers over them).
+  function inSea(area, x, y) {
+    var w = area.water, i;
+    if (!w || !w.length) return false;
+    for (i = 0; i < w.length; i++) if (inRect(w[i], x, y, 0)) break;
+    if (i === w.length) return false;
+    for (i = 0; i < area.decks.length; i++) if (inRect(area.decks[i], x, y, 0)) return false;
+    return true;
+  }
+  // The sea with a margin: the point, or any of 8 points `pad` around it, is in open water.
+  function nearSea(area, x, y, pad) {
+    if (inSea(area, x, y)) return true;
+    if (!pad) return false;
+    for (var a = 0; a < 8; a++) if (inSea(area, x + Math.cos(a * TAU / 8) * pad, y + Math.sin(a * TAU / 8) * pad)) return true;
+    return false;
+  }
+  // True when (x, y) is inside a solid structure (with a margin).
+  function inSolid(area, x, y, pad) {
+    var s = area.solids;
+    if (!s) return false;
+    for (var i = 0; i < s.length; i++) if (inRect(s[i], x, y, pad || 0)) return true;
+    return false;
+  }
+
+  // True when (x, y) is in a pond or the sea, or closer than `pad` to its shore.
   function inWater(area, x, y, pad) {
+    if (area.water && nearSea(area, x, y, pad || 0)) return true;
     for (var i = 0; i < area.ponds.length; i++) {
       var bl = area.ponds[i].blobs;
       for (var j = 0; j < bl.length; j++) if (dist(x, y, bl[j].x, bl[j].y) < bl[j].r + (pad || 0)) return true;
@@ -42,10 +69,17 @@
     var rT = G.util.rng(def.seed), rR = G.util.rng(def.seed * 31 + (visit || 0) * 977 + 5);
     var A = {
       id: def.id, name: def.name, width: def.width, height: def.height,
-      exit: def.exit, spawn: def.spawn, paths: def.paths, reach: def.reach, theme: def.theme,
-      ponds: [], nodes: [], visit: visit || 0
+      exit: def.exit || null, doors: def.doors || [], interior: !!def.interior, parent: def.parent || null, spawn: def.spawn, paths: def.paths, reach: def.reach, theme: def.theme,
+      ponds: [], nodes: [], visit: visit || 0,
+      seed: def.seed, lots: def.lots || [], pads: def.pads || [], crops: def.crops || [], terraces: def.terraces || [], floors: def.floors || [], lights: def.lights || [], footprint: def.footprint || null,
+      water: def.water || [], decks: def.decks || [], structures: def.structures || [], roads: def.roads || [], solids: []
     };
     var i, k;
+    for (i = 0; i < A.structures.length; i++) {          // flat collision: whole box, or only its feet
+      var so = A.structures[i];
+      if (so.legs) for (k = 0; k < so.legs.length; k++) A.solids.push({ x: so.legs[k].x, y: so.legs[k].y, w: so.legs[k].w, h: so.legs[k].h, kind: so.kind });
+      else if (so.solid !== false) A.solids.push({ x: so.x, y: so.y, w: so.w, h: so.h, kind: so.kind });
+    }
 
     for (i = 0; i < def.ponds.length; i++) {
       var pd = def.ponds[i], blobs = [{ x: pd.x, y: pd.y, r: pd.r }], nb = 3 + Math.floor(rT() * 2);
@@ -93,7 +127,11 @@
       var m = def.margin, big = !!(d.tree || d.solid);
       if (x < m || y < m || x > def.width - m || y > def.height - m) return false;
       if (inWater(A, x, y, d.r + 24)) return false;
-      if (dist(x, y, def.exit.x, def.exit.y) < def.exit.r + d.r + 30) return false;
+      if (inSolid(A, x, y, d.canopy ? d.canopy[1] : d.r + 20)) return false;     // crowns must not grow through roofs
+      var paved = A.roads.concat(A.lots, A.crops, A.pads.map(function (pd) { return { x: pd.x - pd.r, y: pd.y - pd.r, w: pd.r * 2, h: pd.r * 2 }; }));                 // no trees growing out of roads and parking lots
+      if (big) for (var q = 0; q < paved.length; q++) if (inRect(paved[q], x, y, d.r + 10)) return false;
+      if (def.exit && dist(x, y, def.exit.x, def.exit.y) < def.exit.r + d.r + 30) return false;
+      for (var dd = 0; def.doors && dd < def.doors.length; dd++) if (dist(x, y, def.doors[dd].x, def.doors[dd].y) < def.doors[dd].r + d.r + 30) return false;
       if (big && dist(x, y, def.spawn.x, def.spawn.y) < def.clearing) return false;
       if (big && pathDist(def.paths, x, y) < 80) return false;
       for (var j = 0; j < A.nodes.length; j++) {
@@ -101,6 +139,16 @@
         if (dist(x, y, e.x, e.y) < need) return false;
       }
       return true;
+    }
+
+    // salvage at hand-picked spots: which spots are used is re-rolled per visit
+    var loot = def.loot || [];
+    for (i = 0; i < loot.length; i++) {
+      var L = loot[i], spots = L.spots.slice();
+      for (k = 0; k < L.count && spots.length; k++) {
+        var s = spots.splice(Math.floor(rR() * spots.length), 1)[0];
+        makeNode(L.type, s[0] + (rR() - 0.5) * 10, s[1] + (rR() - 0.5) * 10, rR);
+      }
     }
 
     var trees = [];
@@ -137,10 +185,31 @@
     p.x = x + (dx / d) * need; p.y = y + (dy / d) * need;
   }
 
-  // Pushes the player out of trunks, boulders and water. Mutates p.x / p.y.
+  function pushRect(p, r) {
+    var cx = p.x < r.x ? r.x : (p.x > r.x + r.w ? r.x + r.w : p.x), cy = p.y < r.y ? r.y : (p.y > r.y + r.h ? r.y + r.h : p.y);
+    var dx = p.x - cx, dy = p.y - cy, d2 = dx * dx + dy * dy;
+    if (d2 >= p.radius * p.radius) return;
+    if (d2 > 1e-9) { var d = Math.sqrt(d2), push = p.radius - d; p.x += (dx / d) * push; p.y += (dy / d) * push; return; }
+    var l = p.x - r.x, rt = r.x + r.w - p.x, t = p.y - r.y, b = r.y + r.h - p.y, m = Math.min(l, rt, t, b);
+    if (m === l) p.x = r.x - p.radius; else if (m === rt) p.x = r.x + r.w + p.radius;
+    else if (m === t) p.y = r.y - p.radius; else p.y = r.y + r.h + p.radius;
+  }
+
+  // The sea: the body may not reach open water. Slide along the edge by keeping one axis of the last step.
+  function keepDry(p, area) {
+    var pad = p.radius * 0.8;
+    if (!nearSea(area, p.x, p.y, pad)) return;
+    var px = p.prevX === undefined ? p.x : p.prevX, py = p.prevY === undefined ? p.y : p.prevY;
+    if (!nearSea(area, px, p.y, pad)) { p.x = px; return; }
+    if (!nearSea(area, p.x, py, pad)) { p.y = py; return; }
+    p.x = px; p.y = py;
+  }
+
+  // Pushes the player out of trunks, boulders, structures and water. Mutates p.x / p.y.
   function collide(p, area) {
     for (var pass = 0; pass < 2; pass++) {
       var i, j;
+      if (area.solids) for (i = 0; i < area.solids.length; i++) pushRect(p, area.solids[i]);
       for (i = 0; i < area.nodes.length; i++) {
         var n = area.nodes[i];
         if (n.solid && !n.dead) pushCircle(p, n.x, n.y, n.solid);
@@ -150,12 +219,17 @@
         for (j = 0; j < bl.length; j++) pushCircle(p, bl[j].x, bl[j].y, bl[j].r - 8);
       }
     }
+    if (area.water && area.water.length) keepDry(p, area);
   }
 
   // What the player can interact with right now: the exit, the nearest node, or the water. Or null.
   function findTarget(area, p) {
     var ex = area.exit;
-    if (dist(p.x, p.y, ex.x, ex.y) <= ex.r) return { kind: 'exit', node: null, x: ex.x, y: ex.y, r: ex.r };
+    if (ex && dist(p.x, p.y, ex.x, ex.y) <= ex.r) return { kind: 'exit', node: null, x: ex.x, y: ex.y, r: ex.r };
+    for (var di = 0; area.doors && di < area.doors.length; di++) {      // doors and stairs to another floor / area
+      var dr = area.doors[di];
+      if (dist(p.x, p.y, dr.x, dr.y) <= dr.r) return { kind: 'door', node: null, door: dr, x: dr.x, y: dr.y, r: dr.r };
+    }
     var best = null, bestD = area.reach, i, j, d;
     for (i = 0; i < area.nodes.length; i++) {
       var n = area.nodes[i];
@@ -224,7 +298,7 @@
   // One simulation step of "hold E to gather". g is mutated. Returns what happened this step.
   function gatherStep(g, target, held, dt, bag, resDefs, items) {
     var out = { active: false, hit: false, done: null, blocked: null };
-    if (!held || !target || target.kind === 'exit') { g.node = null; g.t = 0; return out; }
+    if (!held || !target || target.kind === 'exit' || target.kind === 'door') { g.node = null; g.t = 0; return out; }
     if (g.node !== target.node) { g.node = target.node; g.t = 0; }
     var d = resDefs[target.node.type];
     g.time = d.time;
@@ -260,6 +334,6 @@
     HIT: HIT, generate: generate, collide: collide, findTarget: findTarget, check: check,
     harvest: harvest, newGather: newGather, gatherStep: gatherStep, updateVisuals: updateVisuals,
     delta: delta, applyDelta: applyDelta,
-    inWater: inWater, pathDist: pathDist
+    inWater: inWater, inSea: inSea, inSolid: inSolid, pathDist: pathDist
   };
 })(typeof window !== 'undefined' ? window : globalThis);

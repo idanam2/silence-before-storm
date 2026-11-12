@@ -24,7 +24,7 @@ function test(name, fn) {
 function eq(a, b, msg) { if (a !== b) throw new Error((msg || '') + ` expected ${b}, got ${a}`); }
 function near(a, b, eps, msg) { if (Math.abs(a - b) > (eps || 1e-6)) throw new Error((msg || '') + ` expected ~${b}, got ${a}`); }
 
-const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', 'data/recipes.js', 'data/buildings.js',
+const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', 'data/interiors.js', 'data/recipes.js', 'data/buildings.js',
   'data/difficulty.js', 'data/needs.js', 'data/world.js',
   'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/area.js']);
 // Fixed item table for the inventory tests, so balance changes in data/items.js do not break them.
@@ -740,6 +740,15 @@ test('data: every destination has an area, sane numbers, and a place on the map'
   }
   eq(WORLD.order[0], 'forest'); eq(G.world.has('forest'), true); eq(G.world.has('base'), false); eq(G.world.has('nope'), false);
 });
+test('map: every destination has a road from the base that ends at it, and a pictogram-free name', () => {
+  const geo = WORLD.geo;
+  for (const id of WORLD.order) {
+    const r = geo.routes[id], d = DEST[id];
+    if (!r || r.length < 2) throw new Error(id + ' has no road');
+    eq(r[0][0], WORLD.base.pos.x, id + ' road start x: '); eq(r[0][1], WORLD.base.pos.y, id + ' road start y: ');
+    eq(r[r.length - 1][0], d.pos.x, id + ' road end x: '); eq(r[r.length - 1][1], d.pos.y, id + ' road end y: ');
+  }
+});
 test('travel cost grows with distance and follows the difficulty', () => {
   let prev = 0;
   for (const id of WORLD.order) {
@@ -800,6 +809,89 @@ test('a visit can be changed and restored from the delta list alone', () => {
   if (G.area.findTarget(B, w) && G.area.findTarget(B, w).node === B.nodes[stones[0].id]) throw new Error('a used-up node is still targetable');
 });
 
+console.log('port');
+const PORT = G.data.areas.port;
+test('port: structures are solid, cranes only at their feet, ships are not walkable', () => {
+  const A = G.area.generate(PORT, RES, 1);
+  const wh = PORT.structures.find(s => s.kind === 'warehouse');
+  if (!G.area.inSolid(A, wh.x + wh.w / 2, wh.y + wh.h / 2)) throw new Error('warehouse not solid');
+  const cr = PORT.structures.find(s => s.kind === 'crane');
+  if (G.area.inSolid(A, cr.x + cr.w / 2, cr.y + cr.h / 2)) throw new Error('you should walk between the crane legs');
+  if (!G.area.inSolid(A, cr.legs[0].x + 5, cr.legs[0].y + 5)) throw new Error('crane leg not solid');
+  const ship = PORT.structures.find(s => s.kind === 'ship');
+  if (!G.area.inSea(A, ship.x + ship.w / 2, ship.y + ship.h / 2)) throw new Error('the ship should lie in open water');
+});
+test('port: the sea stops the player, the piers carry them', () => {
+  const A = G.area.generate(PORT, RES, 1);
+  const p = G.player.create(1000, 960);                      // on the quay, walk north into the sea
+  for (let i = 0; i < 240; i++) { G.player.update(p, { x: 0, y: -1 }, null, 1 / 60, A); G.area.collide(p, A); }
+  if (p.y < 880) throw new Error('walked into the sea: y=' + p.y);
+  if (G.area.inWater(A, p.x, p.y, 0)) throw new Error('standing in water');
+  const pier = PORT.decks[0], q = G.player.create(pier.x + pier.w / 2, 960);
+  for (let i = 0; i < 400; i++) { G.player.update(q, { x: 0, y: -1 }, null, 1 / 60, A); G.area.collide(q, A); }
+  if (q.y > pier.y + 60) throw new Error('could not walk out onto the pier: y=' + q.y);
+  for (let i = 0; i < 200; i++) { G.player.update(q, { x: 1, y: 0 }, null, 1 / 60, A); G.area.collide(q, A); }
+  if (q.x > pier.x + pier.w) throw new Error('walked off the side of the pier');
+});
+for (const PID of Object.keys(G.data.areas).filter(id => G.data.areas[id].loot)) test(PID + ': salvage sits at reachable spots, re-rolled per visit, and the map names it', () => {
+  const DEF = G.data.areas[PID], kinds = DEF.loot.map(l => l.type);
+  const A = G.area.generate(DEF, RES, 1), B = G.area.generate(DEF, RES, 2);
+  for (const k of kinds) {
+    const want = DEF.loot.find(l => l.type === k).count, got = A.nodes.filter(n => n.type === k);
+    eq(got.length, want, k + ' count: ');
+    if (!ITEMS[RES[k].item]) throw new Error(k + ' gives an unknown item');
+    for (const n of got) {
+      if (G.area.inSolid(A, n.x, n.y, 0) || G.area.inWater(A, n.x, n.y, 0)) throw new Error(k + ' at ' + n.x + ',' + n.y + ' is blocked');
+      // somewhere around the node there is a free spot for the player within reach
+      let ok = false;
+      for (let a = 0; a < 16 && !ok; a++) {
+        const d = n.r + 18 + 10, x = n.x + Math.cos(a / 16 * Math.PI * 2) * d, y = n.y + Math.sin(a / 16 * Math.PI * 2) * d;
+        const p = G.player.create(x, y); G.area.collide(p, A);
+        if (Math.hypot(p.x - x, p.y - y) < 1 && G.area.findTarget(A, p) && G.area.findTarget(A, p).node === n) ok = true;
+      }
+      if (!ok) throw new Error(k + ' at ' + n.x + ',' + n.y + ' cannot be reached');
+    }
+  }
+  const pos = v => JSON.stringify(v.nodes.filter(n => kinds.includes(n.type)).map(n => [n.x, n.y]));
+  if (pos(A) === pos(B)) throw new Error('salvage spots should change between visits');
+  if (!G.world.has(PID)) return;
+  const loot = G.world.loot(PID, 6);
+  const main = ITEMS[RES[DEF.loot[0].type].item].name;                    // the map names what the place is known for
+  if (!loot.includes(main)) throw new Error('map summary ' + loot + ' lacks ' + main);
+});
+
+test('police: the station, walls and cars block, the yard and the impound lot can be entered', () => {
+  const A = G.area.generate(G.data.areas.police, RES, 1);
+  if (!G.area.inSolid(A, 1500, 800)) throw new Error('station not solid');
+  const car = G.data.areas.police.structures.find(s => s.kind === 'car');
+  if (!G.area.inSolid(A, car.x + car.w / 2, car.y + car.h / 2)) throw new Error('car not solid');
+  for (const [x, y, gx, gy] of [[800, 500, 1, 0], [3275, 1560, 0, -1]]) {   // walk into the yard (west gap) / the impound lot (south gate)
+    const p = G.player.create(x, y);
+    for (let i = 0; i < 200; i++) { G.player.update(p, { x: gx, y: gy }, null, 1 / 60, A); G.area.collide(p, A); }
+    if (gx && p.x < 1100) throw new Error('could not enter the yard: x=' + p.x);
+    if (gy && p.y > 1300) throw new Error('could not enter the impound lot: y=' + p.y);
+  }
+});
+
+test('buildings: every door leads somewhere, both ways, to a free spot outside the door circle', () => {
+  const AR = G.data.areas;
+  for (const id of Object.keys(AR)) {
+    for (const d of AR[id].doors || []) {
+      const to = AR[d.to];
+      if (!to) throw new Error(id + ' door to nowhere: ' + d.to);
+      if (!(to.doors || []).some(b => b.to === id)) throw new Error(d.to + ' has no way back to ' + id);
+      const A = G.area.generate(to, RES, 1), p = G.player.create(d.at.x, d.at.y);
+      G.area.collide(p, A);
+      if (Math.hypot(p.x - d.at.x, p.y - d.at.y) > 0.5) throw new Error(id + ' -> ' + d.to + ': arrival spot is blocked');
+      const t = G.area.findTarget(A, p);
+      if (t && t.kind === 'door') throw new Error(id + ' -> ' + d.to + ': arriving right inside another door');
+      // the door is reachable from inside its own area
+      const B = G.area.generate(AR[id], RES, 1), q = G.player.create(d.x, d.y); G.area.collide(q, B);
+      if (Math.hypot(q.x - d.x, q.y - d.y) > d.r) throw new Error(id + ' door at ' + d.x + ',' + d.y + ' is inside a wall');
+    }
+  }
+  if (AR.police_f1.parent !== 'police' || G.world.has('police_f1')) throw new Error('floors are not map destinations');
+});
 console.log('saving');
 const mkState = () => {
   const st = {
@@ -913,6 +1005,18 @@ test('no fetch / import in game code', () => {
       if (/\bfetch\s*\(|^\s*(import|export)\s/m.test(src)) throw new Error(dir + '/' + f);
     }
   }
+});
+
+console.log('buildings (save)');
+test('save: the inside of a building and the floors already searched survive a reload', () => {
+  const st = mkState(), A = G.area.generate(G.data.areas.police_f2, RES, 3);
+  G.area.harvest(A.nodes[0], bagWith([]), RES);
+  st.area = 'police_f2'; st.zone = A; st.player = { x: 2150, y: 680 }; st.trip = { police: [[1, 0]], police_f1: [[0, 0], [2, 1]] };
+  const d = G.save.parse(JSON.stringify(G.save.snapshot(st, 1))).data;
+  eq(d.area, 'police_f2'); eq(d.zone.visit, 3); eq(d.zone.delta.length, 1); eq(d.visits.police, 3);
+  eq(JSON.stringify(d.trip), JSON.stringify({ police: [[1, 0]], police_f1: [[0, 0], [2, 1]] }));
+  const bad = G.save.parse(JSON.stringify(Object.assign(G.save.snapshot(st, 1), { trip: { ghost: [[0, 0]], police: 'x' } }))).data;
+  eq(JSON.stringify(bad.trip), JSON.stringify({ police: [] }));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -22,9 +22,10 @@
 
     // Names of the main things you can gather there, most plentiful first (at most `max`).
     loot: function (id, max) {
-      var a = G.data.areas[id], res = G.data.resources, items = G.data.items, score = {};
+      var a = G.data.areas[id], res = G.data.resources, items = G.data.items, score = {}, d = W().destinations[id];
+      if (d && d.finds) return d.finds.slice(0, max || 3).map(function (k) { return items[k].name; });   // hand-written for built places
       if (!a || !a.spawns) return [];
-      a.spawns.forEach(function (s) {
+      a.spawns.concat(a.loot || []).forEach(function (s) {
         var r = res[s.type];
         if (!r || r.item === undefined) return;
         score[r.item] = (score[r.item] || 0) + s.count * (r.yield[0] + r.yield[1]) / 2;
