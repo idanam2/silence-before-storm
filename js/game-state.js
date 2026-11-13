@@ -14,7 +14,7 @@
   var DOOR_FADE = 0.26;        // quicker fade through a door / up the stairs
   var AUTOSAVE = 30;           // seconds between automatic saves
   var ZERO = { x: 0, y: 0, run: false };
-  var PROMPTS = { chest: 'E · פתיחת המחסן', workbench: 'E · שולחן עבודה', campfire: 'E · מדורה', rack: 'E · מתלה ייבוש',
+  var PROMPTS = { chest: 'E · פתיחת התיבה', box: 'E · פתיחת התיבה', workbench: 'E · שולחן עבודה', campfire: 'E · מדורה', rack: 'E · מתלה ייבוש',
     garage_moto: 'E · מוסך אופנוע וטרקטורון', garage_jeep: "E · מוסך ג'יפ", garage_heli: 'E · מוסך מסוק', garage_tank: 'E · מוסך טנק' };
   var LOW_NOTE = { hunger: 'מתחילים להיות רעבים', thirst: 'מתחילים להיות צמאים', energy: 'מתחילים להיות עייפים' };
   var pcfg = { radius: cfg.player.radius, walkSpeed: cfg.player.walkSpeed, runMult: cfg.player.runMult };
@@ -27,7 +27,7 @@
     area: 'base', world: cfg.world, zone: null, visits: {}, trip: {},
     gather: G.area.newGather(), gathering: false, target: null, targetBlock: null,
     floaters: [], particles: [], fade: null, fullNoteAt: -10,
-    vehicles: {}, ride: null,                        // owned vehicles { id: { fuel, at } } and the one being ridden (js/game-vehicles.js)
+    vehicles: {}, ride: null, builds: {},                      // owned vehicles { id: { fuel, at } } and the one being ridden (js/game-vehicles.js)
     diff: 'normal', needs: null, tank: null, playTime: 0, sinceSave: 0, low: {}, saveWarned: false,
     // fighting: the infected of this area, bullet lines, noise the player is making, hit feedback
     enemies: [], enemyKeep: {}, shots: [], burst: G.combat.newBurst(), gunCool: 0, dryAt: -10, kills: 0, guns: {}, reload: null,

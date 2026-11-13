@@ -197,7 +197,10 @@
       G.input.consumeFrame();
     }
     render(res.alpha);
-    if (G.audio) { if (st.player) G.audio.listen(st.player.x, st.player.y); G.audio.update(Math.min(0.1, (now - (lastAudio || now)) / 1000)); }
+    if (G.audio) {
+      if (st.player) G.audio.listen(st.player.x, st.player.y);
+      G.audio.engine(st.scene === 'play' && !st.paused && st.ride ? st.ride : null, st.player && st.player.moving ? (st.player.running ? 1 : 0.32) : 0);   // the ridden vehicle's engine: idle / cruising / Shift boost
+      G.audio.update(Math.min(0.1, (now - (lastAudio || now)) / 1000)); }
     lastAudio = now;
     st.frames++;
     root.requestAnimationFrame(frame);
@@ -205,9 +208,11 @@
 
   // Called after a structure was built or upgraded (or a save was loaded): collision, drawing and chest size follow the levels.
   function applyBuildings() {
-    G.base.setBuildings(st.base, st.buildings, st.placed);
+    st.fences = st.fences || []; st.felled = st.felled || [];
+    st.buildings.fence = G.placing.fenceLevel(st.fences.length);        // the fence level follows the pieces that stand (js/placing.js)
+    G.base.setBuildings(st.base, st.buildings, st.placed, st.fences, st.felled);
     G.baseArt.refresh(st.base);
-    G.inventory.resize(st.chest, G.crafting.chestSlots(st.buildings));
+    G.inventory.resize(st.chest, G.crafting.chestSlots(st.buildings, st.placed));
     G.inventory.resize(st.bag, G.crafting.bagSlots(st.buildings));
     G.ui.markDirty();
   }
@@ -239,9 +244,10 @@
       G.forestArt.prepare(G.area.generate(G.data.areas.forest, G.data.resources, 0));
       st.buildings = G.crafting.startBuildings();
       st.fence = st.fence || { material: 'wood' };
+      st.fences = st.fences || []; st.felled = st.felled || [];
       st.placed = st.placed || []; st.floor = st.floor || G.placing.createFloor();
       st.base = G.base.build();
-      G.base.setBuildings(st.base, st.buildings, st.placed);
+      G.base.setBuildings(st.base, st.buildings, st.placed, st.fences, st.felled);
       G.baseArt.prepare(st.base);
       st.player = G.player.create(G.base.layout.spawn.x, G.base.layout.spawn.y);
       G.ui.init();
@@ -277,6 +283,9 @@
     render: render,
     travel: travel,
     depart: depart,
+    vehicleInstall: function (id, upId) { return X.vehInstall(id, upId); },       // garage workshop (js/game-vehicles.js)
+    vehicleWash: function (id) { return X.vehWash(id); },
+    vehicleAssemble: function (id, part) { return X.vehAssemble(id, part); },
     fly: function (veh, to) { return X.vehFly(veh, to); },            // the helicopter (js/game-vehicles.js)
     flight: { here: function () { return X.vehHere(); }, fuel: function (veh, to) { return X.vehFlightFuel(veh, to); }, can: function (to) { return X.vehCanFlyTo(to); } },
     setArea: setArea,

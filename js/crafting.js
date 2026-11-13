@@ -111,6 +111,16 @@
       return out;
     },
 
+    // What one fence piece costs in a material (id of G.data.fenceMaterials; unknown = wood).
+    fenceCost: function (material) {
+      var m = G.data.fenceMaterials[material] || G.data.fenceMaterials.wood, cost = G.data.fencePiece.cost, out = {};
+      for (var it in cost) {
+        var to = m.swap[it] || it, n = m.half && to !== it ? Math.ceil(cost[it] / 2) : cost[it];
+        out[to] = (out[to] || 0) + n;
+      }
+      return out;
+    },
+
     // 'max' | 'cost' | null (ok).
     buildStatus: function (ctx, id) {
       var cost = crafting.buildCost(ctx, id);
@@ -134,7 +144,7 @@
     placeStatus: function (ctx, id) {
       var d = G.data.buildings[id];
       if (!d || !d.spot) return 'unknown';
-      if (ctx.placed && G.placing.count(ctx.placed, id) >= G.placing.MAX_EACH) return 'max';
+      if (ctx.placed && G.placing.count(ctx.placed, id) >= G.placing.max(id)) return 'max';
       return missing(invs(ctx), d.levels[0].cost) ? 'cost' : null;
     },
     place: function (ctx, id) {
@@ -150,9 +160,12 @@
       for (var id in cost) { var left = cost[id]; for (var i = 0; i < 2 && left > 0; i++) left = G.inventory.add(invs(ctx)[i], id, left); }
     },
 
-    chestSlots: function (buildings) {
+    // Storage size: the main chest's level, plus every extra box placed in the yard (`placed`, see js/placing.js).
+    chestSlots: function (buildings, placed) {
       var d = G.data.buildings.chest, lv = Math.max(1, (buildings && buildings.chest) || 1);
-      return d.levels[lv - 1].chestSlots;
+      var b = G.data.buildings.box, bl = Math.min(b.levels.length, (buildings && buildings.box) || 0);
+      var boxes = bl > 0 && placed ? Math.min(b.max, G.placing.count(placed, 'box')) : 0;
+      return d.levels[lv - 1].chestSlots + boxes * (bl > 0 ? b.levels[bl - 1].boxSlots : 0);
     },
 
     // Backpack size for the bag level (building 'bag'); never below the starting size.

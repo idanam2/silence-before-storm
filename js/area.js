@@ -73,7 +73,8 @@
       ponds: [], nodes: [], visit: visit || 0,
       seed: def.seed, lots: def.lots || [], pads: def.pads || [], crops: def.crops || [], terraces: def.terraces || [], floors: def.floors || [], lights: def.lights || [], footprint: def.footprint || null,
       water: def.water || [], decks: def.decks || [], structures: (def.structures || []).map(function (q) { return q.breakable ? Object.assign({}, q) : q; }), roads: def.roads || [], solids: [],
-      dark: def.dark || null, enemyPlan: def.enemyPlan || null, need: def.need || null
+      dark: def.dark || null, enemyPlan: def.enemyPlan || null, need: def.need || null,
+      rads: def.rads || [], valves: (def.valves || []).map(function (v) { return Object.assign({}, v, { closed: false }); })
     };
     var i, k;
     for (i = 0; i < A.structures.length; i++) {          // flat collision: whole box, or only its feet
@@ -229,6 +230,10 @@
   function findTarget(area, p) {
     var ex = area.exit;
     if (ex && dist(p.x, p.y, ex.x, ex.y) <= ex.r) return { kind: 'exit', node: null, x: ex.x, y: ex.y, r: ex.r };
+    for (var vi = 0; area.valves && vi < area.valves.length; vi++) {     // a valve to turn (shuts a leaking pipe, see rads)
+      var vv = area.valves[vi];
+      if (dist(p.x, p.y, vv.x, vv.y) <= vv.r) return { kind: 'valve', node: null, valve: vv, x: vv.x, y: vv.y, r: vv.r };
+    }
     for (var di = 0; area.doors && di < area.doors.length; di++) {      // doors and stairs to another floor / area
       var dr = area.doors[di];
       if (dist(p.x, p.y, dr.x, dr.y) <= dr.r) return { kind: 'door', node: null, door: dr, x: dr.x, y: dr.y, r: dr.r };
@@ -284,11 +289,13 @@
       if (n.dead || n.amount !== n.a0) out.push([i, n.dead ? 0 : n.amount]);
     }
     for (i = 0; i < area.structures.length; i++) if (area.structures[i].smashed) out.push([WALL_BASE + i, 0]);   // walls broken down
+    for (i = 0; area.valves && i < area.valves.length; i++) if (area.valves[i].closed) out.push([VALVE_BASE + i, 0]);   // valves turned off
     return out;
   }
 
   function applyDelta(area, list) {
     for (var k = 0; k < list.length; k++) {
+      if (list[k][0] >= VALVE_BASE) { if (area.valves && area.valves[list[k][0] - VALVE_BASE]) area.valves[list[k][0] - VALVE_BASE].closed = true; continue; }
       if (list[k][0] >= WALL_BASE) { breakWall(area, list[k][0] - WALL_BASE); continue; }
       var n = area.nodes[list[k][0]];
       if (!n || n.border) continue;
@@ -299,6 +306,7 @@
   }
 
   // ---- sealed rooms: a structure { kind: 'bwall', breakable: true, hp } is a solid wall that only an axe breaks. ----
+  var VALVE_BASE = 200000;                                  // delta entries >= this are closed valves (index - VALVE_BASE)
   var WALL_BASE = 100000;                                   // delta entries >= this are broken walls (index - WALL_BASE)
   function breakWall(area, idx) {
     var s = area.structures[idx];
@@ -319,6 +327,17 @@
     }
     return best;
   }
+  // ---- radiation: area.rads = [{ x, y, w, h, leak? }] floor patches that hurt unless protected. A patch with a `leak` id is
+  // switched off while the valve with that id is closed (area.valves = [{ id, x, y, r, label }], E turns it). Returns the patch or null. ----
+  function valveClosed(area, id) { for (var i = 0; area.valves && i < area.valves.length; i++) if (area.valves[i].id === id) return !!area.valves[i].closed; return false; }
+  function radAt(area, x, y) {
+    for (var i = 0; area.rads && i < area.rads.length; i++) {
+      var r = area.rads[i];
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h && !(r.leak && valveClosed(area, r.leak))) return r;
+    }
+    return null;
+  }
+  function toggleValve(v) { v.closed = !v.closed; return v.closed; }
   // One blow lands on the wall: 'hit', 'broke' (the room behind it is open now) or null.
   function hitWall(area, idx) {
     var s = area.structures[idx];
@@ -368,7 +387,7 @@
   G.area = {
     HIT: HIT, generate: generate, collide: collide, findTarget: findTarget, check: check,
     harvest: harvest, newGather: newGather, gatherStep: gatherStep, updateVisuals: updateVisuals,
-    delta: delta, applyDelta: applyDelta, wallNear: wallNear, hitWall: hitWall, breakWall: breakWall,
+    delta: delta, applyDelta: applyDelta, radAt: radAt, valveClosed: valveClosed, toggleValve: toggleValve, wallNear: wallNear, hitWall: hitWall, breakWall: breakWall,
     inWater: inWater, inSea: inSea, inSolid: inSolid, pathDist: pathDist
   };
 })(typeof window !== 'undefined' ? window : globalThis);

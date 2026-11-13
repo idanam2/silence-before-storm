@@ -11,8 +11,9 @@ if (G.vehicles) {
       const d = VD[id];
       if (!d.name || !VB[d.garage] || !VB[d.garage].station || !VB[d.garage].spot) throw new Error(id + ' garage');
       if (!(d.speed > 1.5 && d.speed < 8) || !(d.fuelCap >= 10) || !(d.per1000 > 0) || !(d.perKm >= 0) || !(d.len > 20 && d.wid > 10)) throw new Error(id + ' numbers');
-      const r = G.data.recipes.filter(x => x.vehicle === id);
-      eq(r.length, 1); eq(r[0].station, d.garage); eq(r[0].out[0], 'veh_' + id);
+      const list = G.vehicles.buildList(id);                         // assembled from parts, each made at that garage's bench
+      if (list.length < 3) throw new Error(id + ' build list');
+      for (const x of list) { if (!G.data.items[x.part] || !(x.n >= 1) || !G.data.recipes.some(r => r.station === d.garage && r.out[0] === x.part)) throw new Error(id + ' part ' + x.part); }
       if (!G.data.items['veh_' + id]) throw new Error(id + ' item');
     }
     if (!G.data.items.fuel) throw new Error('no fuel item');
@@ -29,19 +30,44 @@ if (G.vehicles) {
     eq(G.crafting.place(ctx, 'garage_jeep').ok, true);
   });
 
-  test('building a vehicle: once only, pays the cost, the garage level decides the tank size', () => {
-    const levels = Object.assign(G.crafting.startBuildings(), { garage_jeep: 1 });
-    const v = {}, ctx = mkctx([['metal', 50], ['plank', 10], ['nails', 20], ['electronics', 5], ['cloth', 10]], [], levels);
-    ctx.vehicles = v; ctx.buildings = levels;
-    const r = G.data.recipes.filter(x => x.vehicle === 'jeep')[0];
-    const res = G.crafting.craft(ctx, r.id);
-    eq(res.ok, true); eq(res.vehicle, 'jeep'); eq(v.jeep.fuel, 0); eq(v.jeep.at, null);
-    eq(G.crafting.craft(ctx, r.id).ok, false);                      // one jeep per player
-    eq(G.crafting.craft(ctx, r.id).reason, 'owned');
+  test('building a vehicle: parts are fitted one by one (bag, then box), the last one completes it, the garage level decides the tank size', () => {
+    const builds = {}, list = G.vehicles.buildList('jeep'), total = list.reduce((n, x) => n + x.n, 0);
+    const b = bag([['part_frame', 1], ['part_wheels', 2]]), c = chestOf([['part_wheels', 2], ['part_engine', 1], ['part_tank', 1]]);
+    eq(G.vehicles.assemble(builds, 'jeep', 'nope', b, c).reason, 'unknown');
+    eq(G.vehicles.assemble(builds, 'jeep', 'part_rotor', b, c).reason, 'unknown');           // not a jeep part
+    let last = null, fitted = 0;
+    for (const x of list) for (let i = 0; i < x.n; i++) { last = G.vehicles.assemble(builds, 'jeep', x.part, b, c); eq(last.ok, true); fitted++; eq(last.done, fitted === total); }
+    eq(last.done, true); eq(G.vehicles.buildDone(builds, 'jeep'), true);
+    eq(G.vehicles.assemble(builds, 'jeep', 'part_frame', b, c).reason, 'full');
+    const empty = {}; eq(G.vehicles.assemble(empty, 'tank', 'part_turret', bag([]), chestOf([])).reason, 'part');
+    eq(G.vehicles.builtCount(empty, 'tank', 'part_turret'), 0);                              // a failed fit changes nothing
     eq(G.vehicles.cap('jeep', { garage_jeep: 1 }), VD.jeep.fuelCap);
     eq(G.vehicles.cap('jeep', { garage_jeep: 2 }), Math.round(VD.jeep.fuelCap * 1.5));
     eq(G.vehicles.cap('jeep', { garage_jeep: 3 }), VD.jeep.fuelCap * 2); eq(G.vehicles.cap('jeep', { garage_jeep: 4 }), Math.round(VD.jeep.fuelCap * 2.5));
     for (const g of ['garage_moto', 'garage_jeep', 'garage_heli', 'garage_tank']) eq(VB[g].levels.length, 4);
+  });
+
+  test('assembly saving: work in progress survives, finished or unknown vehicles and silly counts are dropped', () => {
+    const st = mkState();
+    st.vehicles = { atv: { fuel: 1, at: null, up: {}, dirt: 0 } };
+    st.builds = { jeep: { part_frame: 1, part_wheels: 99, ghost: 4 }, atv: { part_frame: 1 }, ghostveh: { part_frame: 1 } };
+    const d = G.save.parse(JSON.stringify(G.save.snapshot(st, 1))).data;
+    eq(d.builds.jeep.part_frame, 1); eq(d.builds.jeep.part_wheels, 4); eq(d.builds.jeep.ghost, undefined);
+    eq(d.builds.atv, undefined); eq(d.builds.ghostveh, undefined);                           // the atv is built already
+    const old = G.save.snapshot(mkState(), 1); delete old.builds;
+    eq(Object.keys(G.save.parse(JSON.stringify(old)).data.builds).length, 0);
+  });
+
+  test('parked vehicles: solid hulls (turned to the heading), and the garage area decides where a left vehicle parks', () => {
+    const q = { x: 500, y: 400, angle: 0 }, s = G.vehicles.solid('tank', q);
+    if (!(s.w > s.h)) throw new Error('a tank heading east is wider than tall');
+    const turned = G.vehicles.solid('tank', { x: 500, y: 400, angle: Math.PI / 2 }); if (!(turned.h > turned.w)) throw new Error('heading south');
+    const p = { x: 500, y: 400, radius: 12 }; G.base.collide(p, [s]);
+    if (Math.abs(p.x - 500) < 20 && Math.abs(p.y - 400) < 20) throw new Error('the player must be pushed off the hull');
+    const placed = [{ id: 'garage_tank', x: 1760, y: 1215 }], blds = Object.assign(G.crafting.startBuildings(), { garage_tank: 1 });
+    eq(G.vehicles.garageAt('tank', 1760 + 130, 1215 + 80, placed, blds), true);
+    eq(G.vehicles.garageAt('tank', 1760 + 130, 1215 + 300, placed, blds), false);
+    eq(G.vehicles.garageAt('tank', 1760 + 130, 1215 + 80, placed, Object.assign({}, blds, { garage_tank: 0 })), false);   // no garage built there
   });
 
   test('fuel: cans pour from the bag then the chest, stop when the tank is full, driving burns it, a trip is paid in fuel', () => {
@@ -69,17 +95,20 @@ if (G.vehicles) {
     }
   });
 
-  test('parked position: in front of the garage at home, where it was left elsewhere, nowhere in another area', () => {
-    const placed = [{ id: 'garage_moto', x: 900, y: 1330 }];
+  test('parked position: inside the garage at home (side by side, nose to the door), where it was left elsewhere, nowhere in another area', () => {
+    const placed = [{ id: 'garage_moto', x: 900, y: 1240 }], S = VB.garage_moto.spot;
     const p1 = G.vehicles.position('motorcycle', { fuel: 3, at: null }, 'base', placed), p2 = G.vehicles.position('atv', { fuel: 3, at: null }, 'base', placed);
-    if (!(p1.y > 1330 + VB.garage_moto.spot.h) || p1.x === p2.x) throw new Error('side by side in front of the garage');
+    for (const p of [p1, p2]) if (!(p.x > 900 && p.x < 900 + S.w && p.y > 1240 + 20 && p.y < 1240 + S.h)) throw new Error('inside the garage room');
+    if (p1.x === p2.x) throw new Error('side by side');
+    eq(G.vehicles.inGarage('motorcycle', { fuel: 3, at: null }, 'base', placed), true);
+    eq(G.vehicles.inGarage('motorcycle', { fuel: 3, at: { area: 'base', x: 900 + 90, y: 1240 + S.h + 80, angle: 0 } }, 'base', placed), false);   // left outside the door
     eq(G.vehicles.position('jeep', { fuel: 0, at: null }, 'forest', []), null);
     const left = { fuel: 1, at: { area: 'forest', x: 300, y: 400, angle: 1 } };
     eq(G.vehicles.position('jeep', left, 'base', []), null);
     eq(G.vehicles.position('jeep', left, 'forest', []).x, 300);
     // the garage placed somewhere else: the vehicle follows it
     const q = G.vehicles.position('motorcycle', { fuel: 3, at: null }, 'base', [{ id: 'garage_moto', x: 100, y: 200 }]);
-    if (!(q.x < 400 && q.y < 600)) throw new Error('parks at the moved garage');
+    if (!(q.x < 400 && q.y < 500)) throw new Error('parks at the moved garage');
   });
 
   test('saving: vehicles, their fuel, where they were left and the ridden one survive; garbage is cleaned', () => {

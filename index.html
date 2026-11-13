@@ -81,7 +81,7 @@
   <div id="inv-layer" class="inv-layer">
     <div class="inv-wrap">
       <section id="chest-panel" class="panel hidden">
-        <header><h2>מחסן</h2><span id="chest-count" class="cap"></span></header>
+        <header><h2>תיבה</h2><span id="chest-count" class="cap"></span></header>
         <div id="chest-grid" class="grid chest"></div>
       </section>
       <section id="craft-panel" class="panel wide hidden">
@@ -90,8 +90,13 @@
         <div id="craft-list" class="rows"></div>
       </section>
       <section id="build-panel" class="panel wide hidden">
-        <header><h2>בנייה ושדרוג</h2><span class="cap">חומרים מהתיק ומהמחסן</span></header>
+        <header><h2>בנייה ושדרוג</h2><span class="cap">חומרים מהתיק ומהתיבה · הזזה: מקש T</span></header>
         <div id="build-list" class="rows"></div>
+      </section>
+      <section id="veh-panel" class="panel wide hidden">
+        <header><h2 id="veh-title">מוסך</h2><span id="veh-cap" class="cap"></span></header>
+        <div id="veh-tabs" class="tabs"></div>
+        <div id="veh-list" class="rows"></div>
       </section>
       <section id="map-panel" class="panel map hidden">
         <header><h2>מפת העולם</h2><span id="map-energy" class="cap"></span></header>
@@ -205,6 +210,7 @@
   <script src="story/data/notes.js"></script>
   <script src="story/data/triggers.js"></script>
   <script src="story/data/endings.js"></script>
+  <script src="story/data/cellar.js"></script>
   <script src="data/story-wire.js"></script>
   <script src="js/input.js"></script>
   <script src="js/inventory.js"></script>

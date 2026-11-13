@@ -4,18 +4,15 @@
   'use strict';
   var G = root.G;
 
-  var T = 12; // fence thickness
   var layout = {
     area:  { x: 800, y: 480, w: 1600, h: 1040 },   // fenced yard (4x the first version, same centre)
-    gate:  { x: 1560, w: 90 },                     // gap in the north fence (leads to the forest)
-    cabin: { x: 1250, y: 780, w: 230, h: 130 },
+    gate:  { x: 1560, w: 90 },                     // the way in from the forest (north): placed things keep it open. No fence is built at the start
     chest: { x: 1770, y: 790, w: 52, h: 36 },       // the storage chest (the player can move it: setChest)
-    woodpile: { x: 1486, y: 800, w: 34, h: 82 },    // stacked against the cabin's east wall
     spawn: { x: 1600, y: 1060 },
     trail: { x: 1605, y: 350, r: 74 },             // trailhead north of the gate: travel to the forest
     arrive: { x: 1605, y: 408 },                   // where the player stands when coming back
     interactRange: 36,                             // extra reach beyond the chest edge
-    trees: { seed: 8121, count: 78, gap: 128, clear: 135, trunk: 22, borderStep: 84, borderDepth: 80 }
+    trees: { seed: 8121, count: 78, gap: 128, clear: 135, trunk: 22, borderStep: 84, borderDepth: 80, yard: 16, yardGap: 170 }
   };
 
   function rect(x, y, w, h, kind) { return { x: x, y: y, w: w, h: h, kind: kind }; }
@@ -54,39 +51,86 @@
       if (!ok(x, y, c.gap)) continue;
       add(x, y, false); placed++;
     }
+    // Trees standing inside the yard (the player fells them with the axe before laying floor there): away from the way in,
+    // the first spot, the chest and the fixed building spots. They are added last, so the woods above keep their places.
+    var yardTrees = 0, tries2 = c.yard * 80, avoid = [{ x: layout.spawn.x - 130, y: layout.spawn.y - 130, w: 260, h: 260 },
+      { x: layout.gate.x - 130, y: a.y, w: layout.gate.w + 260, h: 320 }, { x: layout.chest.x - 110, y: layout.chest.y - 110, w: layout.chest.w + 220, h: layout.chest.h + 220 }];
+    var bd = G.data && G.data.buildings;
+    for (var id in bd) if (bd[id].spot) avoid.push({ x: bd[id].spot.x - 70, y: bd[id].spot.y - 70, w: bd[id].spot.w + 140, h: bd[id].spot.h + 140 });
+    while (yardTrees < c.yard && tries2-- > 0) {
+      x = a.x + 70 + rand() * (a.w - 140); y = a.y + 70 + rand() * (a.h - 140);
+      var hit = false, q;
+      for (q = 0; q < avoid.length && !hit; q++) hit = x > avoid[q].x && x < avoid[q].x + avoid[q].w && y > avoid[q].y && y < avoid[q].y + avoid[q].h;
+      for (q = 0; q < out.length && !hit; q++) if (out[q].yard) hit = Math.hypot(out[q].x - x, out[q].y - y) < c.yardGap;
+      if (hit) continue;
+      add(x, y, false);
+      var t = out[out.length - 1]; t.yard = true; t.amount = t.a0 = 4 + Math.floor(rand() * 3);
+      yardTrees++;
+    }
     return out;
   }
 
   function build(world) {
-    var a = layout.area, g = layout.gate, solids = [], W = world || G.config.world;
-    solids.push(rect(a.x, a.y, g.x - a.x, T, 'fence'));                          // north-west
-    solids.push(rect(g.x + g.w, a.y, a.x + a.w - (g.x + g.w), T, 'fence'));      // north-east
-    solids.push(rect(a.x, a.y + a.h - T, a.w, T, 'fence'));                      // south
-    solids.push(rect(a.x, a.y, T, a.h, 'fence'));                                // west
-    solids.push(rect(a.x + a.w - T, a.y, T, a.h, 'fence'));                      // east
-    solids.push(rect(layout.cabin.x, layout.cabin.y, layout.cabin.w, layout.cabin.h, 'cabin'));
+    var solids = [], W = world || G.config.world;
     solids.push(rect(layout.chest.x, layout.chest.y, layout.chest.w, layout.chest.h, 'chest'));
-    solids.push(rect(layout.woodpile.x, layout.woodpile.y, layout.woodpile.w, layout.woodpile.h, 'woodpile'));
     var trees = plantTrees(W), s = layout.trees.trunk;
-    for (var i = 0; i < trees.length; i++) solids.push(rect(trees[i].x - s / 2, trees[i].y - s / 2, s, s, 'trunk'));
+    for (var i = 0; i < trees.length; i++) { var tr = rect(trees[i].x - s / 2, trees[i].y - s / 2, s, s, 'trunk'); tr.tree = trees[i]; solids.push(tr); }
     // fixed = always there; solids = fixed + the structures the player has built (see setBuildings)
     return { layout: layout, fixed: solids, solids: solids.slice(), levels: {}, trees: trees, width: W.width, height: W.height };
   }
 
+  // A garage is a room without a roof: three walls (north, west, east; the south side is the open door), a workbench along the back
+  // wall and a floor you can drive onto. Its parts are separate rects with the garage's kind, so each can be drawn and sorted by itself:
+  //   part 'room'  the whole footprint: not solid, only keeps the place reserved (hollow) and holds the floor
+  //   part 'wall'  solid, drawn as a low wall (side walls come in short pieces so they sort correctly against people and vehicles)
+  //   part 'bench' solid, the garage's own workbench (E opens its crafting panel)
+  // Every part has ox, oy = the top-left corner of the whole garage, so a copy can be found again when it is moved.
+  var WALL = 10, PIECE = 36, BENCH = { w: 78, h: 22 };
+  function roomParts(p, d) {
+    var w = d.spot.w, h = d.spot.h, out = [], y, n, k, bx = Math.min(BENCH.w, w - 2 * WALL - 40);
+    function add(part, x, yy, ww, hh, extra) {
+      var r = rect(x, yy, ww, hh, p.id); r.part = part; r.ox = p.x; r.oy = p.y;
+      if (extra) for (var key in extra) r[key] = extra[key];
+      out.push(r);
+    }
+    add('room', p.x, p.y, w, h, { hollow: true });
+    add('wall', p.x, p.y, w, WALL, { noUse: true });
+    n = Math.ceil((h - WALL) / PIECE);
+    for (k = 0; k < n; k++) {
+      y = p.y + WALL + k * ((h - WALL) / n);
+      add('wall', p.x, y, WALL, (h - WALL) / n, { noUse: true, side: 'w', first: k === 0, last: k === n - 1 });
+      add('wall', p.x + w - WALL, y, WALL, (h - WALL) / n, { noUse: true, side: 'e', first: k === 0, last: k === n - 1 });
+    }
+    add('bench', p.x + WALL + 6, p.y + WALL, bx, BENCH.h);
+    return out;
+  }
+
   // Applies the built structures ({ id: level }) to the base: built ones become solid rects.
   // `placed` = [{ id, x, y }] copies put down by the player (js/placing.js); without it every built structure sits on its old fixed spot.
-  function setBuildings(b, levels, placed) {
-    var defs = G.data.buildings, s = b.fixed.filter(function (r) { return r.kind !== 'chest'; });
+  // `fences` = [{ o: 'h' | 'v', cx, cy, m: material }] pieces on the block grid (js/placing.js); `felled` = indices of yard trees that were cut down.
+  function setBuildings(b, levels, placed, fences, felled) {
+    var defs = G.data.buildings, i;
+    var cut = {};
+    for (i = 0; felled && i < felled.length; i++) cut[felled[i]] = true;
+    for (i = 0; i < b.trees.length; i++) {                                    // yard trees: felled ones lie down, the others stand (a new game starts with all of them up)
+      var yt = b.trees[i];
+      if (!yt.yard) continue;
+      if (cut[i]) { if (!yt.dead) { yt.dead = true; yt.deadT = 99; yt.amount = 0; } }
+      else if (yt.dead && yt.deadT >= 99) { yt.dead = false; yt.deadT = 0; yt.amount = yt.a0; }
+    }
+    var s = b.fixed.filter(function (r) { return r.kind !== 'chest' && !(r.tree && r.tree.dead); });
     s.push(rect(layout.chest.x, layout.chest.y, layout.chest.w, layout.chest.h, 'chest'));
     b.levels = levels;
     placed = placed || G.placing.legacy(levels);
-    for (var i = 0; i < placed.length; i++) {
+    for (i = 0; i < placed.length; i++) {
       var p = placed[i], d = defs[p.id];
       if (!d || !d.spot || !(levels[p.id] > 0)) continue;
+      if (d.room) { roomParts(p, d).forEach(function (r) { r.level = levels[p.id]; s.push(r); }); continue; }
       var r = rect(p.x, p.y, d.spot.w, d.spot.h, p.id);
       r.level = levels[p.id];
       s.push(r);
     }
+    for (i = 0; fences && i < fences.length; i++) { var fr = G.placing.fenceRect(fences[i]); fr.kind = 'fence'; fr.mat = fences[i].m; fr.piece = true; s.push(fr); }
     b.solids = s;
     return b;
   }
@@ -110,7 +154,9 @@
   function collide(p, solids) {
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < solids.length; i++) {
-        var r = solids[i], c = closest(r, p.x, p.y);
+        var r = solids[i];
+        if (r.hollow) continue;                                       // the inside of a garage: walk and drive in
+        var c = closest(r, p.x, p.y);
         var dx = p.x - c.x, dy = p.y - c.y, d2 = dx * dx + dy * dy;
         if (d2 >= p.radius * p.radius) continue;
         if (d2 > 1e-9) {
@@ -142,7 +188,7 @@
     var rs = [{ id: 'chest', r: layout.chest }], i;
     for (i = 0; i < b.solids.length; i++) {
       var k = b.solids[i].kind, d = defs[k];
-      if (d && d.spot && (d.station || d.use)) rs.push({ id: k, r: b.solids[i] });
+      if (d && d.spot && (d.station || d.use) && !b.solids[i].hollow && !b.solids[i].noUse) rs.push({ id: k, r: b.solids[i] });
     }
     for (i = 0; i < rs.length; i++) {
       var c = closest(rs[i].r, p.x, p.y), dx = p.x - c.x, dy = p.y - c.y, d2 = dx * dx + dy * dy;

@@ -715,7 +715,7 @@
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       if (!n.canopy || !seen(vr, n.x, n.y, 60)) continue;
-      if (n.dead) blit(ctx, SP.stump[n.type], n.x, n.y);
+      if (n.dead) { if (!n.yard) blit(ctx, SP.stump[n.type], n.x, n.y); }   // a tree felled in the base leaves nothing behind (no stump)
       else blit(ctx, SP.canopyShadow, n.x + 3, n.y + 4, n.r / 46);          // contact shadow at the roots
     }
   }
@@ -828,7 +828,7 @@
       blit(ctx, list[n.variant % list.length], n.x + ox, n.y, n.type === 'boulder' ? n.scale : 1);
     }
     ctx.globalAlpha = 1;
-    if (G.doorArt && !area.interior && area.doors && area.doors.length) G.doorArt.draw(ctx, area, vr, time);   // hatches and gates in the open (js/art/forest.js)
+    if (G.doorArt && ((area.doors && area.doors.length) || (area.rads && area.rads.length) || (area.valves && area.valves.length))) G.doorArt.draw(ctx, area, vr, time);   // hatches and gates in the open (js/art/forest.js)
     if (PA) PA.drawStructures(ctx, area, st, vr, time, sorted ? -Infinity : py, false);   // sorted: only the ships and boats on the water
     if (!sorted) drawTreeTrunks(ctx, area.nodes, vr, py, false);
   }

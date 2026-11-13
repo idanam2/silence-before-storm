@@ -452,6 +452,7 @@
       g.strokeStyle = 'rgba(230,240,210,0.35)'; g.lineWidth = 2; g.beginPath(); g.arc(30, 30, 14, Math.PI * 1.1, Math.PI * 1.55); g.stroke();
     },
     jacket: function (g) { coat(g, '#a07444', '#6a4a28', true); },
+    hazsuit: function (g) { coat(g, '#e6c62c', '#a98a14', true); g.fillStyle = '#2a2a1c'; g.fillRect(22, 40, 20, 4); g.beginPath(); g.arc(32, 32, 5, 0, TAU); g.fill(); },
     vest: function (g) { coat(g, '#6c7e5a', '#46543a', false); },
     pants: function (g) {                                  // cargo trousers with a pocket on each leg
       shadow(g, 32, 55, 18, 3.5);
@@ -482,6 +483,81 @@
       g.strokeStyle = 'rgba(40,12,8,0.5)'; g.lineWidth = 1.6;                                                                          // pressed cross
       g.beginPath(); g.moveTo(20, 24); g.lineTo(44, 48); g.moveTo(44, 24); g.lineTo(20, 48); g.stroke();
       g.strokeStyle = 'rgba(255,200,180,0.2)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(19, 22); g.lineTo(19, 49); g.stroke();
+    },
+    rubber: function (g) {                                                // a slab of black rubber with a roll next to it
+      shadow(g, 32, 54, 22, 5);
+      g.fillStyle = '#1c1d1c'; rr(g, 10, 30, 34, 20, 4); g.fill(); g.strokeStyle = '#050605'; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = '#2f3130'; g.beginPath(); g.moveTo(10, 34); g.lineTo(18, 25); g.lineTo(52, 25); g.lineTo(44, 34); g.closePath(); g.fill(); g.stroke();
+      g.strokeStyle = 'rgba(120,125,120,0.35)'; g.lineWidth = 1;
+      for (var i = 0; i < 5; i++) { g.beginPath(); g.moveTo(14 + i * 6, 32); g.lineTo(14 + i * 6, 48); g.stroke(); }
+      g.beginPath(); g.ellipse(46, 40, 8, 11, 0, 0, TAU); g.fillStyle = '#242625'; g.fill(); g.strokeStyle = '#050605'; g.lineWidth = 1.5; g.stroke();
+      g.beginPath(); g.ellipse(46, 40, 3.5, 5, 0, 0, TAU); g.fillStyle = '#0e0f0e'; g.fill();
+    },
+    iron_rod: function (g) {                                              // three iron rods in a bundle
+      shadow(g, 32, 54, 24, 4);
+      [[0, '#5d666b'], [7, '#747d82'], [14, '#656e73']].forEach(function (r) {
+        var y = 24 + r[0];
+        var gr = g.createLinearGradient(0, y - 4, 0, y + 4); gr.addColorStop(0, '#9aa3a8'); gr.addColorStop(1, r[1]);
+        g.fillStyle = gr; rr(g, 8, y - 3.5, 48, 7, 3.5); g.fill(); g.strokeStyle = '#1a1d1f'; g.lineWidth = 1.2; g.stroke();
+      });
+      g.strokeStyle = '#8a7a58'; g.lineWidth = 3; g.beginPath(); g.moveTo(24, 18); g.lineTo(24, 44); g.moveTo(40, 18); g.lineTo(40, 44); g.stroke();
+    },
+    part_wheels: function (g) {                                           // a big tyre with a hub
+      shadow(g, 32, 55, 22, 5);
+      g.beginPath(); g.arc(32, 33, 21, 0, TAU); g.fillStyle = '#1b1d1c'; g.fill(); g.strokeStyle = '#050605'; g.lineWidth = 1.6; g.stroke();
+      g.strokeStyle = 'rgba(125,130,124,0.4)'; g.lineWidth = 1.4;
+      for (var i = 0; i < 16; i++) { var a = i / 16 * TAU; g.beginPath(); g.moveTo(32 + Math.cos(a) * 17, 33 + Math.sin(a) * 17); g.lineTo(32 + Math.cos(a) * 21, 33 + Math.sin(a) * 21); g.stroke(); }
+      g.beginPath(); g.arc(32, 33, 12, 0, TAU); g.fillStyle = '#7c858a'; g.fill(); g.strokeStyle = '#2a2f33'; g.lineWidth = 1.4; g.stroke();
+      g.strokeStyle = '#3d4448'; g.lineWidth = 2;
+      for (var j = 0; j < 5; j++) { var b = j / 5 * TAU; g.beginPath(); g.moveTo(32, 33); g.lineTo(32 + Math.cos(b) * 11, 33 + Math.sin(b) * 11); g.stroke(); }
+      g.beginPath(); g.arc(32, 33, 3, 0, TAU); g.fillStyle = '#c4cacc'; g.fill();
+    },
+    part_engine: function (g) {                                           // an engine block with cylinder fins and a pipe
+      shadow(g, 32, 55, 22, 4);
+      g.fillStyle = '#4a4f52'; rr(g, 12, 28, 40, 22, 3); g.fill(); g.strokeStyle = '#111314'; g.lineWidth = 1.5; g.stroke();
+      var gr = g.createLinearGradient(0, 14, 0, 30); gr.addColorStop(0, '#8d949a'); gr.addColorStop(1, '#5e656a');
+      g.fillStyle = gr; rr(g, 17, 14, 14, 16, 2); g.fill(); g.stroke(); rr(g, 33, 17, 14, 13, 2); g.fill(); g.stroke();
+      g.strokeStyle = 'rgba(20,22,24,0.7)'; g.lineWidth = 1;
+      for (var i = 0; i < 4; i++) { g.beginPath(); g.moveTo(17, 18 + i * 3.4); g.lineTo(31, 18 + i * 3.4); g.moveTo(33, 20 + i * 2.8); g.lineTo(47, 20 + i * 2.8); g.stroke(); }
+      g.fillStyle = '#b9a064'; g.beginPath(); g.arc(32, 39, 6, 0, TAU); g.fill(); g.strokeStyle = '#111314'; g.stroke();
+      g.strokeStyle = '#2b2f31'; g.lineWidth = 3; g.beginPath(); g.moveTo(52, 44); g.quadraticCurveTo(60, 44, 60, 36); g.stroke();
+    },
+    part_tank: function (g) {                                             // a big painted fuel tank with a cap
+      shadow(g, 32, 55, 22, 4);
+      var gr = g.createLinearGradient(0, 18, 0, 50); gr.addColorStop(0, '#b24d3c'); gr.addColorStop(1, '#6a261e');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(32, 36, 24, 15, 0, 0, TAU); g.fill(); g.strokeStyle = '#2a0f0b'; g.lineWidth = 1.6; g.stroke();
+      g.strokeStyle = 'rgba(235,225,200,0.5)'; g.lineWidth = 2; g.beginPath(); g.ellipse(32, 35, 18, 9, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+      g.fillStyle = '#9aa3a5'; g.beginPath(); g.arc(32, 31, 4.5, 0, TAU); g.fill(); g.strokeStyle = '#1a1d1f'; g.lineWidth = 1.2; g.stroke();
+      g.strokeStyle = '#2a2f31'; g.lineWidth = 2.6; g.beginPath(); g.moveTo(54, 40); g.quadraticCurveTo(62, 42, 60, 50); g.stroke();
+    },
+    part_frame: function (g) {                                            // a welded tubular frame
+      shadow(g, 32, 55, 24, 4);
+      g.strokeStyle = '#1a1d1f'; g.lineWidth = 6.5; g.lineCap = 'round'; g.lineJoin = 'round';
+      g.beginPath(); g.moveTo(10, 44); g.lineTo(24, 22); g.lineTo(46, 22); g.lineTo(54, 44); g.closePath(); g.moveTo(24, 22); g.lineTo(32, 44); g.lineTo(46, 22); g.stroke();
+      g.strokeStyle = '#8c949a'; g.lineWidth = 3.6; g.stroke();
+      g.fillStyle = '#c4cacc'; [[10, 44], [24, 22], [46, 22], [54, 44], [32, 44]].forEach(function (p) { g.beginPath(); g.arc(p[0], p[1], 2.6, 0, TAU); g.fill(); });
+      g.lineCap = 'butt';
+    },
+    part_rotor: function (g) {                                            // a rotor hub with four blades
+      shadow(g, 32, 55, 22, 4);
+      g.save(); g.translate(32, 33);
+      for (var i = 0; i < 4; i++) { g.rotate(TAU / 4); g.fillStyle = '#2a3034'; rr(g, 4, -3, 26, 6, 2); g.fill(); g.strokeStyle = '#0b0d0e'; g.lineWidth = 1.2; g.stroke(); g.fillStyle = '#b49a3a'; g.fillRect(25, -3, 4, 6); }
+      g.restore();
+      g.beginPath(); g.arc(32, 33, 6.5, 0, TAU); g.fillStyle = '#7c858a'; g.fill(); g.strokeStyle = '#1a1d1f'; g.lineWidth = 1.4; g.stroke();
+    },
+    part_tracks: function (g) {                                           // a caterpillar track
+      shadow(g, 32, 55, 24, 4);
+      g.fillStyle = '#25271f'; rr(g, 6, 22, 52, 22, 11); g.fill(); g.strokeStyle = '#0b0c09'; g.lineWidth = 1.6; g.stroke();
+      g.strokeStyle = 'rgba(150,152,138,0.55)'; g.lineWidth = 2;
+      for (var i = 0; i < 9; i++) { g.beginPath(); g.moveTo(11 + i * 5.4, 23); g.lineTo(11 + i * 5.4, 43); g.stroke(); }
+      [[18, 33], [32, 33], [46, 33]].forEach(function (w) { g.beginPath(); g.arc(w[0], w[1], 6, 0, TAU); g.fillStyle = '#5a6055'; g.fill(); g.strokeStyle = '#0b0c09'; g.stroke(); });
+    },
+    part_turret: function (g) {                                           // a turret with a gun barrel
+      shadow(g, 32, 55, 22, 4);
+      var gr = g.createLinearGradient(0, 18, 0, 48); gr.addColorStop(0, '#6a7458'); gr.addColorStop(1, '#3a4230');
+      g.fillStyle = '#2e3328'; rr(g, 34, 29, 26, 7, 2); g.fill(); g.strokeStyle = '#0b0c09'; g.lineWidth = 1.2; g.stroke();
+      g.fillStyle = gr; g.beginPath(); g.ellipse(28, 34, 20, 15, 0, 0, TAU); g.fill(); g.lineWidth = 1.6; g.stroke();
+      g.fillStyle = '#4a5240'; g.beginPath(); g.arc(24, 31, 5.5, 0, TAU); g.fill(); g.stroke();
     },
     veh_motorcycle: function (g) { G.vehicleArt.icon(g, 'motorcycle'); },
     veh_atv: function (g) { G.vehicleArt.icon(g, 'atv'); },

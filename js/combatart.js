@@ -82,7 +82,16 @@
           ctx.beginPath(); ctx.moveTo(s.x0, s.y0 - s.h); ctx.lineTo(s.x1, s.y1 - s.h); ctx.stroke();
           ctx.globalAlpha = a * 0.95; ctx.strokeStyle = '#fff6d6'; ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.moveTo(s.x0, s.y0 - s.h); ctx.lineTo(s.x1, s.y1 - s.h); ctx.stroke();
-          var fr = 11 * (1 - k * 0.7), gr = ctx.createRadialGradient(s.x0, s.y0 - s.h, 0, s.x0, s.y0 - s.h, fr);
+          if (tt < 0.05) {                               // the flash itself: a few bright spikes out of the muzzle for 3 frames
+            var dx = s.x1 - s.x0, dy = s.y1 - s.y0, dl = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / dl, uy = dy / dl, fl = 1 - tt / 0.05;
+            ctx.globalAlpha = fl; ctx.strokeStyle = '#fff2c0'; ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(s.x0, s.y0 - s.h); ctx.lineTo(s.x0 + ux * 26 * fl, s.y0 - s.h + uy * 26 * fl);
+            ctx.moveTo(s.x0, s.y0 - s.h); ctx.lineTo(s.x0 + (ux * 0.8 - uy * 0.6) * 13 * fl, s.y0 - s.h + (uy * 0.8 + ux * 0.6) * 13 * fl);
+            ctx.moveTo(s.x0, s.y0 - s.h); ctx.lineTo(s.x0 + (ux * 0.8 + uy * 0.6) * 13 * fl, s.y0 - s.h + (uy * 0.8 - ux * 0.6) * 13 * fl);
+            ctx.stroke();
+          }
+          var fr = 20 * (1 - k * 0.7), gr = ctx.createRadialGradient(s.x0, s.y0 - s.h, 0, s.x0, s.y0 - s.h, fr);
           gr.addColorStop(0, 'rgba(255,238,170,' + (a * 0.95).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,170,60,0)');
           ctx.globalAlpha = 1; ctx.fillStyle = gr;
           ctx.beginPath(); ctx.arc(s.x0, s.y0 - s.h, fr, 0, TAU); ctx.fill();

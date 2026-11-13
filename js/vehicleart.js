@@ -31,29 +31,42 @@
 
   var BODY = {
     motorcycle: function (c, d, o) {
-      wheel(c, -15, 0, 15, 5, o.ph); wheel(c, 16, 0, 15, 5, o.ph);
+      var wl = o.up.wheels || 0, en = o.up.engine || 0, tk = o.up.tank || 0;                  // fitted upgrades (garage workshop)
+      wheel(c, -15 - wl, 0, 15 + wl * 3, 5 + wl * 0.9, o.ph); wheel(c, 16 + wl, 0, 15 + wl * 3, 5 + wl * 0.9, o.ph);   // bigger wheels
       rr(c, -12, -3, 28, 6, 3); fillStroke(c, '#2a2c2b', '#0d0e0d', 1);                      // frame
-      c.beginPath(); c.ellipse(3, 0, 8, 5.5, 0, 0, TAU); fillStroke(c, d.color, shade(d.color, 0.45), 1.2);   // fuel tank
+      if (en) {                                                                               // a stronger engine: chrome cylinders and pipes
+        rr(c, -9, -6.5, 9, 13, 2); fillStroke(c, '#8a9094', '#1b1e20', 1);
+        c.strokeStyle = '#b8bec2'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-8, -7.5 - en * 0.4); c.lineTo(-22 - en * 2, -7.5 - en * 0.4); c.moveTo(-8, 7.5 + en * 0.4); c.lineTo(-22 - en * 2, 7.5 + en * 0.4); c.stroke();
+      }
+      c.beginPath(); c.ellipse(3, 0, 8 + tk * 1.6, 5.5 + tk * 0.9, 0, 0, TAU); fillStroke(c, d.color, shade(d.color, 0.45), 1.2);   // fuel tank (bigger with the tank upgrade)
+      if (tk) { c.strokeStyle = 'rgba(235,225,200,0.55)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-3, -2.6); c.lineTo(9 + tk, -2.6); c.stroke(); }
       rr(c, -6, -3.4, 12, 6.8, 3); fillStroke(c, '#25201d', '#0d0e0d', 1);                  // seat
       c.strokeStyle = '#17191a'; c.lineWidth = 2.6; c.beginPath(); c.moveTo(13, -9); c.lineTo(13, 9); c.stroke();   // handlebar
       c.fillStyle = '#e8dca0'; c.beginPath(); c.arc(21, 0, 2.4, 0, TAU); c.fill();           // headlight
     },
     atv: function (c, d, o) {
-      [[-17, -15], [-17, 15], [17, -15], [17, 15]].forEach(function (w) { wheel(c, w[0], w[1], 15, 10, o.ph); });
+      var wl = o.up.wheels || 0, en = o.up.engine || 0, tk = o.up.tank || 0;
+      [[-17, -15], [-17, 15], [17, -15], [17, 15]].forEach(function (w) { wheel(c, w[0] + Math.sign(w[0]) * wl, w[1] + Math.sign(w[1]) * wl * 0.8, 15 + wl * 3, 10 + wl * 1.6, o.ph); });
       rr(c, -23, -11, 46, 22, 7); fillStroke(c, d.color, shade(d.color, 0.45), 1.3);        // body
+      if (en) { c.strokeStyle = '#b8bec2'; c.lineWidth = 2; c.beginPath(); c.moveTo(-23, -5); c.lineTo(-30 - en * 2, -5); c.moveTo(-23, 5); c.lineTo(-30 - en * 2, 5); c.stroke(); }
+      if (tk) { rr(c, -2, -5, 8 + tk * 2, 10, 3); fillStroke(c, '#8a3a2e', '#2a0f0b', 1); }
       rr(c, -4, -9, 22, 18, 5); fillStroke(c, shade(d.color, 1.15), shade(d.color, 0.5), 1);   // front cover
       rr(c, -8, -8, 16, 16, 4); fillStroke(c, '#26221f', '#0d0e0d', 1);                    // seat
       c.strokeStyle = '#16181a'; c.lineWidth = 3; c.beginPath(); c.moveTo(14, -13); c.lineTo(14, 13); c.stroke();   // handlebar
       c.fillStyle = '#e8dca0'; c.fillRect(24, -8, 2.5, 4); c.fillRect(24, 4, 2.5, 4);
     },
     jeep: function (c, d, o) {
-      [[-28, -26], [-28, 26], [27, -26], [27, 26]].forEach(function (w) { wheel(c, w[0], w[1], 20, 9, o.ph); });
+      var wl = o.up.wheels || 0, en = o.up.engine || 0, tk = o.up.tank || 0;                  // fitted upgrades (garage workshop)
+      [[-28, -26], [-28, 26], [27, -26], [27, 26]].forEach(function (w) { wheel(c, w[0], w[1] + Math.sign(w[1]) * wl * 1.2, 20 + wl * 4, 9 + wl * 1.8, o.ph); });   // bigger wheels
+      if (en) { c.strokeStyle = '#b8bec2'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(-45, -12); c.lineTo(-54 - en * 2, -12); c.moveTo(-45, 12); c.lineTo(-54 - en * 2, 12); c.stroke(); }   // exhausts
       rr(c, -45, -22, 90, 44, 8); fillStroke(c, d.color, shade(d.color, 0.42), 1.4);        // body
       rr(c, 12, -19, 30, 38, 6); fillStroke(c, shade(d.color, 1.12), shade(d.color, 0.5), 1);   // hood
       c.beginPath(); c.moveTo(8, -19); c.lineTo(14, -17); c.lineTo(14, 17); c.lineTo(8, 19); c.closePath(); fillStroke(c, '#6f8590', '#1c2328', 1);   // windscreen
       rr(c, -36, -18, 42, 36, 5); fillStroke(c, shade(d.color, 0.8), shade(d.color, 0.4), 1);   // canvas top
       c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1;
       for (var i = 1; i < 4; i++) { c.beginPath(); c.moveTo(-36 + i * 10.5, -17); c.lineTo(-36 + i * 10.5, 17); c.stroke(); }
+      if (en) { rr(c, 30, -17, 12, 5, 2); fillStroke(c, '#8a9094', '#1b1e20', 1); }           // chrome air intake on the hood
+      if (tk) for (var j = 0; j < tk; j++) { rr(c, -34 + j * 11, -24, 9, 6, 2); fillStroke(c, '#8a3a2e', '#2a0f0b', 1); }   // extra fuel cans on the side
       c.beginPath(); c.arc(-48, 0, 8, 0, TAU); fillStroke(c, '#1b1d1c', '#0c0d0c', 1);        // spare wheel on the tail
       c.fillStyle = '#e8dca0'; c.fillRect(43, -16, 3, 6); c.fillRect(43, 10, 3, 6);
     },
@@ -61,6 +74,7 @@
     // heading: the skids on the ground, the fuselage above them (its dark belly shows), the rotor above the roof.
     heli: function (c, d, o) {
       var a = o.a || 0, ux = -Math.sin(a), uy = -Math.cos(a), h, i;
+      var hen = o.up.engine || 0, hro = o.up.rotor || 0, htk = o.up.tank || 0, RL = 62 + hro * 5;       // fitted upgrades (garage workshop)
       c.scale(1.3, 1.3);                                                                         // a helicopter is a big machine next to a person
       function fus() {
         c.beginPath(); c.moveTo(44, 0);
@@ -72,6 +86,7 @@
       c.strokeStyle = '#14171a'; c.lineCap = 'round';                                            // skids and their cross tubes
       [-1, 1].forEach(function (s) { c.lineWidth = 3; c.beginPath(); c.moveTo(-16, s * 20); c.lineTo(28, s * 20); c.lineTo(32, s * 18.5); c.stroke(); });
       c.lineWidth = 2; [-4, 18].forEach(function (x) { c.beginPath(); c.moveTo(x, -20); c.lineTo(x, 20); c.stroke(); });
+      for (i = 0; i < htk; i++) [-1, 1].forEach(function (s) { rr(c, -12 + i * 14, s * 22 - 3.5, 22, 7, 3.5); fillStroke(c, '#8a3a2e', '#2a0f0b', 1); });   // extra fuel pods on the skids
       for (h = 2; h <= 9; h += 2.333) { c.save(); c.translate(ux * h, uy * h); fus(); fillStroke(c, '#1a1e22'); c.restore(); }   // belly and sides
       c.save(); c.translate(ux * 10, uy * 10);
       rr(c, -80, -13, 8, 26, 2); fillStroke(c, shade(d.color, 0.9), '#0b0e10', 1.1);            // tail plane
@@ -95,7 +110,7 @@
       rr(c, -22, -8.5, 22, 17, 5); fillStroke(c, shade(d.color, 0.78), '#0b0e10', 1.2);          // engine cowling
       c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1;
       for (i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-18 + i * 3.2, -5.5); c.lineTo(-18 + i * 3.2, 5.5); c.stroke(); }
-      [-6, 6].forEach(function (y) { c.beginPath(); c.ellipse(-23, y, 3, 2, 0, 0, TAU); fillStroke(c, '#0d0f10', '#2e3438', 1); });   // exhausts
+      [-6, 6].forEach(function (y) { c.beginPath(); c.ellipse(-23 - hen, y, 3 + hen * 0.6, 2 + hen * 0.3, 0, 0, TAU); fillStroke(c, '#0d0f10', hen ? '#b8bec2' : '#2e3438', 1); });   // exhausts
       c.beginPath(); c.moveTo(-76, -1.8); c.lineTo(-92, -8.5); c.lineTo(-87, -8.5); c.lineTo(-70, -1.8); c.closePath(); fillStroke(c, shade(d.color, 0.85), '#0b0e10', 1.1);   // fin
       c.save(); c.translate(-89, -9.5); c.rotate(o.spin ? o.rot * 3 : 0.5); c.strokeStyle = '#1a1e21'; c.lineWidth = 2;        // tail rotor
       c.beginPath(); c.moveTo(0, -9); c.lineTo(0, 9); c.stroke(); c.restore();
@@ -103,13 +118,13 @@
       c.restore();
       c.save(); c.translate(ux * 21 - 4, uy * 21);                                               // main rotor, above the roof
       c.beginPath(); c.arc(0, 0, 5.5, 0, TAU); fillStroke(c, '#22272b', '#0b0e10', 1.2);
-      if (o.spin) { c.beginPath(); c.arc(0, 0, 62, 0, TAU); fillStroke(c, 'rgba(190,200,205,0.12)'); }
+      if (o.spin) { c.beginPath(); c.arc(0, 0, RL, 0, TAU); fillStroke(c, 'rgba(190,200,205,0.12)'); }
       c.rotate(o.spin ? o.rot : 0.42);
       for (i = 0; i < 4; i++) {
         c.rotate(TAU / 4);
-        c.beginPath(); c.moveTo(3, -1.4); c.lineTo(14, -2.6); c.lineTo(62, -2.2); c.lineTo(62, 2.2); c.lineTo(14, 2.6); c.lineTo(3, 1.4); c.closePath();
+        c.beginPath(); c.moveTo(3, -1.4); c.lineTo(14, -2.6); c.lineTo(RL, -2.2); c.lineTo(RL, 2.2); c.lineTo(14, 2.6); c.lineTo(3, 1.4); c.closePath();
         fillStroke(c, '#1d2226', '#0a0c0d', 0.9);
-        c.fillStyle = '#b49a3a'; c.fillRect(57, -2.2, 4, 4.4);                                   // warning paint on the tips
+        c.fillStyle = '#b49a3a'; c.fillRect(RL - 5, -2.2, 4, 4.4);                                   // warning paint on the tips
       }
       c.beginPath(); c.arc(0, 0, 2.4, 0, TAU); fillStroke(c, '#7c858a');
       c.restore();
@@ -119,9 +134,10 @@
     // so the dark side walls show like on the buildings.
     tank: function (c, d, o) {
       var a = o.a || 0, ux = -Math.sin(a), uy = -Math.cos(a), h, i;
+      var ten = o.up.engine || 0, ttr = o.up.tracks || 0, ttk = o.up.tank || 0;                      // fitted upgrades (garage workshop)
       function hull() { c.beginPath(); c.moveTo(-56, -25); c.lineTo(34, -25); c.lineTo(54, -15); c.lineTo(54, 15); c.lineTo(34, 25); c.lineTo(-56, 25); c.closePath(); }
       [-1, 1].forEach(function (s) {                                                             // the two tracks, on the ground
-        rr(c, -60, s * 29 - 10, 120, 20, 8); fillStroke(c, '#1b1d19', '#0a0b09', 1.2);
+        rr(c, -60, s * (29 + ttr * 1.5) - 10 - ttr * 1.5, 120, 20 + ttr * 3, 8); fillStroke(c, '#1b1d19', '#0a0b09', 1.2);
         c.strokeStyle = 'rgba(120,124,110,0.5)'; c.lineWidth = 1.6;
         for (var t = 0; t < 13; t++) { var x = -56 + (((t / 13) + o.ph) % 1) * 112; c.beginPath(); c.moveTo(x, s * 29 - 9); c.lineTo(x, s * 29 + 9); c.stroke(); }
       });
@@ -144,6 +160,8 @@
       rr(c, -44, -8, 12, 16, 1); fillStroke(c, '#16170f', '#0a0b08', 1);                         // engine grille
       c.strokeStyle = 'rgba(110,112,96,0.5)'; c.lineWidth = 1;
       for (i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-42, -5 + i * 3.4); c.lineTo(-34, -5 + i * 3.4); c.stroke(); }
+      if (ten) { c.strokeStyle = '#b8bec2'; c.lineWidth = 2.8; c.beginPath(); c.moveTo(-56, -17); c.lineTo(-63 - ten * 2, -17); c.moveTo(-56, 17); c.lineTo(-63 - ten * 2, 17); c.stroke(); }   // stronger engine: exhaust pipes
+      for (i = 0; i < ttk; i++) { c.beginPath(); c.arc(-47 + i * 0, i ? 15 : -15, 5.5, 0, TAU); fillStroke(c, '#8a3a2e', '#2a0f0b', 1); }   // extra fuel drums on the rear deck
       c.strokeStyle = '#30332c'; c.lineWidth = 2.2;                                              // slat armour along both sides
       [-27, 27].forEach(function (y) {
         c.beginPath(); c.moveTo(-50, y); c.lineTo(30, y); c.stroke();
@@ -168,11 +186,23 @@
   // Does a closed cab hide the rider? (bikes and quads keep the rider visible)
   function covers(id) { return id !== 'motorcycle' && id !== 'atv'; }
 
-  // v = { id, x, y, angle, ridden, moving }
+  // Mud splashed on the body: more spots the dirtier it is (v.dirt 0..1), always the same places for the same vehicle.
+  function mud(c, d, dirt) {
+    var n = Math.floor(dirt * 16), i, h = 0;
+    c.fillStyle = 'rgba(82,64,40,0.5)';
+    for (i = 0; i < n; i++) {
+      h = (h * 9301 + 49297 + i * 233) % 233280;
+      var u = h / 233280, w = ((h * 7) % 233280) / 233280;
+      c.beginPath(); c.ellipse((u - 0.5) * d.len * 0.86, (w - 0.5) * d.wid * 0.8, 2 + (i % 3), 1.4 + (i % 2), u * 6, 0, TAU); c.fill();
+    }
+    if (dirt > 0.6) { c.fillStyle = 'rgba(70,54,34,0.22)'; c.fillRect(-d.len * 0.45, -d.wid * 0.15, d.len * 0.4, d.wid * 0.3); }
+  }
+
+  // v = { id, x, y, angle, ridden, moving, up, dirt }
   function draw(c, v, time) {
     var d = G.data.vehicles[v.id], lift = v.ridden && d.fly ? 26 : 0;
     var run = v.ridden && (v.moving || d.fly);
-    var o = { ph: run ? (time * 2.4) % 1 : 0, rot: time * 26, spin: v.ridden, a: v.angle };
+    var o = { ph: run ? (time * 2.4) % 1 : 0, rot: time * 26, spin: v.ridden, a: v.angle, up: v.up || {} };
     c.save();
     c.translate(v.x, v.y);
     // cast shadow (the helicopter floats above it when flying)
@@ -183,6 +213,7 @@
     c.rotate(v.angle);
     c.lineJoin = 'round'; c.lineCap = 'round';
     BODY[v.id](c, d, o);
+    if (v.dirt > 0.05 && !d.fly) mud(c, d, v.dirt);
     c.restore();
   }
 
@@ -191,7 +222,7 @@
     var d = G.data.vehicles[id], s = Math.min(1, 52 / (id === 'heli' ? 172 : d.len + 14));
     g.save(); g.translate(32, 33); g.scale(s, s);
     g.fillStyle = 'rgba(0,0,0,0.28)'; g.beginPath(); g.ellipse(2, 5, d.len * 0.5, d.wid * 0.55, 0, 0, TAU); g.fill();
-    BODY[id](g, d, { ph: 0, rot: 0, spin: false, a: 0 });
+    BODY[id](g, d, { ph: 0, rot: 0, spin: false, a: 0, up: {} });
     g.restore();
   }
 

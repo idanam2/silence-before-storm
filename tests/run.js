@@ -225,17 +225,13 @@ test('starting loadout fits its containers', () => {
 });
 
 console.log('base');
-test('wall pushes the player out', () => {
-  const b = G.base.build(), a = G.base.layout.area;
-  const p = G.player.create(a.x + 100, a.y + a.h - 8);   // inside the south fence
+test('a fence piece pushes the player out, and there is no house or perimeter fence', () => {
+  const b = G.base.build();
+  if (G.base.layout.cabin || b.solids.some(s => s.kind === 'cabin' || s.kind === 'fence' || s.kind === 'woodpile')) throw new Error('the house, the woodpile or a fence is still there at the start');
+  G.base.setBuildings(b, G.crafting.startBuildings(), [], [{ o: 'h', cx: 2, cy: 1, m: 'wood' }]);
+  const r = G.placing.fenceRect({ o: 'h', cx: 2, cy: 1 }), p = G.player.create(r.x + 60, r.y + 6);   // inside the piece
   G.base.collide(p, b.solids);
-  if (p.y > a.y + a.h - 12 - p.radius + 1e-6) throw new Error('still in wall: ' + p.y);
-});
-test('player cannot walk through the cabin', () => {
-  const b = G.base.build(), c = G.base.layout.cabin;
-  const p = G.player.create(c.x + c.w / 2, c.y + c.h + 40);
-  for (let i = 0; i < 120; i++) { G.player.update(p, { x: 0, y: -1, run: true }, null, 1 / 60, G.config.world); G.base.collide(p, b.solids); }
-  if (p.y < c.y + c.h + p.radius - 1e-3) throw new Error('inside cabin: ' + p.y);
+  if (p.y > r.y - p.radius + 1e-6 && p.y < r.y + r.h + p.radius - 1e-6) throw new Error('still in the piece: ' + p.y);
 });
 test('gate is open: player can leave the base to the north', () => {
   const b = G.base.build(), L = G.base.layout;
@@ -401,18 +397,16 @@ test('base: woods never block the yard, the gate or the trail', () => {
   if (b.trees.length < 60) throw new Error('too few trees: ' + b.trees.length);
   eq(b.solids.filter(s => s.kind === 'trunk').length, b.trees.length);
   for (const t of b.trees) {
-    if (t.x > a.x - 100 && t.x < a.x + a.w + 100 && t.y > a.y - 100 && t.y < a.y + a.h + 100) throw new Error('tree at the fence');
+    if (!t.yard && t.x > a.x - 100 && t.x < a.x + a.w + 100 && t.y > a.y - 100 && t.y < a.y + a.h + 100) throw new Error('tree at the fence');
+    if (t.yard && ((t.x > L.gate.x - 120 && t.x < L.gate.x + L.gate.w + 120 && t.y < a.y + 320) || Math.hypot(t.x - L.spawn.x, t.y - L.spawn.y) < 130)) throw new Error('yard tree on the entrance or the spawn');
     if (Math.abs(t.x - L.trail.x) < 120 && t.y < a.y) throw new Error('tree on the trail');
   }
   eq(JSON.stringify(G.base.build().trees.map(t => [t.x, t.y])), JSON.stringify(b.trees.map(t => [t.x, t.y])));
 });
-test('base: trunks and the woodpile are solid', () => {
+test('base: trunks are solid', () => {
   const b = G.base.build(), t = b.trees.find(x => !x.border), p = G.player.create(t.x + 2, t.y);
   G.base.collide(p, b.solids);
   if (Math.abs(p.x - t.x) < 11 + p.radius - 1e-6 && Math.abs(p.y - t.y) < 11 + p.radius - 1e-6 && Math.hypot(p.x - t.x, p.y - t.y) < 11 + p.radius - 1e-6) throw new Error('inside trunk');
-  const w = G.base.layout.woodpile, q = G.player.create(w.x + w.w / 2, w.y + w.h / 2);
-  G.base.collide(q, b.solids);
-  if (q.x > w.x && q.x < w.x + w.w && q.y > w.y && q.y < w.y + w.h) throw new Error('inside woodpile');
 });
 
 console.log('crafting');
@@ -443,7 +437,7 @@ test('data: every building has 2 levels, known costs, a spot inside the yard tha
     for (const lv of d.levels) for (const [it, n] of Object.entries(lv.cost)) if (!ITEMS[it] || !(n > 0)) throw new Error(id + ' cost ' + it);
     if (d.spot) spots.push([id, d.spot]);
   }
-  eq(Object.keys(BLD).length, G.data.buildingOrder.length);
+  eq(Object.keys(BLD).length - 1, G.data.buildingOrder.length);       // the fence has no card of its own (pieces, see G.data.fencePiece)
   const hit = (p, q) => p.x < q.x + q.w && p.x + p.w > q.x && p.y < q.y + q.h && p.y + p.h > q.y;
   for (const [id, s] of spots) {
     if (s.x < a.x + 30 || s.y < a.y + 30 || s.x + s.w > a.x + a.w - 30 || s.y + s.h > a.y + a.h - 30) throw new Error(id + ' outside the yard');
@@ -462,7 +456,7 @@ test('data: nothing is stuck: every upgrade cost is made of items the player can
 });
 test('start: chest and fence exist, the rest is not built', () => {
   const s = G.crafting.startBuildings();
-  eq(s.chest, 1); eq(s.fence, 1); eq(s.workbench, 0); eq(s.campfire, 0); eq(s.bed, 0); eq(s.tank, 0);
+  eq(s.chest, 1); eq(s.fence, 0); eq(s.workbench, 0); eq(s.campfire, 0); eq(s.bed, 0); eq(s.tank, 0);
   eq(G.crafting.chestSlots(s), G.data.inventory.chestSlots);
 });
 test('building: needs the full cost, takes it from bag then chest, sets level 1', () => {
@@ -528,7 +522,7 @@ test('crafting: with no room anywhere it is refused and every change is rolled b
   eq(G.inventory.count(c.bag, 'plank'), 0);
 });
 test('crafting: recipes are split between the workbench and the campfire', () => {
-  eq(G.crafting.recipesFor('workbench').length + G.crafting.recipesFor('campfire').length + G.crafting.recipesFor('rack').length + RECIPES.filter(r => r.vehicle).length, RECIPES.length);
+  eq(G.crafting.recipesFor('workbench').length + G.crafting.recipesFor('campfire').length + G.crafting.recipesFor('rack').length + RECIPES.filter(r => /^garage_/.test(r.station)).length, RECIPES.length);   // + the garage benches (parts)
   const c = mkctx([['mushroom', 2], ['water_dirty', 1]], [], { campfire: 1 });
   eq(G.crafting.craft(c, 'cooked_food').ok, true); eq(total(c, 'cooked_food'), 1);
   eq(G.crafting.craft(c, 'water_clean').ok, true); eq(total(c, 'water_clean'), 1);
@@ -1532,10 +1526,10 @@ test('rack and workbench: every new item has a name, a stack (50, tools 1) and a
 });
 
 console.log('big base, three upgrades, fence materials, floor');
-test('yard is four times the first one, holds the cabin, chest, woodpile and every building spot', () => {
+test('yard is four times the first one, holds the chest and every building spot', () => {
   const a = G.base.layout.area, L = G.base.layout;
   if (a.w * a.h < 4 * 800 * 520) throw new Error('yard too small');
-  for (const r of [L.cabin, L.chest, L.woodpile]) if (r.x < a.x || r.y < a.y || r.x + r.w > a.x + a.w || r.y + r.h > a.y + a.h) throw new Error('outside the yard');
+  for (const r of [L.chest]) if (r.x < a.x || r.y < a.y || r.x + r.w > a.x + a.w || r.y + r.h > a.y + a.h) throw new Error('outside the yard');
   for (const id of G.data.buildingOrder) { const sp = BLD[id].spot; if (sp && (sp.x < a.x || sp.y < a.y || sp.x + sp.w > a.x + a.w || sp.y + sp.h > a.y + a.h)) throw new Error(id + ' outside'); }
   if (!(L.gate.x > a.x && L.gate.x + L.gate.w < a.x + a.w)) throw new Error('gate is not on the north fence');
   if (!(L.trail.y < a.y && L.arrive.y < a.y)) throw new Error('trailhead must be north of the fence');
@@ -1544,15 +1538,43 @@ test('every structure has three upgrades after it is built', () => {
   for (const id of ['workbench', 'rack', 'campfire', 'bed', 'tank', 'chest', 'fence']) if (BLD[id].levels.length < 4) throw new Error(id + ' has ' + BLD[id].levels.length + ' levels');
   eq(G.crafting.chestSlots({ chest: 4 }), 60);
 });
-test('fence material: the cost follows the chosen material, an unknown one falls back to wood in a save', () => {
-  const b = G.crafting.startBuildings(), cWood = { bag: G.inventory.create(4), chest: G.inventory.create(4), buildings: b, fence: { material: 'wood' } };
-  eq(G.crafting.buildCost(cWood, 'fence').plank, 10);
-  const cSt = Object.assign({}, cWood, { fence: { material: 'stone' } }), st = G.crafting.buildCost(cSt, 'fence');
-  eq(st.plank, undefined); eq(st.stone, 20);
-  const cMe = Object.assign({}, cWood, { fence: { material: 'metal' } }), me = G.crafting.buildCost(cMe, 'fence');
-  eq(me.metal, 10);
+test('fence material: a piece costs by material, an unknown one falls back to wood in a save', () => {
+  eq(G.crafting.fenceCost('wood').plank, 2);
+  const st = G.crafting.fenceCost('stone'); eq(st.plank, undefined); eq(st.stone, 2);
+  eq(G.crafting.fenceCost('metal').metal, 1);
+  eq(G.crafting.fenceCost('gold').plank, 2);
   eq(G.save.parse(JSON.stringify({ v: 1, fence: { material: 'gold' } })).data.fence.material, 'wood');
   eq(G.save.parse(JSON.stringify({ v: 1, fence: { material: 'metal' } })).data.fence.material, 'metal');
+});
+test('fence pieces: only beside a floor block, turn lengthwise or crosswise, no doubles, the way in stays open, saves are cleaned', () => {
+  const P = G.placing, b = G.base.build(), floor = P.createFloor(), L = G.base.layout, g = P.grid();
+  const cx = 3, cy = 3, h = { o: 'h', cx, cy }, v = { o: 'v', cx, cy };
+  eq(P.fenceCheck(b, floor, [], h), 'floor');
+  floor.cells[cx + ',' + cy] = 'wood';
+  eq(P.fenceCheck(b, floor, [], h), null); eq(P.fenceCheck(b, floor, [], v), null);
+  eq(P.fenceCheck(b, floor, [Object.assign({ m: 'wood' }, h)], h), 'dup');
+  const rh = P.fenceRect(h), rv = P.fenceRect(v);
+  if (!(rh.w > rh.h) || !(rv.h > rv.w)) throw new Error('h is lengthwise, v crosswise');
+  const f = P.fenceNear('h', rh.x + 40, rh.y + 3); eq(f.cx, cx); eq(f.cy, cy);
+  const gc = P.cellAt(L.gate.x + 40, L.area.y + 60);                      // a block at the way in: the piece on its north edge would close it
+  if (gc) { floor.cells[gc.key] = 'wood'; eq(P.fenceCheck(b, floor, [], { o: 'h', cx: gc.cx, cy: gc.cy }), 'gate'); }
+  eq(P.fenceLevel(0), 0); eq(P.fenceLevel(6), 1); eq(P.fenceLevel(18), 2); eq(P.fenceLevel(60), 4);
+  const clean = P.cleanFences([{ o: 'h', cx: 1, cy: 1, m: 'gold' }, { o: 'h', cx: 1, cy: 1, m: 'wood' }, { o: 'x', cx: 1, cy: 1 }, { o: 'v', cx: 999, cy: 1 }, null]);
+  eq(clean.length, 1); eq(clean[0].m, 'wood');
+  eq(G.save.parse(JSON.stringify({ v: 1, fences: [{ o: 'v', cx: 2, cy: 2, m: 'stone' }, { o: 'v', cx: -1, cy: 0 }], felled: [3, 'x', -2] })).data.fences.length, 1);
+  eq(JSON.stringify(G.save.parse(JSON.stringify({ v: 1, felled: [3, 'x', -2] })).data.felled), '[3]');
+});
+test('yard trees: block floor and structures until felled; felling is kept by the list', () => {
+  const P = G.placing, b = G.base.build(), lv = G.crafting.startBuildings(), yt = b.trees.filter(t => t.yard);
+  if (yt.length < 8) throw new Error('too few trees in the yard: ' + yt.length);
+  const t = yt[0], i = b.trees.indexOf(t), c = P.cellAt(t.x, t.y);
+  if (!P.treeIn(b, c)) throw new Error('floor block with a tree must be blocked');
+  const r = P.rectAt('rack', t.x, t.y); if (r.x < t.x && r.x + r.w > t.x && r.y < t.y && r.y + r.h > t.y && P.check(b, r, null) !== 'blocked') throw new Error('a structure on a tree');
+  G.base.setBuildings(b, lv, [], [], [i]);
+  eq(t.dead, true); if (P.treeIn(b, c) === t) throw new Error('a felled tree still blocks');
+  if (b.solids.some(s => s.tree === t)) throw new Error('felled trunk is still solid');
+  G.base.setBuildings(b, lv, [], [], []);                                  // a new game: the tree stands again
+  eq(t.dead, false); if (!b.solids.some(s => s.tree === t)) throw new Error('the trunk is back');
 });
 test('placing: a structure goes anywhere free in the yard, as many as wanted, and the first copy sets the level', () => {
   const P = G.placing, a = G.base.layout.area;

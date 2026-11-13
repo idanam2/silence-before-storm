@@ -15,17 +15,12 @@
     { id: 'weapons', name: 'נשקים' },
     { id: 'ammo',    name: 'תחמושת' },
     { id: 'food',    name: 'אוכל ומים' },
-    { id: 'vehicles', name: 'כלי רכב' }
+    { id: 'vehicles', name: 'כלי רכב' },
+    { id: 'parts',    name: 'חלקים' }
   ];
 
   G.data.recipes = [
-    // Vehicles: crafted at their garage, one of each (G.crafting.craft hands the vehicle to ctx.vehicles instead of an item).
-    { id: 'v_motorcycle', station: 'garage_moto', level: 1, cat: 'vehicles', out: ['veh_motorcycle', 1], vehicle: 'motorcycle', cost: { metal: 12, nails: 6, electronics: 2, cloth: 2 } },
-    { id: 'v_atv',        station: 'garage_moto', level: 1, cat: 'vehicles', out: ['veh_atv', 1],        vehicle: 'atv',        cost: { metal: 18, nails: 8, electronics: 2, cloth: 4 } },
-    { id: 'v_jeep',       station: 'garage_jeep', level: 1, cat: 'vehicles', out: ['veh_jeep', 1],       vehicle: 'jeep',       cost: { metal: 40, plank: 6, nails: 12, electronics: 4, cloth: 6 } },
-    { id: 'v_heli',       station: 'garage_heli', level: 1, cat: 'vehicles', out: ['veh_heli', 1],       vehicle: 'heli',       cost: { metal: 70, nails: 20, electronics: 12, cloth: 8 } },
-    { id: 'v_tank',       station: 'garage_tank', level: 1, cat: 'vehicles', out: ['veh_tank', 1],       vehicle: 'tank',       cost: { metal: 120, plank: 10, nails: 30, electronics: 10 } },
-    { id: 'gasmask',    station: 'workbench', level: 2, cat: 'home',    out: ['gasmask', 1],      cost: { cloth: 4, metal: 3, plank: 1 } },
+    { id: 'gasmask',    station: 'workbench', level: 2, cat: 'home',   out: ['gasmask', 1],      cost: { cloth: 4, metal: 3, plank: 1 } },
     { id: 'plank',      station: 'workbench', level: 1, cat: 'home',    out: ['plank', 2],        cost: { wood: 2 } },
     { id: 'axe',        station: 'workbench', level: 1, cat: 'home',    out: ['axe', 1],          cost: { wood: 2, stone: 3 } },
     { id: 'pickaxe',    station: 'workbench', level: 1, cat: 'home',    out: ['pickaxe', 1],      cost: { wood: 2, stone: 4, plank: 1 } },
@@ -55,4 +50,28 @@
     { id: 'dried_mushroom', station: 'rack',  level: 1, cat: 'food',    out: ['dried_mushroom', 2], cost: { mushroom: 3 } },
     { id: 'ration',     station: 'rack',      level: 2, cat: 'food',    out: ['ration', 2],       cost: { dried_mushroom: 3, cooked_food: 1 } }
   ];
+
+  // The garage benches: every garage makes raw parts (rubber, iron rods) and the parts a vehicle is assembled from and upgraded with.
+  // Vehicles themselves are no recipes: they are assembled part by part in the garage panel (U, data/vehicles.js vehicleBuild).
+  // Ids: g_ (garage_moto), j_ (garage_jeep), h_ (garage_heli), t_ (garage_tank). Wheels, tank, frame and engines (rotors, tracks, turrets for the heli and the tank) per garage.
+  (function () {
+    var PREFIX = { garage_moto: 'g_', garage_jeep: 'j_', garage_heli: 'h_', garage_tank: 't_' };
+    var COMMON = [
+      { k: 'rubber',  out: ['rubber', 2],      cost: { cloth: 2, fuel: 1 } },
+      { k: 'rod',     out: ['iron_rod', 2],    cost: { metal: 2 } },
+      { k: 'frame',   out: ['part_frame', 1],  cost: { metal: 8, iron_rod: 4, nails: 4 } },
+      { k: 'wheels',  out: ['part_wheels', 1], cost: { rubber: 4, iron_rod: 2, metal: 3 }, not: ['garage_heli', 'garage_tank'] },
+      { k: 'tank',    out: ['part_tank', 1],   cost: { metal: 6, iron_rod: 2, rubber: 2 } },
+      { k: 'engine',  out: ['part_engine', 1], cost: { metal: 8, iron_rod: 4, electronics: 3, nails: 6 } },
+      { k: 'rotor',   out: ['part_rotor', 1],  cost: { metal: 14, iron_rod: 6, electronics: 2, nails: 8 }, only: ['garage_heli'] },
+      { k: 'tracks',  out: ['part_tracks', 1], cost: { metal: 12, iron_rod: 4, rubber: 6 }, only: ['garage_tank'] },
+      { k: 'turret',  out: ['part_turret', 1], cost: { metal: 16, iron_rod: 6, electronics: 2, nails: 6 }, only: ['garage_tank'] }
+    ];
+    Object.keys(PREFIX).forEach(function (st) {
+      COMMON.forEach(function (p) {
+        if ((p.only && p.only.indexOf(st) < 0) || (p.not && p.not.indexOf(st) >= 0)) return;
+        G.data.recipes.push({ id: PREFIX[st] + p.k, station: st, level: p.k === 'engine' && (st === 'garage_heli' || st === 'garage_tank') ? 2 : 1, cat: 'parts', out: p.out, cost: p.cost });
+      });
+    });
+  })();
 })(typeof window !== 'undefined' ? window : globalThis);

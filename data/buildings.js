@@ -2,7 +2,7 @@
 // Each structure has 2 levels. levels[0] is the cost to build it (level 1), levels[1] the cost to upgrade.
 // start: level the structure already has at the start (0 = not built). spot: fixed place in the yard
 // (null = it already exists in the layout: the chest and the fence). station: opens a panel with E.
-// use: another E action ('sleep' | 'tank'), handled in js/game.js.
+// use: another E action ('sleep' | 'tank' | 'chest'), handled in js/game.js. max: most copies in the yard (default G.placing.MAX_EACH). room: a garage is a roofless room you can drive into (js/base.js roomParts).
 // Per-level effects: chestSlots (chest capacity), sleep (what a night gives: energy / health restored,
 // hunger / thirst lost), tank ({ cap, secs }: rain water stored, seconds to collect one unit).
 // The fence strength arrives with combat in stage 5.
@@ -11,7 +11,7 @@
   var G = root.G;
   G.data = G.data || {};
 
-  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'garage_moto', 'garage_jeep', 'garage_heli', 'garage_tank', 'bed', 'tank', 'bag', 'chest', 'fence'];
+  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'garage_moto', 'garage_jeep', 'garage_heli', 'garage_tank', 'bed', 'tank', 'bag', 'chest', 'box'];                      // the fence is not a card of its own any more: pieces are laid one by one (see fencePiece)
 
   // Fence materials the player chooses between (state: G.state.fence.material). `swap` replaces cost items: the fence
   // levels are priced in planks and stone; stone fences use stone instead of planks, metal fences metal (half as much, rounded up).
@@ -22,6 +22,9 @@
     metal: { name: 'מתכת', swap: { plank: 'metal', stone: 'metal' }, half: true, hp: 2.2 }
   };
   G.data.fenceMaterialOrder = ['wood', 'stone', 'metal'];
+  // One fence piece (one floor block long) costs this, priced in the chosen material (see G.crafting.fenceCost). How many pieces stand
+  // sets the fence level that the raid chance reads (G.placing.fenceLevel); the level is derived, never bought.
+  G.data.fencePiece = { cost: { plank: 2 } };
 
   // Floor blocks the player lays one by one (B menu, "רצפה"): the material and what one big block (G.placing.CELL px, about a room tile) costs.
   G.data.floorMaterials = {
@@ -59,22 +62,22 @@
     // Garages: stations where a vehicle is built (recipes with `vehicle` in data/recipes.js) and parked. Level 2: the vehicle's tank holds 50% more.
     // Costs are forest items (the vehicle itself needs metal and electronics from the places beyond).
     garage_moto: {
-      name: 'מוסך אופנוע וטרקטורון', start: 0, station: true, spot: { x: 900, y: 1240, w: 190, h: 120 },
+      name: 'מוסך אופנוע וטרקטורון', start: 0, station: true, max: 1, room: true, spot: { x: 900, y: 1240, w: 190, h: 120 },
       desc: 'כאן בונים אופנוע וטרקטורון וחונים אותם. כל רמה מגדילה את מיכל הדלק של שניהם (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).',
       levels: [{ cost: { wood: 10, plank: 8, stone: 6 } }, { cost: { plank: 10, stone: 10, wood: 8 } }, { cost: { plank: 12, stone: 14, wood: 10 } }, { cost: { plank: 14, stone: 16, nails: 14, metal: 8 } }]
     },
     garage_jeep: {
-      name: "מוסך ג'יפ", start: 0, station: true, spot: { x: 1150, y: 1230, w: 220, h: 130 },
+      name: "מוסך ג'יפ", start: 0, station: true, max: 1, room: true, spot: { x: 1150, y: 1230, w: 220, h: 130 },
       desc: "כאן בונים ג'יפ וחונים אותו. כל רמה מגדילה את מיכל הדלק (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).",
       levels: [{ cost: { wood: 12, plank: 10, stone: 8 } }, { cost: { plank: 12, stone: 12, wood: 8 } }, { cost: { plank: 14, stone: 16, wood: 12 } }, { cost: { plank: 16, stone: 18, nails: 16, metal: 10 } }]
     },
     garage_heli: {
-      name: 'מוסך מסוק', start: 0, station: true, spot: { x: 1440, y: 1210, w: 250, h: 170 },
+      name: 'מוסך מסוק', start: 0, station: true, max: 1, room: true, spot: { x: 1440, y: 1210, w: 250, h: 170 },
       desc: 'האנגר ומנחת: כאן בונים מסוק וחונים אותו. כל רמה מגדילה את מיכל הדלק (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).',
       levels: [{ cost: { wood: 14, plank: 12, stone: 12 } }, { cost: { plank: 14, stone: 14, wood: 10 } }, { cost: { plank: 16, stone: 18, wood: 14 } }, { cost: { plank: 18, stone: 20, nails: 18, metal: 12 } }]
     },
     garage_tank: {
-      name: 'מוסך טנק', start: 0, station: true, spot: { x: 1760, y: 1215, w: 270, h: 160 },
+      name: 'מוסך טנק', start: 0, station: true, max: 1, room: true, spot: { x: 1760, y: 1215, w: 270, h: 160 },
       desc: 'בונקר חזק במיוחד: כאן בונים טנק וחונים אותו. כל רמה מגדילה את מיכל הדלק (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).',
       levels: [{ cost: { stone: 24, plank: 12, wood: 10 } }, { cost: { stone: 24, plank: 14, wood: 10 } }, { cost: { stone: 28, plank: 16, wood: 16 } }, { cost: { stone: 32, plank: 18, nails: 20, metal: 14 } }]
     },
@@ -84,7 +87,7 @@
       levels: [{ cost: { wood: 4, stone: 6 } }, { cost: { stone: 10, plank: 2 } }, { cost: { stone: 14, plank: 6 } }, { cost: { stone: 16, plank: 8, metal: 4 } }]
     },
     bed: {
-      name: 'מיטה', start: 0, station: false, use: 'sleep', spot: { x: 1780, y: 1090, w: 56, h: 98 },
+      name: 'מיטה', start: 0, station: false, max: 1, use: 'sleep', spot: { x: 1780, y: 1090, w: 56, h: 98 },
       desc: 'שינה (E): האנרגיה מתמלאת, אבל רעב וצמא עולים קצת. כל רמה מרפאת יותר.',
       levels: [
         { cost: { wood: 6, plank: 4 }, sleep: { energy: 100, health: 10, hunger: 12, thirst: 16 } },
@@ -104,14 +107,39 @@
       ]
     },
     chest: {
-      name: 'מחסן', start: 1, station: true, spot: null,
-      desc: 'מגדילים את המחסן: 24, 36, 48 ובסוף 60 משבצות.',
+      name: 'תיבה ראשית', start: 1, station: true, spot: null,
+      desc: 'התיבה שליד הבית. שדרוג מגדיל אותה: 24, 36, 48 ובסוף 60 משבצות.',
       levels: [{ cost: {}, chestSlots: 24 }, { cost: { wood: 10, plank: 6 }, chestSlots: 36 }, { cost: { wood: 14, plank: 10 }, chestSlots: 48 }, { cost: { plank: 14, nails: 10, metal: 4 }, chestSlots: 60 }]
     },
+    // Extra boxes: up to `max` of them anywhere in the yard. All boxes open the same storage; every box adds boxSlots[level] slots to it
+    // (G.crafting.chestSlots). Upgrading makes every box bigger.
+    box: {
+      name: 'תיבה נוספת', start: 0, station: false, use: 'chest', max: 4, spot: { x: 1868, y: 790, w: 52, h: 36 },
+      desc: 'עוד תיבה בחצר, עד 4. כל התיבות פותחות את אותו מחסן, וכל תיבה מוסיפה לו משבצות (8, 10, 12 ובסוף 14 לכל תיבה).',
+      levels: [{ cost: { wood: 8, plank: 4 }, boxSlots: 8 }, { cost: { plank: 8, stone: 4 }, boxSlots: 10 }, { cost: { plank: 10, stone: 8 }, boxSlots: 12 }, { cost: { plank: 12, nails: 8, metal: 4 }, boxSlots: 14 }]
+    },
     fence: {
-      name: 'גדר', start: 1, station: false, spot: null,
-      desc: 'גדר גבוהה וחזקה יותר, עד שלוש רמות שדרוג. אפשר לבחור ממה היא בנויה (עץ, אבן, מתכת).',
-      levels: [{ cost: {} }, { cost: { plank: 10, stone: 10 } }, { cost: { plank: 14, stone: 16 } }, { cost: { plank: 16, stone: 20, nails: 14, metal: 8 } }]
+      name: 'גדר', start: 0, station: false, spot: null,
+      desc: 'גדר נבנית חתיכה אחרי חתיכה, רק על רצפה. הרמה נקבעת לפי מספר החתיכות.',
+      levels: [{ cost: {} }, { cost: {} }, { cost: {} }, { cost: {} }]
     }
+  };
+
+  // How each building looks on its card in the build panel (B): an emoji and a one-line "what it does".
+  // The long text stays in buildings[id].desc and shows as the card's tooltip.
+  G.data.buildingCards = {
+    bag:          { icon: '🎒', blurb: 'יותר מקום בתיק: עד 32 משבצות' },
+    workbench:    { icon: '🛠️', blurb: 'יצירת כלים, נשקים ותחמושת' },
+    rack:         { icon: '🍄', blurb: 'ייבוש פטריות ואוכל, מנות שדה' },
+    garage_moto:  { icon: '🏍️', blurb: 'חדר פתוח: חונים, מרכיבים חלקים, שוטפים' },
+    garage_jeep:  { icon: '🚙', blurb: "בונים וחונים ג'יפ" },
+    garage_heli:  { icon: '🚁', blurb: 'האנגר: בונים וחונים מסוק' },
+    garage_tank:  { icon: '🪖', blurb: 'בונקר: בונים וחונים טנק' },
+    campfire:     { icon: '🔥', blurb: 'בישול אוכל וטיהור מים' },
+    bed:          { icon: '🛏️', blurb: 'שינה: ממלאת אנרגיה ומרפאת' },
+    tank:         { icon: '💧', blurb: 'אוסף מי גשם נקיים לשתייה' },
+    chest:        { icon: '📦', blurb: 'התיבה הראשית: עד 60 משבצות' },
+    box:          { icon: '🧰', blurb: 'עוד תיבה בחצר, עד 4. מוסיפה משבצות' },
+    fence:        { icon: '🧱', blurb: 'גדר חתיכה אחרי חתיכה: עץ, אבן או מתכת' }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

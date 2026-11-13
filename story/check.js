@@ -16,7 +16,7 @@ function load(file) { vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { 
 for (const f of ['data/items.js', 'data/world.js']) {
   try { load(path.join(ROOT, f)); } catch (e) { console.warn('warn: could not load ' + f + ': ' + e.message); }
 }
-const order = ['story-items.js', 'spots.js', 'quests.js', 'dialogue-1.js', 'dialogue-2.js', 'notes.js', 'triggers.js', 'endings.js'];
+const order = ['story-items.js', 'spots.js', 'quests.js', 'dialogue-1.js', 'dialogue-2.js', 'notes.js', 'triggers.js', 'endings.js', 'cellar.js'];
 for (const f of order) load(path.join(__dirname, 'data', f));
 
 const G = sandbox.G, D = G.data;

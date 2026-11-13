@@ -4,7 +4,9 @@
   'use strict';
   var G = root.G;
 
-  var mode = 'none';           // 'none' | 'bag' | 'chest' | 'craft' | 'build' | 'map'
+  var mode = 'none';           // 'none' | 'bag' | 'chest' | 'craft' | 'build' | 'veh' | 'map'
+  var vehId = null;            // the vehicle in the workshop panel (mode 'veh')
+  var vehGarage = null;        // the garage whose panel is open (its vehicles are the tabs)
   function snd(name, o) { if (G.audio) G.audio.play(name, o); }
   var station = null;          // 'workbench' | 'campfire' while mode === 'craft'
   var craftCat = 'all';        // the open category tab of the crafting panel
@@ -22,7 +24,7 @@
   };
 
   var REASON = {
-    cost: 'חסרים חומרים', space: 'אין מקום בתיק ובמחסן', station: 'אין תחנה כזו בבסיס',
+    cost: 'חסרים חומרים', space: 'אין מקום בתיק ובתיבה', station: 'אין תחנה כזו בבסיס',
     level: 'דרוש שדרוג של התחנה', locked: 'עוד לא ידוע איך', owned: 'כבר בנית כלי רכב כזה', max: 'כבר ברמה המקסימלית', unknown: 'פעולה לא מוכרת'
   };
 
@@ -137,44 +139,123 @@
     return h + '</div>';
   }
 
-  // The floor row: pick a material, then lay blocks one by one in the yard.
-  function floorRowHtml() {
-    var M = G.data.floorMaterials, h = '<div class="row"><span class="badge">▦</span><div class="info"><div class="rname">רצפה (בלוק אחרי בלוק)</div>' +
-      '<div class="desc">בוחרים חומר ומניחים בלוקים בכל מקום בחצר. לחיצה מניחה, קליק ימני מסיר ומחזיר את החומרים.</div><div class="mats">';
-    G.data.floorMaterialOrder.forEach(function (m) {
-      h += '<button class="act mat" data-act="floorMat" data-id="' + m + '" tabindex="-1">' + M[m].name + ' · ' +
-        Object.keys(M[m].cost).map(function (k) { return M[m].cost[k] + ' ' + G.data.items[k].name; }).join(' + ') + '</button>';
-    });
-    return h + '</div></div></div>';
+  // ---- the build board (B): a grid of equal cards, each with an emoji, name, short text, price and its buttons ----
+
+  // One card. `mid` sits between the text and the price (the fence's material buttons).
+  function cardHtml(o) {
+    return '<div class="bcard' + (o.cls ? ' ' + o.cls : '') + (o.off ? ' off' : '') + '" title="' + (o.tip || '').replace(/"/g, '&quot;') + '">' +
+      '<div class="bhead"><span class="bico">' + o.icon + '</span>' +
+      '<div class="btitle"><div class="bname">' + o.name + (o.tag ? '<em>' + o.tag + '</em>' : '') + '</div>' + (o.pips || '') + '</div></div>' +
+      '<div class="bblurb">' + o.blurb + '</div>' + (o.mid || '') +
+      (o.costs ? '<div class="costs">' + o.costs + '</div>' : '') +
+      '<div class="bbtns">' + o.btns + '</div></div>';
   }
 
-  function moveRowHtml() {
-    return '<div class="row"><span class="badge">✥</span><div class="info"><div class="rname">הזזה (מקש T)</div>' +
-      '<div class="desc">תופסים מבנה, מחסן או בלוק רצפה ומניחים במקום אחר, בחינם. Shift: מזיזים את כל הרצפה כיחידה אחת.</div></div>' +
-      '<div class="btns"><button class="act" data-act="move" tabindex="-1">הזזה</button></div></div>';
+  // The floor card: pick a material, then lay blocks one by one in the yard.
+  function floorCardHtml() {
+    var M = G.data.floorMaterials, mats = '<div class="mats">';
+    G.data.floorMaterialOrder.forEach(function (m) {
+      mats += '<button class="act mat" data-act="floorMat" data-id="' + m + '" tabindex="-1"><b>' + M[m].name + '</b><span>' +
+        Object.keys(M[m].cost).map(function (k) { return M[m].cost[k] + ' ' + G.data.items[k].name; }).join(' + ') + '</span></button>';
+    });
+    return cardHtml({ cls: 'wide2', icon: '🟫', name: 'רצפה', tag: 'בלוק אחרי בלוק', blurb: 'בוחרים חומר ומניחים בכל מקום בחצר. קליק ימני מסיר ומחזיר את החומרים.', btns: mats + '</div>',
+      tip: 'בוחרים חומר ומניחים בלוקים בכל מקום בחצר. לחיצה מניחה, קליק ימני מסיר ומחזיר את החומרים.' });
+  }
+
+  // The fence card: pick a material, then put pieces down one by one on the edges of floor blocks (R turns the piece).
+  function fenceCardHtml() {
+    var FM = G.data.fenceMaterials, mats = '<div class="mats">', st = G.state, n = (st.fences || []).length;
+    G.data.fenceMaterialOrder.forEach(function (m) {
+      var cost = G.crafting.fenceCost(m);
+      mats += '<button class="act mat" data-act="fenceMat" data-id="' + m + '" tabindex="-1"><b>' + FM[m].name + '</b><span>' +
+        Object.keys(cost).map(function (k) { return cost[k] + ' ' + G.data.items[k].name; }).join(' + ') + '</span></button>';
+    });
+    return cardHtml({ cls: 'wide2', icon: '🧱', name: 'גדר', tag: n ? n + ' חתיכות · רמה ' + (st.buildings.fence || 0) : 'חתיכה אחרי חתיכה',
+      blurb: 'בוחרים חומר ומניחים חתיכה על קצה של בלוק רצפה (רק על רצפה). R מסובב, קליק ימני מסיר ומחזיר את החומרים. ככל שיש יותר גדר, הבסיס מוגן יותר.', btns: mats + '</div>',
+      tip: 'גדר נבנית חתיכה אחרי חתיכה, רק על רצפה שכבר הנחתם. R מסובב לאורך או לרוחב.' });
   }
 
   function buildHtml() {
-    var c = ctx(), h = '';
+    var c = ctx(), h = '', CARDS = G.data.buildingCards || {};
     G.data.buildingOrder.forEach(function (id) {
-      var d = G.data.buildings[id], lv = G.crafting.levelOf(c, id), next = G.crafting.nextLevel(c, id);
+      var d = G.data.buildings[id], lv = G.crafting.levelOf(c, id), next = G.crafting.nextLevel(c, id), card = CARDS[id] || {};
       var why = G.crafting.buildStatus(c, id);
       var label = !next ? 'מקסימום' : (lv === 0 ? 'בנה' : 'שדרג');
       var free = !!d.spot, n = free ? G.placing.count(c.placed, id) : 0, pwhy = free ? G.crafting.placeStatus(c, id) : null;
+      var one = free && G.placing.max(id) === 1;                  // the bed and the garages: one copy only, so "place more" never shows
+      var more = free && lv > 0 && !(one && n >= 1);
       var btns = free && lv === 0
         ? '<button class="act" data-act="place" data-id="' + id + '" tabindex="-1"' + (pwhy ? ' disabled' : '') + '>בנה והצב</button>'
-        : (free ? '<button class="act" data-act="place" data-id="' + id + '" tabindex="-1"' + (pwhy ? ' disabled' : '') + '>הצב עוד</button>' : '') +
+        : (more ? '<button class="act" data-act="place" data-id="' + id + '" tabindex="-1"' + (pwhy ? ' disabled' : '') + '>' + (n ? 'הצב עוד' : 'הצב') + '</button>' : '') +
           '<button class="act" data-act="build" data-id="' + id + '" tabindex="-1"' + (why ? ' disabled' : '') + '>' + label + '</button>';
       if (free && lv === 0) why = pwhy;
-      h += '<div class="row' + (why ? ' off' : '') + '">' +
-        '<span class="badge">' + pips(lv, d.levels.length) + '</span>' +
-        '<div class="info"><div class="rname">' + d.name + (lv ? (n > 1 ? ' ×' + n : '') : '<em>לא נבנה</em>') + '</div>' +
-        '<div class="desc">' + d.desc + '</div>' +
-        (id === 'fence' ? fenceMatHtml() : '') +
-        '<div class="costs">' + (free && lv === 0 ? costHtml(d.levels[0].cost) : (next ? costHtml(G.crafting.buildCost(c, id)) : '<span class="cost ok">רמה מלאה</span>')) + '</div></div>' +
-        '<div class="btns">' + btns + '</div></div>';
+      h += cardHtml({
+        off: !!why, icon: card.icon || '🏠', name: d.name, tag: !lv ? 'לא נבנה' : (free && G.placing.max(id) > 1 && G.placing.max(id) < G.placing.MAX_EACH ? n + '/' + G.placing.max(id) : (n > 1 ? '×' + n : '')),
+        pips: pips(lv, d.levels.length), blurb: card.blurb || d.desc, tip: d.desc,
+        mid: '',
+        costs: free && lv === 0 ? costHtml(d.levels[0].cost) : (next ? costHtml(G.crafting.buildCost(c, id)) : '<span class="cost ok">רמה מלאה</span>'),
+        btns: btns
+      });
     });
-    return h + floorRowHtml() + moveRowHtml();
+    return h + floorCardHtml() + fenceCardHtml();                                  // moving things is the T key (no card for it here)
+  }
+
+  // ---- the garage workshop panel (U next to a vehicle inside its garage): fitted upgrades, parts, washing ----
+
+  // The vehicles of the open garage as tabs (none when the garage has just one).
+  function vehTabsHtml() {
+    var ids = G.data.vehicleOrder.filter(function (id) { return G.data.vehicles[id].garage === vehGarage; });
+    if (ids.length < 2) return '';
+    return ids.map(function (id) {
+      return '<button class="tab' + (id === vehId ? ' on' : '') + '" data-veh="' + id + '" tabindex="-1">' + G.data.vehicles[id].name + '<em>' + (G.state.vehicles[id] ? '✓' : '…') + '</em></button>';
+    }).join('');
+  }
+
+  // A vehicle that is not built yet: its parts one by one. Each press fits one part from the bag or the box; the last one completes the vehicle.
+  function assemblyHtml() {
+    var c = ctx(), V = G.vehicles, d = G.data.vehicles[vehId], list = V.buildList(vehId), builds = G.state.builds, total = 0, got = 0, h = '';
+    list.forEach(function (x) { total += x.n; got += Math.min(x.n, V.builtCount(builds, vehId, x.part)); });
+    h += '<div class="bcard wide3 vstat"><div class="bhead"><span class="bico" style="background-image:url(' + G.icons.url('veh_' + vehId) + ')"></span>' +
+      '<div class="btitle"><div class="bname">' + d.name + '<em>בבנייה · ' + got + '/' + total + ' חלקים</em></div></div></div>' +
+      '<div class="bblurb">את החלקים מייצרים בשולחן העבודה של המוסך (E ליד השולחן, לשונית "חלקים"): גומי ומוטות ברזל הופכים לגלגלים, שלד, מנוע ועוד. כאן מרכיבים אותם אחד אחד עד שהכלי מוכן.</div></div>';
+    list.forEach(function (x) {
+      var fitted = V.builtCount(builds, vehId, x.part), full = fitted >= x.n, have = G.crafting.have(c, x.part), cost = {}, it = items()[x.part];
+      cost[x.part] = 1;
+      h += cardHtml({
+        off: full || (have < 1 && !G.crafting.free), icon: '<i class="pico" style="background-image:url(' + G.icons.url(x.part) + ')"></i>', name: it.name, tag: fitted + '/' + x.n, pips: pips(fitted, x.n, 'הותקנו'),
+        blurb: full ? 'הותקן במלואו' : 'מתקינים חלק אחד בכל לחיצה', costs: full ? '<span class="cost ok">הותקן</span>' : costHtml(cost),
+        btns: '<button class="act" data-act="vassemble" data-id="' + x.part + '" tabindex="-1"' + (full || (have < 1 && !G.crafting.free) ? ' disabled' : '') + '>' + (full ? 'הותקן' : 'התקן') + '</button>'
+      });
+    });
+    return h;
+  }
+
+  function vehHtml() {
+    var c = ctx(), v = G.state.vehicles[vehId], d = G.data.vehicles[vehId], V = G.vehicles, h = '';
+    if (!v) return assemblyHtml();
+    var cap = V.cap(vehId, G.state.buildings, v), dirtPct = Math.round((v.dirt || 0) * 100);
+    var sp = Math.round((V.speedMult(vehId, v) - 1) * 100), bn = Math.round((V.burnMult(vehId, v) - 1) * 100);
+    h += '<div class="bcard wide3 vstat"><div class="bhead"><span class="bico" style="background-image:url(' + G.icons.url('veh_' + vehId) + ')"></span>' +
+      '<div class="btitle"><div class="bname">' + d.name + '</div></div></div>' +
+      '<div class="costs"><span class="cost">דלק ' + Math.round(v.fuel) + '/' + cap + '</span><span class="cost ' + (dirtPct > 50 ? 'lack' : 'ok') + '">לכלוך ' + dirtPct + '%</span>' +
+      '<span class="cost">מהירות ' + (sp >= 0 ? '+' : '') + sp + '%</span><span class="cost">צריכת דלק ' + (bn >= 0 ? '+' : '') + bn + '%</span></div>' +
+      '<div class="bblurb">החלקים מיוצרים בשולחן העבודה של המוסך (E ליד השולחן): גומי ומוטות ברזל הופכים לגלגלים, מנוע ומיכל.</div></div>';
+    V.upgradesFor(vehId).forEach(function (u) {
+      var lv = V.upLevel(v, u.id), have = G.crafting.free ? 1 : G.crafting.have(c, u.part), full = lv >= u.max, cost = {};
+      cost[u.part] = 1;
+      h += cardHtml({
+        off: full || have < 1, icon: u.icon, name: u.name, tag: lv ? 'רמה ' + lv : 'לא הותקן', pips: pips(lv, u.max, 'רמה'), blurb: u.blurb, tip: u.blurb,
+        costs: full ? '<span class="cost ok">רמה מלאה</span>' : costHtml(cost),
+        btns: '<button class="act" data-act="vinstall" data-id="' + u.id + '" tabindex="-1"' + (full || have < 1 ? ' disabled' : '') + '>' + (full ? 'מקסימום' : (lv ? 'שדרג' : 'התקן')) + '</button>'
+      });
+    });
+    var dirty = (v.dirt || 0) > 0.02, water = G.crafting.have(c, 'water_clean');
+    h += cardHtml({
+      off: !dirty || water < 1, icon: '🧽', name: 'שטיפה', tag: dirty ? 'לכלוך ' + dirtPct + '%' : 'נקי', blurb: 'מים נקיים שוטפים את הבוץ, והכלי חוזר לרוץ מהר וחסכוני.',
+      costs: costHtml({ water_clean: 1 }),
+      btns: '<button class="act" data-act="vwash" tabindex="-1"' + (!dirty || water < 1 ? ' disabled' : '') + '>' + (dirty ? 'שטוף' : 'נקי') + '</button>'
+    });
+    return h;
   }
 
   // ---- world map ----------------------------------------------------------------------------------
@@ -252,6 +333,11 @@
       els.craftTitle.textContent = G.data.buildings[station].name;
     } else if (mode === 'build') {
       fill(els.buildList, buildHtml());
+    } else if (mode === 'veh') {
+      if (!vehGarage || !vehId) { ui.close(); return; }
+      els.vehTabs.innerHTML = vehTabsHtml();
+      fill(els.vehList, vehHtml());
+      els.vehTitle.textContent = G.data.buildings[vehGarage].name;
     } else if (mode === 'map') {
       var mp = mapParts();
       els.mapLines.innerHTML = mp.lines;
@@ -265,7 +351,8 @@
 
   function hintFor() {
     if (mode === 'chest') return 'לחיצה: העבר הכל · קליק ימני: העבר אחד · E / Esc: סגירה';
-    if (mode === 'craft') return 'חומרים נלקחים מהתיק ואז מהמחסן · לחיצה על פריט בתיק: שימוש · E / Esc: סגירה';
+    if (mode === 'craft') return 'חומרים נלקחים מהתיק ואז מהתיבה · לחיצה על פריט בתיק: שימוש · E / Esc: סגירה';
+    if (mode === 'veh') return 'חלקים לוקחים מהתיק ומהתיבה · U / Esc: סגירה';
     if (mode === 'build') return 'מבנה חדש נבנה במקום המסומן בבסיס · B / Esc: סגירה';
     if (mode === 'map' && flight) return 'בחרו יעד ולחצו "המראה" (או Enter). הטיסה עולה דלק בלבד · Esc: סגירה';
     if (mode === 'map') return 'בחרו יעד ולחצו "צאו לדרך" (או Enter). החזרה מכל יעד חינם · E / Esc: סגירה';
@@ -277,8 +364,9 @@
     els.chestPanel.classList.toggle('hidden', mode !== 'chest');
     els.craftPanel.classList.toggle('hidden', mode !== 'craft');
     els.buildPanel.classList.toggle('hidden', mode !== 'build');
+    els.vehPanel.classList.toggle('hidden', mode !== 'veh');
     els.mapPanel.classList.toggle('hidden', mode !== 'map');
-    els.bagPanel.classList.toggle('hidden', mode === 'build' || mode === 'map');
+    els.bagPanel.classList.toggle('hidden', mode === 'build' || mode === 'map' || mode === 'veh');
     els.gearPanel.classList.toggle('hidden', mode !== 'bag');
     els.hint.textContent = hintFor();
     els.msg.textContent = '';
@@ -310,6 +398,7 @@
       els.craftLevel = document.getElementById('craft-level');
       els.craftList = document.getElementById('craft-list');
       els.craftTabs = document.getElementById('craft-tabs');
+      els.vehPanel = document.getElementById('veh-panel'); els.vehList = document.getElementById('veh-list'); els.vehTitle = document.getElementById('veh-title'); els.vehTabs = document.getElementById('veh-tabs');
       els.buildPanel = document.getElementById('build-panel');
       els.buildList = document.getElementById('build-list');
       els.mapPanel = document.getElementById('map-panel');
@@ -359,6 +448,7 @@
         if (tab) {                                    // a category tab of the crafting panel
           e.preventDefault();
           if (amount === Infinity && mode === 'craft') { craftCat = tab.getAttribute('data-cat'); dirty = true; }
+          if (amount === Infinity && mode === 'veh' && tab.getAttribute('data-veh')) { vehId = tab.getAttribute('data-veh'); dirty = true; }
           return;
         }
         var act = e.target.closest ? e.target.closest('.act') : null;
@@ -373,6 +463,9 @@
             else if (what === 'move') { ui.close(); G.game.startPlacing({ kind: 'move', carry: null }); }
             else if (what === 'floorMat') ui.floorMat(id);
             else if (what === 'go') ui.depart(id);
+            else if (what === 'vinstall') ui.vehInstall(id);
+            else if (what === 'vwash') ui.vehWash();
+            else if (what === 'vassemble') ui.vehAssemble(id);
           }
           return;
         }
@@ -440,6 +533,25 @@
     openChest: function () { mode = 'chest'; station = null; chestChanged = false; applyMode(); snd('open'); },
     openBag: function () { mode = 'bag'; station = null; applyMode(); snd('pickup', { vol: 0.6 }); },
     openCraft: function (id) { mode = 'craft'; station = id; craftCat = 'all'; applyMode(); snd('ui'); },
+    openVehicle: function (garage, id) { mode = 'veh'; vehGarage = garage; vehId = id; station = null; applyMode(); snd('open'); },
+    vehAssemble: function (part) {
+      if (mode !== 'veh') return null;
+      var r = G.game.vehicleAssemble(vehId, part), it = items()[part];
+      say(r.ok ? (r.done ? 'הושלם: ' + G.data.vehicles[vehId].name : 'הותקן: ' + it.name + ' (' + r.fitted + '/' + r.need + ')') : (r.reason === 'part' ? 'חסר חלק: ' + it.name : r.reason === 'full' ? 'החלק כבר הותקן' : 'אי אפשר להרכיב כאן'));
+      dirty = true; return r;
+    },
+    vehInstall: function (upId) {
+      if (mode !== 'veh') return null;
+      var r = G.game.vehicleInstall(vehId, upId), up = G.vehicles.upgradesFor(vehId).filter(function (u) { return u.id === upId; })[0];
+      say(r.ok ? 'הותקן: ' + up.name + ' (רמה ' + r.level + ')' : (r.reason === 'part' ? 'חסר חלק: ' + items()[up.part].name : r.reason === 'max' ? 'הגעתם למקסימום' : 'אי אפשר להתקין כאן'));
+      dirty = true; return r;
+    },
+    vehWash: function () {
+      if (mode !== 'veh') return null;
+      var r = G.game.vehicleWash(vehId);
+      say(r.ok ? 'נשטף: ' + G.data.vehicles[vehId].name + ' נקי' : (r.reason === 'water' ? 'חסרים מים נקיים' : r.reason === 'clean' ? 'כבר נקי' : 'אי אפשר לשטוף כאן'));
+      dirty = true; return r;
+    },
     openBuild: function () { mode = 'build'; station = null; applyMode(); snd('ui'); },
     // flightId: the helicopter the player just boarded (then every open place and home can be reached, for fuel).
     openMap: function (flightId) {
@@ -588,10 +700,8 @@
     fenceMat: function (id) {
       if (mode !== 'build' || !G.data.fenceMaterials[id]) return;
       G.state.fence = { material: id };
-      G.game.applyBuildings();
-      snd('ui'); say('חומר הגדר: ' + G.data.fenceMaterials[id].name);
-      game('save', 'fence');
-      dirty = true;
+      ui.close();
+      G.game.startPlacing({ kind: 'fence', o: 'h' });
     },
 
     build: function (id) {

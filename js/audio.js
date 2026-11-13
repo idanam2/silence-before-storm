@@ -137,6 +137,37 @@
 
   A.listen = function (x, y) { A.lx = x; A.ly = y; };
 
+  // Pushes the ambience and music down for a moment (a gunshot), then lets them come back.
+  A.duck = function (depth) {
+    if (!A.ready) return;
+    var now = A.ctx.currentTime, k = Math.max(0.15, 1 - depth);
+    ['amb', 'music'].forEach(function (b) {
+      var p = A[b].gain, full = A.vol[b] * A.user[b];
+      p.cancelScheduledValues(now);
+      p.setValueAtTime(p.value, now);
+      p.linearRampToValueAtTime(full * k, now + 0.015);
+      p.setTargetAtTime(full, now + 0.08, 0.25);
+    });
+  };
+
+  // The engine of the vehicle being ridden: kind (null = none) and load 0..1 (standing still .. full speed).
+  // Switching kind fades the old one out; a mute / volume change follows through the sfx bus.
+  A._eng = null; A._engKind = null;
+  A.engine = function (kind, load) {
+    if (!A.ready) return;
+    if (!G.engines || !G.engines[kind]) kind = null;
+    if (kind !== A._engKind) {
+      if (A._eng) A._eng.stop();
+      A._eng = null; A._engKind = kind;
+      if (kind) {
+        var g = A.ctx.createGain(); g.gain.value = 0; g.connect(A.sfx);
+        A._eng = G.engines[kind](A, g);
+        if (G.sfx && G.sfx.ignition) A.play('ignition', { kind: kind });
+      }
+    }
+    if (A._eng) A._eng.set(Math.max(0, Math.min(1, load || 0)));
+  };
+
   A.scene = function (place, indoor, menu) {
     A.place = place; A.indoor = !!indoor; A.menu = !!menu;
     if (A.ready && G.ambience && G.ambience.set) G.ambience.set(A, place, A.indoor, A.menu);

@@ -101,9 +101,10 @@
   function hitEnemy(e, dmg, w, fx, fy, from) {
     var res = G.enemies.hurt(e, dmg, from.x, from.y, w);
     if (!res.dealt) return;
-    snd('hit', at(fx, fy, { mat: 'flesh', heavy: res.killed || w.kind !== 'gun', vol: w.kind === 'gun' ? 0.6 : 1 }));
-    if (res.killed) { snd('growl', at(e.x, e.y, { kind: e.type, mood: 'die' })); snd('body', at(e.x, e.y, { delay: 0.7 })); }
-    else snd('growl', at(e.x, e.y, { kind: e.type, mood: 'hurt', gap: 0.35, key: e.uid }));
+    var gun = w.kind === 'gun';                       // a bullet: the shot itself is the sound, the impact only a dull thud under it
+    snd('hit', at(fx, fy, { mat: 'flesh', heavy: res.killed || !gun, vol: gun ? 0.35 : 1 }));
+    if (res.killed) { snd('growl', at(e.x, e.y, { kind: e.type, mood: 'die', delay: gun ? 0.08 : 0 })); snd('body', at(e.x, e.y, { delay: 0.75 })); }
+    else if (!gun || Math.random() < 0.3) snd('growl', at(e.x, e.y, { kind: e.type, mood: 'hurt', gap: gun ? 1.2 : 0.5, key: e.uid, delay: gun ? 0.1 : 0 }));
     G.forestArt.spawnFx(st.particles, 'blood', fx, fy, res.killed ? 12 : 6, fxRand);
     if (w.kind !== 'gun') G.feel.kick(st.shake, e.x - from.x, e.y - from.y, G.feel.meleeKick(res.killed));   // feel: a tiny camera kick along the blow
     floater(e.x, e.y + 14, null, 0, (res.sneak ? 'מכה שקטה ' : '') + '-' + Math.round(res.dealt), res.sneak ? '#d8c07a' : '#d8a496');
@@ -244,8 +245,8 @@
       var ev = c.events[i], q = ev.e;
       if (ev.type === 'notice') {
         snd('growl', at(q.x, q.y, { kind: q.type, mood: 'notice', gap: 1, key: q.uid }));
-        snd('notice', { gap: 5, vol: 0.8 });
       } else if (ev.type === 'blow') snd('growl', at(q.x, q.y, { kind: q.type, mood: 'attack', gap: 0.4, key: q.uid }));
+      else if (ev.type === 'scream') snd('growl', at(q.x, q.y, { kind: q.type, mood: 'scream', gap: 2, key: q.uid }));
       else if (ev.type === 'hear') snd('growl', at(q.x, q.y, { kind: q.type, mood: 'idle', vol: 0.8, gap: 1.5, key: q.uid }));
     }
     if (G.audio) G.audio.tension(Math.min(1, hunt * 0.4));
@@ -273,7 +274,7 @@
 
   function moveInput() {
     var m = G.input.getMove();
-    if (m.run && !G.needs.canRun(st.needs)) m.run = false;
+    if (m.run && !st.ride && !G.needs.canRun(st.needs)) m.run = false;   // on a vehicle Shift is the boost: no energy needed
     return m;
   }
 
@@ -293,7 +294,6 @@
       st.enemies.push(e);
       snd('growl', at(e.x, e.y, { kind: e.type, mood: 'notice', gap: 0.5, key: e.uid }));
     }
-    snd('notice', { gap: 5, vol: 0.8 });
     G.ui.toast('דוממים עקבו אחריכם הביתה!', 2800);
   }
 

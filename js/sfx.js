@@ -172,38 +172,55 @@
   };
 
   // ---------- guns ----------
+  // A gunshot is mostly low-mid energy: a distorted noise BOOM (lowpass closing fast), a mid punch around 300-500 Hz
+  // (what laptop speakers can actually play), a sub thump that drops in pitch, a short dull crack on top, and a
+  // real reverb tail (convolver, see reverb()) instead of resonant filters, so nothing rings like a "ping".
+  // While a shot sounds the ambience and music duck for a moment (A.duck), so it lands on top of everything.
   var SHOT = {
-    gun:    { click: 0.6,  bf: 1800, bq: 0.7, bd: 0.09, bp: 0.85, s0: 150, s1: 45, sd: 0.14, sp: 0.7,  tf: 1200, td: 0.45, tp: 0.25 },
-    uzi:    { click: 0.5,  bf: 2200, bq: 0.8, bd: 0.05, bp: 0.7,  s0: 180, s1: 60, sd: 0.07, sp: 0.5,  tf: 1500, td: 0.12, tp: 0.12 },
-    m16:    { click: 0.6,  bf: 2000, bq: 0.8, bd: 0.07, bp: 0.85, s0: 130, s1: 45, sd: 0.12, sp: 0.6,  tf: 1400, td: 0.5,  tp: 0.25 },
-    ak:     { click: 0.55, bf: 1300, bq: 0.6, bd: 0.11, bp: 0.9,  s0: 95,  s1: 35, sd: 0.2,  sp: 0.85, tf: 900,  td: 0.65, tp: 0.3, dist: 3 },
-    sniper: { click: 0.7,  bf: 1600, bq: 0.5, bd: 0.14, bp: 0.9,  s0: 80,  s1: 28, sd: 0.3,  sp: 0.9,  tf: 700,  td: 1.2,  tp: 0.35, dist: 4, echo: true }
+    gun:    { k: 1.0,  boom: 1800, bd: 0.16, punch: 420, s0: 120, sd: 0.22, crack: 0.35, verb: 0.55, dist: 30 },
+    uzi:    { k: 0.8,  boom: 2000, bd: 0.09, punch: 480, s0: 140, sd: 0.12, crack: 0.3,  verb: 0.35, dist: 26 },
+    m16:    { k: 1.15, boom: 2200, bd: 0.18, punch: 380, s0: 110, sd: 0.24, crack: 0.45, verb: 0.65, dist: 34 },
+    ak:     { k: 1.3,  boom: 1500, bd: 0.22, punch: 320, s0: 95,  sd: 0.3,  crack: 0.4,  verb: 0.75, dist: 40 },
+    sniper: { k: 1.55, boom: 1300, bd: 0.3,  punch: 260, s0: 75,  sd: 0.42, crack: 0.5,  verb: 1.0,  dist: 46 }
   };
-  S.shot = function (A, dest, t, o) {
-    o = o || {};
-    var c = SHOT[o.weapon] || SHOT.gun, ind = !!o.indoor;
-    // transient
-    nz(A, dest, t, 'highpass', rv(4500, 0.1), 0.7, 0.0008, 0.008, c.click);
-    // blast body (noise through bandpass, a bit of grit for the heavy rifles)
-    var bg = A.gain(0, dest), bf = A.filter('bandpass', rv(c.bf, 0.1), c.bq, c.dist ? shaper(A, c.dist, bg) : bg);
-    A.noise(t, c.bd, bf);
-    sweep(bf.frequency, t, rv(c.bf, 0.1), c.bf * 0.45, c.bd);
-    pulse(bg, t, 0.001, c.bd, c.bp);
-    // low thump with pitch drop
-    tn(A, dest, t, 'sine', rv(c.s0, 0.08), c.s1, 0.002, c.sd, c.sp, c.sd * 0.8);
-    // tail
-    if (ind) {
-      var it = nz(A, dest, t + 0.006, 'bandpass', rv(480, 0.1), 1.3, 0.005, c.td * 0.3, c.tp * 1.1);
-      it.f.frequency.value = rv(480, 0.1);
-      nz(A, dest, t + rnd(0.02, 0.03), 'bandpass', rv(900, 0.1), 1.2, 0.002, 0.04, c.tp * 0.7); // early reflection
-    } else {
-      var tl = nz(A, dest, t + 0.008, 'lowpass', c.tf, 0.7, 0.01, c.td, c.tp);
-      sweep(tl.f.frequency, t + 0.008, rv(c.tf, 0.1), c.tf * 0.3, c.td);
-      if (c.echo) {
-        nz(A, dest, t + rnd(0.32, 0.4), 'lowpass', 600, 0.7, 0.03, 0.4, 0.14);
-        nz(A, dest, t + rnd(0.7, 0.8), 'lowpass', 450, 0.7, 0.05, 0.45, 0.08);
+  // Shared reverbs (impulse = decaying stereo noise), built once per context: outdoor long and dark, indoor short.
+  var verbs = {};
+  function reverb(A, indoor) {
+    var key = indoor ? 'in' : 'out';
+    if (verbs[key] && verbs[key].context === A.ctx) return verbs[key];
+    var ctx = A.ctx, len = Math.floor(ctx.sampleRate * (indoor ? 0.45 : 1.8)), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (var ch = 0; ch < 2; ch++) {
+      var d = buf.getChannelData(ch), lp = 0;
+      for (var n = 0; n < len; n++) {
+        var x = n / len, e = Math.pow(1 - x, indoor ? 2.2 : 3.2);
+        lp += ((Math.random() * 2 - 1) - lp) * (indoor ? 0.5 : 0.18);       // darker tail outdoors
+        d[n] = lp * e * (n < ctx.sampleRate * 0.012 ? n / (ctx.sampleRate * 0.012) : 1);
       }
     }
+    var cv = ctx.createConvolver(); cv.buffer = buf;
+    var out = A.gain(indoor ? 1.6 : 2.2, A.sfx); cv.connect(out);
+    return (verbs[key] = cv);
+  }
+  S.shot = function (A, dest, t, o) {
+    o = o || {};
+    var c = SHOT[o.weapon] || SHOT.gun, ind = !!o.indoor, k = c.k;
+    var bus = A.gain(0.45, dest);                       // the layers add up to about 3x: keep the sum near full scale
+    if (A.ctx.createConvolver) bus.connect(A.gain(c.verb * (ind ? 0.6 : 0.45), reverb(A, ind)));
+    if (A.duck) A.duck(0.25 + 0.15 * k);
+    // 1. the BOOM: hot noise into a hard clip, lowpass slamming shut
+    var bg = A.gain(0, bus), lp = A.filter('lowpass', c.boom, 0.6, bg), w = shaper(A, c.dist, lp);
+    A.noise(t, c.bd + 0.1, A.gain(3, w));
+    sweep(lp.frequency, t, c.boom, 160, c.bd + 0.06);
+    pulse(bg, t, 0.001, c.bd + 0.08, 0.95 * k);
+    // 2. mid punch (the "chest" of the shot on small speakers)
+    nz(A, bus, t, 'bandpass', rv(c.punch, 0.06), 0.9, 0.001, c.bd * 0.8, 0.85 * k);
+    // 3. sub thump + its octave, both dropping (no bright partials, so no ring)
+    tn(A, bus, t, 'sine', rv(c.s0, 0.05), 38, 0.001, c.sd, 1.0 * k, c.sd * 0.8);
+    tn(A, bus, t, 'sine', rv(c.s0 * 2, 0.05), 70, 0.001, c.sd * 0.6, 0.55 * k, c.sd * 0.5);
+    // 4. a short, dull crack on top (lowpassed, not a high hiss)
+    nz(A, bus, t, 'lowpass', 3500, 0.5, 0.0005, 0.018, c.crack * k);
+    // 5. outdoors: the low rumble rolling away
+    if (!ind) nz(A, bus, t + 0.03, 'lowpass', 320, 0.6, 0.04, 0.5 + c.verb * 0.6, 0.25 * k);
   };
 
   S.dry = function (A, dest, t, o) {
@@ -246,49 +263,65 @@
   };
 
   // ---------- infected voices ----------
+  // Built like a ruined throat: two detuned low sawtooths + a sub, heavy distortion, low dark formants, a rattle
+  // (fast irregular amplitude chop = vocal fry) and a big breath / rasp layer. Pitch barely moves, so nothing sounds
+  // like a cartoon "oy". kind -> voice; unknown kinds use the shambler.
   var VOICE = {
-    shambler: { f: 82, fr: [450, 1050], q: [6, 8], vib: 5, vd: 4, br: 700, bk: 0.5, dist: 6 },
-    runner:   { f: 160, fr: [800, 1800], q: [5, 7], vib: 7, vd: 9, br: 1800, bk: 0.9, dist: 9 }
+    shambler: { f: 52, fr: [300, 720, 1500], q: [5, 6, 4], fry: 23, br: 900, bk: 1.0, dist: 18 },
+    runner:   { f: 78, fr: [420, 980, 2100], q: [4, 5, 4], fry: 31, br: 1500, bk: 1.25, dist: 24 },
+    brute:    { f: 38, fr: [220, 560, 1200], q: [6, 6, 4], fry: 17, br: 600, bk: 0.8, dist: 16 },
+    crawler:  { f: 70, fr: [380, 900, 2300], q: [4, 5, 3], fry: 37, br: 1800, bk: 1.4, dist: 22 },
+    screamer: { f: 96, fr: [600, 1300, 2600], q: [4, 5, 3], fry: 29, br: 2000, bk: 1.2, dist: 26 },
+    glower:   { f: 46, fr: [260, 640, 1400], q: [5, 6, 4], fry: 20, br: 800, bk: 1.0, dist: 20 }
   };
+  // c = pitch at start / middle / end (kept close to 1), a = attack, peak = loudness.
   var MOOD = {
-    idle:   { dur: [1.0, 1.6], c: [0.9, 1.05, 0.85], a: 0.3, peak: 0.32 },
-    notice: { dur: [0.5, 0.6], c: [1.25, 1.4, 1.1], a: 0.04, peak: 0.55, intake: true },
-    attack: { dur: [0.32, 0.4], c: [1.4, 1.3, 1.05], a: 0.03, peak: 0.7 },
-    hurt:   { dur: [0.18, 0.25], c: [1.6, 1.5, 1.2], a: 0.01, peak: 0.55 },
-    die:    { dur: [1.1, 1.3], c: [1.1, 0.8, 0.55], a: 0.05, peak: 0.5, gurgle: true }
+    idle:   { dur: [1.1, 1.8], c: [1.0, 1.04, 0.92], a: 0.35, peak: 0.34 },
+    notice: { dur: [0.45, 0.6], c: [1.0, 1.02, 0.94], a: 0.06, peak: 0.42 },
+    attack: { dur: [0.42, 0.55], c: [1.15, 1.1, 0.95], a: 0.03, peak: 0.72 },
+    hurt:   { dur: [0.22, 0.3], c: [1.05, 1.0, 0.9], a: 0.012, peak: 0.42 },
+    die:    { dur: [0.5, 0.7], c: [0.92, 0.85, 0.75], a: 0.02, peak: 0.26, gurgle: true },
+    scream: { dur: [1.0, 1.2], c: [1.9, 2.1, 1.6], a: 0.04, peak: 0.75, intake: true }
   };
   S.growl = function (A, dest, t, o) {
     o = o || {};
     var v = VOICE[o.kind] || VOICE.shambler, m = MOOD[o.mood] || MOOD.idle;
-    var dur = rnd(m.dur[0], m.dur[1]), f = rv(v.f, 0.12);
-    if (m.intake) { // sharp breath in before the snarl
-      var ib = nz(A, dest, t, 'bandpass', 1500, 1.5, 0.14, 0.06, 0.18 * v.bk);
-      sweep(ib.f.frequency, t, 900, 2600, 0.18);
+    var dur = rnd(m.dur[0], m.dur[1]), f = rv(v.f, 0.1);
+    if (m.intake) { // a wet, ragged breath in before the snarl
+      var ib = nz(A, dest, t, 'bandpass', 1200, 1.2, 0.16, 0.05, 0.22 * v.bk);
+      sweep(ib.f.frequency, t, 700, 2000, 0.2);
       t += 0.2;
     }
     var out = A.gain(0, dest);
-    var am = A.gain(1, null);
-    var f1 = A.filter('bandpass', rv(v.fr[0], 0.1), v.q[0], out);
-    var f2 = A.filter('bandpass', rv(v.fr[1], 0.1), v.q[1], out);
-    am.connect(f1); am.connect(f2);
-    var w = shaper(A, v.dist, am);
-    var osc = A.osc('sawtooth', f * m.c[0], t, dur, w);
-    osc.frequency.linearRampToValueAtTime(f * m.c[1], t + dur * 0.4);
-    osc.frequency.linearRampToValueAtTime(f * m.c[2], t + dur);
-    // vibrato + random jitter on pitch
-    var lg = A.gain(v.vd, osc.frequency);
-    A.osc('sine', rv(v.vib, 0.2), t, dur, lg);
-    var jg = A.gain(f * 0.12, osc.frequency);
-    A.noise(t, dur, A.filter('lowpass', 35, 0.7, jg));
-    if (m.gurgle) { // wet bubbling amplitude modulation
-      am.gain.value = 0.6;
-      A.osc('sine', rnd(11, 16), t, dur, A.gain(0.4, am.gain));
-    }
-    hold(out, t, m.a, dur * 0.55, dur * 0.45 - m.a, m.peak);
-    // breath / rasp layer
-    var b = A.gain(0, dest), bf = A.filter('bandpass', rv(v.br, 0.15), 1.2, b);
-    A.noise(t, dur, bf);
-    hold(b, t, m.a, dur * 0.5, dur * 0.5 - m.a, m.peak * 0.35 * v.bk);
+    var fry = A.gain(0.55, null);                  // vocal fry / rattle: chopped amplitude
+    var bands = [], i;
+    for (i = 0; i < 3; i++) { bands.push(A.filter('bandpass', rv(v.fr[i], 0.08), v.q[i], out)); fry.connect(bands[i]); }
+    var lowp = A.filter('lowpass', 2600, 0.7, fry);
+    var w = shaper(A, v.dist, lowp);
+    var pre = A.gain(0.7, w);
+    var o1 = A.osc('sawtooth', f * m.c[0], t, dur, pre);
+    var o2 = A.osc('sawtooth', f * m.c[0] * 1.013, t, dur, pre);
+    var o3 = A.osc('square', f * m.c[0] * 0.5, t, dur, A.gain(0.5, pre));
+    [o1, o2, o3].forEach(function (osc, j) {
+      var mul = j === 2 ? 0.5 : (j === 1 ? 1.013 : 1);
+      osc.frequency.linearRampToValueAtTime(f * m.c[1] * mul, t + dur * 0.4);
+      osc.frequency.linearRampToValueAtTime(f * m.c[2] * mul, t + dur);
+      A.noise(t, dur, A.filter('lowpass', 18, 0.7, A.gain(f * 0.18 * mul, osc.frequency)));   // unsteady, sick pitch
+    });
+    // fry: a slightly irregular low-rate chop of the voice
+    var fo = A.osc('square', rv(v.fry, 0.15), t, dur, A.gain(0.42, fry.gain));
+    A.noise(t, dur, A.filter('lowpass', 8, 0.7, A.gain(v.fry * 0.5, fo.frequency)));
+    if (m.gurgle) A.osc('sine', rnd(9, 13), t, dur, A.gain(0.35, fry.gain));     // wet bubbling as it goes down
+    hold(out, t, m.a, dur * 0.55, Math.max(0.05, dur * 0.45 - m.a), m.peak);
+    // breath / rasp: the throat noise is half the sound
+    var b = A.gain(0, dest), bf = A.filter('bandpass', rv(v.br, 0.15), 0.9, b);
+    var bw = shaper(A, 6, bf);
+    A.noise(t, dur, bw);
+    hold(b, t, m.a, dur * 0.5, Math.max(0.05, dur * 0.5 - m.a), m.peak * 0.55 * v.bk);
+    // chest: a low noise body under it all
+    var c = A.gain(0, dest);
+    A.noise(t, dur, A.filter('lowpass', 260, 0.9, c));
+    hold(c, t, m.a, dur * 0.5, Math.max(0.05, dur * 0.5 - m.a), m.peak * 0.4);
   };
 
   // ---------- bodies and the player ----------
@@ -510,6 +543,18 @@
     }
   };
 
+  // Starter motor cranking, then the engine catches (played when mounting a vehicle).
+  S.ignition = function (A, dest, t, o) {
+    var heavy = o && (o.kind === 'jeep' || o.kind === 'tank'), n = heavy ? 4 : 3;
+    var g = A.gain(0, dest), f = A.filter('bandpass', heavy ? 500 : 900, 1.5, g);
+    var c = A.osc('sawtooth', heavy ? 9 : 13, t, 0.12 * n + 0.1, A.gain(1, f));
+    A.noise(t, 0.12 * n + 0.1, f);
+    for (var i = 0; i < n; i++) pulse(g, t + i * 0.12, 0.01, 0.09, 0.22);
+    var k = t + 0.12 * n;
+    tn(A, dest, k, 'sawtooth', heavy ? 40 : 70, heavy ? 22 : 38, 0.005, 0.25, 0.3, 0.2);
+    nz(A, dest, k, 'lowpass', heavy ? 400 : 900, 0.8, 0.005, 0.2, 0.35);
+  };
+
   S.notice = function (A, dest, t, o) {
     var g = A.gain(0, dest), f = A.filter('lowpass', 500, 0.8, g);
     var b = rv(73, 0.04);
@@ -520,4 +565,68 @@
   };
 
   G.sfx = S;
+
+  // ---------- vehicle engines (continuous; G.audio.engine(kind, load) builds one and drives it) ----------
+  // A firing pulse (sawtooth + square sub) through distortion and a lowpass, chopped at the firing rate, plus an
+  // exhaust / intake rasp. idle..max = firing frequency, lp = filter idle..max, am = chop depth, vol = loudness.
+  var ENG = {
+    // a light single-cylinder bike: a smooth purr when cruising, a sharp snarl only at full throttle
+    motorcycle: { idle: 30, max: 82, lp: [500, 2400], dist: 6, sub: 0.35, am: 0.4, nf: [900, 2600], nv: 0.12, vol: 0.26, resp: 0.14 },
+    // a chugging four-stroke quad: low, lumpy, soft thump
+    atv:        { idle: 21, max: 46, lp: [360, 1100], dist: 5, sub: 0.7, am: 0.55, nf: [500, 1200], nv: 0.08, vol: 0.3, resp: 0.22 },
+    // a deep, smooth V8: a low rumble, a little gear whine
+    jeep:       { idle: 15, max: 38, lp: [220, 750], dist: 3, sub: 0.9, am: 0.22, nf: [260, 600], nv: 0.06, vol: 0.36, resp: 0.38, whine: [300, 850] },
+    // a big diesel + clanking tracks
+    tank:       { idle: 12, max: 26, lp: [200, 600], dist: 5, sub: 1.0, am: 0.4, nf: [250, 500], nv: 0.08, vol: 0.42, resp: 0.5, tracks: true }
+  };
+  // How hard the engine works for a load 0..1: a gentle curve, so cruising (about 0.3) stays near idle and only a
+  // boost (1) reaches the top revs. drive = how hard the signal hits the distortion (small = clean).
+  function rev(load) { return load * load * 0.7 + load * 0.3; }
+  function src(A, type, f, dest) { var o = A.ctx.createOscillator(); o.type = type; o.frequency.value = f; o.connect(dest); o.start(); return o; }
+  function loopNoise(A, dest) { var n = A.ctx.createBufferSource(); n.buffer = A.noiseBuf(); n.loop = true; n.connect(dest); n.start(0, Math.random() * 1.5); return n; }
+
+  G.engines = {};
+  Object.keys(ENG).forEach(function (kind) {
+    G.engines[kind] = function (A, out) {
+      var P = ENG[kind], ctx = A.ctx, nodes = [];
+      var chop = A.gain(1 - P.am * 0.5, out);
+      var lp = A.filter('lowpass', P.lp[0], 1.2, chop);
+      var w = shaper(A, P.dist, lp), pre = A.gain(0.18, w);
+      var o1 = src(A, 'sawtooth', P.idle, pre), o2 = src(A, 'square', P.idle * 0.5, A.gain(P.sub * 0.6, pre));
+      var o3 = src(A, 'sawtooth', P.idle * 1.007, A.gain(0.5, pre));
+      var lfo = src(A, 'sawtooth', P.idle, A.gain(P.am * 0.5, chop.gain));     // the firing chop
+      var ng = A.gain(P.nv, chop), nf = A.filter('bandpass', P.nf[0], 1.1, ng);
+      nodes.push(o1, o2, o3, lfo, loopNoise(A, nf));
+      var wh = null;
+      if (P.whine) { wh = src(A, 'sine', P.whine[0], A.gain(0.025, out)); nodes.push(wh); }
+      var tr = null;
+      if (P.tracks) {                                    // track links: a gated metallic rattle
+        var tg = A.gain(0, out), tf = A.filter('bandpass', 1800, 2.5, tg);
+        nodes.push(loopNoise(A, tf));
+        tr = src(A, 'square', 7, A.gain(0, tg.gain)); nodes.push(tr);
+        tr._g = tg;
+      }
+      var all = [o1, o2, o3, lfo];
+      return {
+        // load 0 = idling, 1 = driving at full speed
+        set: function (load) {
+          var now = ctx.currentTime, r = rev(load), f = P.idle + (P.max - P.idle) * r, tc = P.resp;
+          pre.gain.setTargetAtTime(0.18 + 0.5 * r * r, now, tc);                 // clean when cruising, gritty on boost
+          ng.gain.setTargetAtTime(P.nv * (0.25 + 0.75 * r * r), now, tc);
+          all.forEach(function (o, i) { o.frequency.setTargetAtTime(f * [1, 0.5, 1.007, 1][i], now, tc); });
+          lp.frequency.setTargetAtTime(P.lp[0] + (P.lp[1] - P.lp[0]) * r, now, tc);
+          nf.frequency.setTargetAtTime(P.nf[0] + (P.nf[1] - P.nf[0]) * r, now, tc);
+          out.gain.setTargetAtTime(P.vol * (0.6 + 0.4 * r), now, 0.25);
+          if (wh) wh.frequency.setTargetAtTime(P.whine[0] + (P.whine[1] - P.whine[0]) * r, now, tc);
+          if (tr) { tr.frequency.setTargetAtTime(4 + 14 * load, now, 0.3); tr._g.gain.setTargetAtTime(0.12 * load, now, 0.3); }
+        },
+        stop: function () {
+          var now = ctx.currentTime;
+          out.gain.cancelScheduledValues(now);
+          out.gain.setTargetAtTime(0, now, 0.18);
+          nodes.forEach(function (n) { try { n.stop(now + 1.2); } catch (e) {} });
+        }
+      };
+    };
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

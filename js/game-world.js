@@ -140,7 +140,7 @@
   function takeRain() {
     var p = st.player, moved = G.tank.take(st.tank, st.bag, st.chest);
     if (moved) { snd('rain'); floater(p.x, p.y, G.tank.ITEM, moved); G.ui.markDirty(); save('rain'); }
-    else snd('uiBad'), floater(p.x, p.y - 22, null, 0, st.tank.amount > 0 ? 'אין מקום בתיק ובמחסן' : 'המיכל ריק');
+    else snd('uiBad'), floater(p.x, p.y - 22, null, 0, st.tank.amount > 0 ? 'אין מקום בתיק ובתיבה' : 'המיכל ריק');
   }
 
   // Health reached 0: fade out, lose part of the bag (by difficulty), wake up in the base.
@@ -199,8 +199,8 @@
     st.fence = { material: 'wood' };
     st.creative = false; G.crafting.free = false;
     st.equip = G.gear.create(); st.player.outfit = st.equip;
-    st.placed = []; st.floor = G.placing.createFloor(); st.placing = null; G.base.setChest(null);
-    st.vehicles = {}; st.ride = null;
+    st.placed = []; st.fences = []; st.felled = []; st.floor = G.placing.createFloor(); st.placing = null; G.base.setChest(null);
+    st.vehicles = {}; st.ride = null; st.builds = {};
     st.tank = G.tank.create();
     st.visits = {}; st.playTime = 0; st.sinceSave = 0; st.low = {}; st.saveWarned = false;
     st.fade = null; st.paused = false; st.lostItems = null;
@@ -248,9 +248,9 @@
     if (!r.ok) return r;
     var d = r.data;
     resetWorld(d.diff);
-    st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings; st.fence = d.fence; st.creative = !!d.creative; G.crafting.free = st.creative; st.equip = d.equip || G.gear.create(); st.player.outfit = st.equip; st.placed = d.placed; st.floor = d.floor; st.placing = null; G.base.setChest(d.chestAt);
+    st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings; st.fence = d.fence; st.creative = !!d.creative; G.crafting.free = st.creative; st.equip = d.equip || G.gear.create(); st.player.outfit = st.equip; st.placed = d.placed; st.fences = d.fences || []; st.felled = d.felled || []; st.floor = d.floor; st.placing = null; G.base.setChest(d.chestAt);
     st.tank = d.tank; st.visits = d.visits; st.playTime = d.playTime;
-    st.vehicles = d.vehicles || {}; st.ride = d.ride && st.vehicles[d.ride] ? d.ride : null;
+    st.vehicles = d.vehicles || {}; st.ride = d.ride && st.vehicles[d.ride] ? d.ride : null; st.builds = d.builds || {};
     st.guns = d.guns;                                  // missing in older saves: a gun in the bag then starts with an empty magazine
     applyBuildings();
     st.trip = d.trip || {};

@@ -16,7 +16,7 @@
   function line(c, x1, y1, x2, y2, col, w) { c.strokeStyle = col; c.lineWidth = w || 1; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
 
   var ART = {
-    tally: function (c, x, y) {                                   // a chalk board on a post, by the cabin door
+    tally: function (c, x, y) {                                   // a chalk board on a post, by the entrance of the yard
       shadow(c, x, y + 6, 20, 5);
       box(c, x - 3, y - 4, 6, 12, '#3e3226');
       box(c, x - 17, y - 42, 34, 40, '#6a5640', '#2c2218');
@@ -98,6 +98,37 @@
       line(c, x - 8, y - 2, x - 8, y + 6, '#8a877c', 2); line(c, x + 8, y - 2, x + 8, y + 6, '#8a877c', 2);
       line(c, x + 16, y - 19, x + 14, y - 25, '#8a877c', 1.5);
       line(c, x - 15, y - 8, x - 30, y + 4, '#6a5a44', 1);
+    },
+    relaymast: function (c, x, y) {                               // a ladder against the wall and a folded mast at its foot
+      shadow(c, x, y + 6, 22, 5);
+      line(c, x - 9, y - 46, x - 9, y + 4, '#6a5a44', 2.2); line(c, x + 9, y - 46, x + 9, y + 4, '#6a5a44', 2.2);
+      for (var r = 0; r < 6; r++) line(c, x - 9, y - 40 + r * 8, x + 9, y - 40 + r * 8, '#7a6a52', 1.4);
+      box(c, x + 16, y - 4, 22, 8, '#3c4448', '#5c6a70');
+    },
+    mailbag: function (c, x, y) {                                 // a canvas post bag, tipped over, letters spilling
+      shadow(c, x, y + 6, 22, 5);
+      box(c, x - 18, y - 12, 36, 20, '#4a5258', '#2c3236');
+      box(c, x - 18, y - 12, 36, 6, '#5a636a');
+      box(c, x + 14, y + 6, 12, 8, '#d6d2c0'); box(c, x + 22, y + 10, 12, 8, '#c9c4b0');
+    },
+    paper: function (c, x, y) {                                   // a sheet or booklet left lying about
+      box(c, x - 9, y - 7, 18, 14, '#c9c4b0', '#8a8472');
+      line(c, x - 5, y - 2, x + 5, y - 2, '#7a7466', 1); line(c, x - 5, y + 2, x + 3, y + 2, '#7a7466', 1);
+    },
+    plank: function (c, x, y) {                                   // one floorboard that sits a little proud
+      box(c, x - 22, y - 3, 44, 6, '#5a4a38', '#3a2e22');
+    },
+    safebox: function (c, x, y) {
+      shadow(c, x, y + 6, 16, 4);
+      box(c, x - 14, y - 16, 28, 22, '#3a4044', '#1e2224');
+      c.fillStyle = '#8a8472'; c.beginPath(); c.arc(x + 3, y - 5, 3, 0, 6.283); c.fill();
+    },
+    dog: function (c, x, y) {                                     // a thin dog sitting by an empty bowl
+      shadow(c, x, y + 6, 16, 4);
+      c.fillStyle = '#7a6a54'; c.beginPath(); c.ellipse(x, y - 6, 11, 7, 0, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(x + 11, y - 13, 5, 0, 6.283); c.fill();
+      line(c, x - 8, y - 1, x - 8, y + 6, '#5a4a38', 2); line(c, x + 6, y - 1, x + 6, y + 6, '#5a4a38', 2);
+      box(c, x - 26, y + 2, 10, 4, '#5c6a70');
     },
     npc: function (c, x, y, t, st, e) {                           // a standing character: its own body
       var n = npcs[e.id];

@@ -97,7 +97,7 @@ if (G.crafting) {
       eq(r.ok, true); eq(G.inventory.count(ctx.bag, 'plank'), 2); eq(G.inventory.count(ctx.bag, 'wood'), 0);
       eq(G.crafting.spend(ctx, { stone: 99 }), null);
     } finally { G.crafting.free = false; }
-    eq(G.crafting.buildStatus(ctx, 'fence'), 'cost');
+    eq(G.crafting.spend(ctx, G.crafting.fenceCost('metal')), 'cost');
   });
   test('the creative kit holds only real items and fits the largest backpack', () => {
     const kit = G.data.creativeKit, top = G.data.buildings.bag.levels;

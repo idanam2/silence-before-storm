@@ -31,18 +31,31 @@
   function moveInput() { return X.moveInput.apply(null, arguments); }
   function raidStep() { return X.raidStep.apply(null, arguments); }
   function startPlacing() { return X.startPlacing.apply(null, arguments); }
+  function applyBuildings() { return X.applyBuildings.apply(null, arguments); }
   function stopPlacing() { return X.stopPlacing.apply(null, arguments); }
   function placingStep() { return X.placingStep.apply(null, arguments); }
   function storySpot() { return X.storySpot.apply(null, arguments); }
   function chimeStep() { return X.chimeStep.apply(null, arguments); }
   function follow() { return X.follow.apply(null, arguments); }
+  // The living yard tree within reach of the player (or null).
+  function yardTree(p) {
+    var best = null, bd = 44, ts = st.base.trees;
+    for (var i = 0; i < ts.length; i++) {
+      var t = ts[i];
+      if (!t.yard || t.dead) continue;
+      var d = Math.hypot(p.x - t.x, p.y - t.y) - t.r - p.radius;
+      if (d <= bd) { bd = d; best = t; }
+    }
+    return best;
+  }
+
   function tickBase(dt, frozen) {
     var inp = G.input, p = st.player, ui = G.ui;
     var near = st.ride ? null : G.base.nearStation(p, st.base), trail = G.base.nearTrail(p);   // no workbench, chest or bed from the saddle
     var sp = storySpot('base', dt, frozen || ui.isOpen() || !!st.fade || !!st.placing);
     if (inp.wasPressed('KeyE') && !st.fade && !sp.sp) {
       if (ui.isOpen()) ui.close();
-      else if (near === 'chest') ui.openChest();
+      else if (near === 'chest' || near === 'box') ui.openChest();      // every box opens the same storage
       else if (near === 'bed') sleep();
       else if (near === 'tank') takeRain();
       else if (near) {
@@ -54,7 +67,7 @@
     if (inp.wasPressed('KeyB') && !st.fade) { stopPlacing(); ui.toggleBuild(); }
     if (inp.wasPressed('KeyT') && !st.fade && !ui.isOpen()) { if (st.placing && st.placing.kind === 'move') stopPlacing(); else { stopPlacing(); startPlacing({ kind: 'move', carry: null }); } }
     // Chest / crafting panels close by themselves if the player is somehow no longer next to the structure
-    if (ui.mode() === 'chest' && near !== 'chest') ui.close();
+    if (ui.mode() === 'chest' && near !== 'chest' && near !== 'box') ui.close();
     if (ui.mode() === 'craft' && near !== ui.station()) ui.close();
 
     frozen = frozen || ui.isOpen();
@@ -62,14 +75,33 @@
     X.vehKeys(p, frozen);                                    // V: climb on / off, F: refuel
     pcfg.walkSpeed = cfg.player.walkSpeed * G.needs.speedMult(st.needs);
     var riding = X.vehSpeed(pcfg, cfg.player.walkSpeed);
-    var aim = !riding && !frozen && inp.mouse.inside ? { x: inp.mouse.x + cam.x, y: inp.mouse.y + cam.y } : null;   // the vehicle points where it drives
-    G.player.update(p, frozen || sp.holding ? ZERO : moveInput(), aim, dt, st.world, pcfg);
+    var tree = !frozen && !near && !trail && !sp.sp && !st.ride && !st.placing ? yardTree(p) : null, chop = null, tdef = null;   // a tree in the yard: hold E to fell it (the axe)
+    if (tree) {
+      var res = G.data.resources, items = G.data.items, tg = { kind: 'node', node: tree, x: tree.x, y: tree.y, r: tree.r };
+      chop = G.area.gatherStep(st.gather, tg, inp.isDown('KeyE'), dt * G.needs.gatherMult(st.needs), st.bag, res, items); tdef = res[tree.type];
+      st.gathering = chop.active;
+      if (chop.hit) {
+        snd('hit', at(tree.x, tree.y, { mat: gatherMat(tdef), heavy: !!chop.done }));
+        G.forestArt.spawnFx(st.particles, tdef.fx, tree.x, tree.y, chop.done ? 12 : 5, fxRand);
+        G.combat.addBurst(st.burst, G.data.noise.chop);
+      }
+      if (chop.done) {
+        if (chop.done.gained) { snd('pickup'); floater(p.x, p.y, chop.done.item, chop.done.gained); ui.markDirty(); }
+        if (chop.done.left) noteFull(p);
+        if (tree.dead) { st.felled.push(st.base.trees.indexOf(tree)); applyBuildings(); save('tree'); }
+      }
+      if (chop.blocked === 'full') noteFull(p);
+      tree.chopBlock = chop.blocked;
+    } else if (st.gather && st.gather.node) { st.gather.node = null; st.gather.t = 0; }
+    var aim = chop && chop.active ? { x: tree.x, y: tree.y } : (!riding && !frozen && inp.mouse.inside ? { x: inp.mouse.x + cam.x, y: inp.mouse.y + cam.y } : null);   // the vehicle points where it drives
+    G.player.update(p, frozen || sp.holding || (chop && chop.active) ? ZERO : moveInput(), aim, dt, st.world, pcfg);
     raidStep(dt, frozen);                                   // a loud trip may have been followed home
     var raid = G.defense.active(st.def);
     if (st.placing && !frozen) placingStep(dt, inp);
     if (!frozen && !st.placing && !riding) attackInput(p, inp, raid);   // guns (and their cost) work at home only while raiders are here
-    G.player.animate(p, dt, null);
+    G.player.animate(p, dt, chop && chop.active ? { tool: tdef ? tdef.tool : null, phase: (st.gather.t % G.area.HIT) / G.area.HIT } : null);
     if (!(riding && G.data.vehicles[st.ride].fly)) G.base.collide(p, st.base.solids);   // the helicopter flies over the base
+    X.vehCollide(p);                                        // parked vehicles are solid (you walk around them)
     X.vehStep(dt, p);
     G.area.updateVisuals({ nodes: st.base.trees }, p, dt);
     if (!frozen && !st.ride) footsteps(p, 1, 'me');
@@ -85,9 +117,27 @@
       var vp = X.vehPrompt(p);
       if (vp) text = text ? text + ' · ' + vp : vp;
       if (sp.sp) text = G.story.spotPrompt(sp.sp);
+      if (tree && !text) {
+        if (tree.chopBlock === 'tool') text = 'כריתת עץ · דרוש ' + G.data.items[tdef.tool].name;
+        else if (tree.chopBlock === 'full') text = 'התיק מלא · פרקו בתיבה';
+        else text = 'E (החזקה) · כריתת עץ, כדי לפנות מקום לרצפה';
+      }
       if (st.placing) text = null;
     }
     ui.showPrompt(text);
+  }
+
+  // Standing on a radioactive patch without the yellow suit (item hazsuit, worn in the body slot) costs health, a few points a second.
+  var radWarn = 0;
+  function hazardStep(dt, frozen) {
+    var F = st.zone, p = st.player;
+    radWarn = Math.max(0, radWarn - dt);
+    if (frozen || !F || !F.rads || !F.rads.length || st.needs.health <= 0) { st.radHit = 0; return; }
+    var patch = G.area.radAt(F, p.x, p.y);
+    if (!patch || (st.equip && st.equip.body === 'hazsuit')) { st.radHit = Math.max(0, (st.radHit || 0) - dt * 2); return; }
+    G.needs.hurt(st.needs, G.data.hazard.dps * dt, diffLevel());
+    st.hurt = Math.max(st.hurt || 0, 0.35); st.radHit = 1;
+    if (radWarn <= 0) { radWarn = 4; snd('uiBad'); G.ui.toast('קרינה! צריך חליפת מגן צהובה, או לסגור את הברז שמזהם', 2600); }
   }
 
   function tickZone(dt, frozen) {
@@ -102,8 +152,13 @@
       if (ui.isOpen()) ui.close();
       else if (target && target.kind === 'exit') travel('base');
       else if (target && target.kind === 'door') goThrough(target.door);
+      else if (target && target.kind === 'valve') {                // a valve: closes (or opens) a leaking pipe
+        var closed = G.area.toggleValve(target.valve);
+        snd('door'); ui.toast(closed ? 'הברז נסגר. הצינור מפסיק לדלוף' : 'הברז נפתח. הצינור דולף שוב', 2200);
+      }
     }
     frozen = frozen || ui.isOpen() || !!st.fade;
+    hazardStep(dt, frozen);                          // radiation on the floor (G.area.radAt): hurts unless the yellow suit is worn
 
     X.vehKeys(p, frozen);                            // V: climb on / off, F: refuel
     var held = !frozen && inp.isDown('KeyE') && !sp.sp && !st.ride;      // no gathering from the saddle
@@ -129,6 +184,7 @@
     if (!frozen && !out.active && !riding) attackInput(p, inp, true);
     G.player.animate(p, dt, out.active ? { tool: def ? def.tool : null, phase: (st.gather.t % G.area.HIT) / G.area.HIT } : null);
     if (!(riding && G.data.vehicles[st.ride].fly)) G.area.collide(p, F);       // the helicopter flies over trees and walls
+    X.vehCollide(p);
     X.vehStep(dt, p);
     if (!frozen && !st.ride) footsteps(p, 1, 'me');
     combatStep(dt, frozen);
@@ -143,6 +199,7 @@
     else if (st.target) {
       if (target.kind === 'exit') text = 'E · חזרה לבסיס';
       else if (target.kind === 'door') text = 'E · ' + target.door.label;
+      else if (target.kind === 'valve') text = 'E · ' + (target.valve.closed ? 'פתיחת ' : 'סגירת ') + (target.valve.label || 'ברז');
       else {
         st.targetBlock = G.area.check(target, st.bag, res, items);
         if (st.targetBlock === 'tool') text = def.action + ' · דרוש ' + items[def.tool].name;
@@ -234,7 +291,7 @@
       if (inp.wasPressed('Digit1')) { if (st.equip.primary) equip(st.equip.primary); else ui.toast('אין נשק ראשי · בחרו בתיק (I)', 1600); }
       if (inp.wasPressed('Digit2')) { if (st.equip.secondary) equip(st.equip.secondary); else ui.toast('אין נשק משני · בחרו בתיק (I)', 1600); }
       if (inp.wasPressed('Digit3')) equip('hands');
-      if (inp.wasPressed('KeyR')) startReload(false);
+      if (inp.wasPressed('KeyR') && !st.placing) startReload(false);
       if (inp.wasPressed('KeyQ')) cycleWeapon();
     }
     checkHeld();

@@ -12,10 +12,12 @@
   function applyBuildings() { return X.applyBuildings.apply(null, arguments); }
   // st.placing = null | { kind: 'struct', id, carry: {x,y} | null, ghost } | { kind: 'floor', mat, ghost, warnT }
   function placingCtx() { return { bag: st.bag, chest: st.chest, buildings: st.buildings, fence: st.fence, placed: st.placed }; }
+  var FENCE_WHY = { floor: 'גדר מעמידים רק על רצפה', gate: 'השאירו את הכניסה פנויה', tree: 'יש עץ בדרך: צריך לכרות אותו', dup: null };
 
   function startPlacing(p) {
     st.placing = p; p.ghost = null; p.warnT = 0;
-    G.ui.toast(p.kind === 'move' ? 'הזזה: לחצו על מבנה, מחסן או בלוק רצפה (Shift: כל הרצפה), ואז על המקום החדש · קליק ימני או Esc: ביטול/סיום' : p.kind === 'floor' ? 'רצפה: לחיצה (או החזקה) מניחה בלוק · קליק ימני מסיר · Esc לסיום'
+    G.ui.toast(p.kind === 'move' ? 'הזזה: לחצו על מבנה, תיבה או בלוק רצפה (Shift: כל הרצפה), ואז על המקום החדש · קליק ימני או Esc: ביטול/סיום' : p.kind === 'floor' ? 'רצפה: לחיצה (או החזקה) מניחה בלוק · קליק ימני מסיר · Esc לסיום'
+      : p.kind === 'fence' ? 'גדר: לחיצה מניחה חתיכה על קצה בלוק רצפה · R מסובב (לאורך / לרוחב) · קליק ימני מסיר · Esc לסיום'
       : 'בחרו מקום: לחיצה מניחה · קליק ימני על מבנה מרים אותו · Esc ביטול', 3200);
   }
 
@@ -31,9 +33,14 @@
     return c && st.floor.cells[c.key] ? { type: 'floor', cell: c } : null;
   }
 
+  // The solid rects of one copy of a structure (a garage is made of several parts, see js/base.js roomParts), or null.
   function solidOf(kind, x, y) {
-    for (var i = 0; i < st.base.solids.length; i++) { var r = st.base.solids[i]; if (r.kind === kind && r.x === x && r.y === y) return r; }
-    return null;
+    var out = [];
+    for (var i = 0; i < st.base.solids.length; i++) {
+      var r = st.base.solids[i];
+      if (r.kind === kind && (r.ox !== undefined ? r.ox === x && r.oy === y : r.x === x && r.y === y)) out.push(r);
+    }
+    return out.length ? out : null;
   }
 
   function moveStep(pl, inp, w) {
@@ -69,7 +76,7 @@
     }
     r = P.rectAt(c.id, w.x, w.y);
     var why = P.check(st.base, r, c.type === 'chest' ? solidOf('chest', G.base.layout.chest.x, G.base.layout.chest.y) : solidOf(c.id, c.from.x, c.from.y));
-    pl.ghost = { rect: r, ok: !why, label: c.id === 'chest' ? 'מחסן' : G.data.buildings[c.id].name };
+    pl.ghost = { rect: r, ok: !why, label: c.id === 'chest' ? 'תיבה' : G.data.buildings[c.id].name };
     if (inp.mouse.rclicked) { stopPlacing(); return; }
     if (inp.mouse.clicked) {
       if (why) { G.ui.toast(why === 'gate' ? 'השאירו את הכניסה פנויה' : 'המקום תפוס', 1200); snd('uiBad'); return; }
@@ -88,6 +95,7 @@
     if (pl.kind === 'struct' && pl.carry) { st.placed.push({ id: pl.id, x: pl.carry.x, y: pl.carry.y }); applyBuildings(); }   // a picked-up copy goes back
     st.placing = null;
     if (pl.kind === 'floor') save('floor');
+    if (pl.kind === 'fence') save('fence');
   }
 
   function placingStep(dt, inp) {
@@ -120,10 +128,33 @@
       }
       return;
     }
+    if (pl.kind === 'fence') {                                               // one piece at a time on the edge of a floor block; R turns it
+      if (G.input.wasPressed('KeyR')) { pl.o = pl.o === 'h' ? 'v' : 'h'; snd('ui'); }
+      var f = P.fenceNear(pl.o || 'h', w.x, w.y), fi = P.fenceIndex(st.fences, f), fw = fi < 0 ? P.fenceCheck(st.base, st.floor, st.fences, f) : null;
+      var fr = P.fenceRect(f), mat = st.fence && st.fence.material || 'wood';
+      pl.ghost = { rect: { x: fr.x - 4, y: fr.y - 4, w: fr.w + 8, h: fr.h + 8 }, ok: fi >= 0 ? true : !fw };
+      if (inp.mouse.rdown && fi >= 0) {                                      // take a piece back: its materials return
+        G.crafting.refund(placingCtx(), G.crafting.fenceCost(st.fences[fi].m)); st.fences.splice(fi, 1);
+        applyBuildings(); snd('ui', { gap: 0.12 }); save('fence'); return;
+      }
+      if (inp.mouse.down && fi < 0) {
+        if (fw) { if (pl.warnT <= 0 && FENCE_WHY[fw]) { G.ui.toast(FENCE_WHY[fw], 1400); pl.warnT = 1.5; snd('uiBad'); } return; }
+        if (st.fences.length >= P.MAX_FENCES) { G.ui.toast('הגעתם למקסימום חתיכות גדר', 1400); return; }
+        if (G.crafting.spend(placingCtx(), G.crafting.fenceCost(mat))) {
+          if (pl.warnT <= 0) { G.ui.toast('חסרים חומרים (' + Object.keys(G.crafting.fenceCost(mat)).map(function (k) { return G.data.items[k].name; }).join(', ') + ')', 1400); pl.warnT = 1.5; snd('uiBad'); }
+          return;
+        }
+        st.fences.push({ o: f.o, cx: f.cx, cy: f.cy, m: mat }); applyBuildings(); snd('build', { gap: 0.12 }); G.ui.markDirty();
+      }
+      return;
+    }
     // floor: hold the left button to lay blocks, the right one to take them up again
     var c = P.cellAt(w.x, w.y), M = G.data.floorMaterials;
     if (!c) return;
-    pl.ghost = { cell: c, ok: true };
+    var tree = P.treeIn(st.base, c);                                        // a yard tree stands in the block: fell it first
+    pl.ghost = { cell: c, ok: !tree };
+    if (tree && inp.mouse.down && pl.warnT <= 0) { G.ui.toast('יש עץ בבלוק הזה: כרתו אותו בגרזן (E) לפני שמניחים רצפה', 1800); pl.warnT = 1.8; snd('uiBad'); }
+    if (tree) return;
     var have = st.floor.cells[c.key];
     if (inp.mouse.down && have !== pl.mat) {
       if (have) G.crafting.refund(placingCtx(), M[have].cost);

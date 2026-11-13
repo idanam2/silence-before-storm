@@ -33,9 +33,48 @@
     ctx.strokeStyle = 'rgba(130,255,90,' + (0.15 + pulse * 0.2).toFixed(3) + ')'; ctx.lineWidth = 2;      // a faint green pulse on the ground
     ctx.beginPath(); ctx.arc(x, y + 30, 70, 0, TAU); ctx.stroke();
   }
+  // ---- radioactive floor patches, valves ----
+  function radPatch(ctx, r, time, live) {
+    if (!live) {                                                       // dried residue after the valve is shut: dark stains, no glow
+      ctx.fillStyle = 'rgba(30,40,20,0.35)'; ctx.fillRect(r.x + 14, r.y + 14, r.w - 28, r.h - 28);
+      return;
+    }
+    var pulse = 0.5 + 0.5 * Math.sin(time * 1.3), cx = r.x + r.w / 2, cy = r.y + r.h / 2, rad = Math.max(r.w, r.h) * 0.62;
+    var gr = ctx.createRadialGradient(cx, cy, rad * 0.1, cx, cy, rad);
+    gr.addColorStop(0, 'rgba(150,255,70,' + (0.5 + pulse * 0.1).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(90,200,50,0.18)');
+    ctx.fillStyle = gr; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = 'rgba(214,185,42,0.95)'; ctx.lineWidth = 5; ctx.setLineDash([22, 18]); ctx.strokeRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4); ctx.setLineDash([]);   // hazard tape
+    ctx.strokeStyle = 'rgba(30,30,20,0.9)'; ctx.lineWidth = 5; ctx.setLineDash([18, 22]); ctx.lineDashOffset = -20; ctx.strokeRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    ctx.fillStyle = 'rgba(210,255,150,0.28)';                          // bubbles drifting up, slowly
+    for (var i = 0; i < 7; i++) {
+      var bx = r.x + ((i * 97 + 31) % Math.max(40, r.w - 40)) + 20, by = r.y + r.h - ((time * 14 + i * 53) % Math.max(40, r.h - 20));
+      ctx.beginPath(); ctx.arc(bx, by, 3 + (i % 3) * 2, 0, TAU); ctx.fill();
+    }
+  }
+  function valve(ctx, v, time) {
+    var x = v.x, y = v.y, closed = !!v.closed;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 12, 26, 8, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a5e5a'; ctx.fillRect(x - 36, y - 6, 72, 12); ctx.strokeStyle = '#1c1f1c'; ctx.lineWidth = 2; ctx.strokeRect(x - 36, y - 6, 72, 12);   // the pipe stub
+    ctx.fillStyle = '#74786f'; ctx.fillRect(x - 40, y - 9, 8, 18); ctx.fillRect(x + 32, y - 9, 8, 18);
+    ctx.fillStyle = '#4a4f4a'; ctx.fillRect(x - 6, y - 18, 12, 14);                                                                                   // the body
+    ctx.strokeStyle = closed ? '#3d8a3a' : '#c0392b'; ctx.lineWidth = 4;                                                                              // the red wheel turns green when it is shut
+    ctx.beginPath(); ctx.arc(x, y - 22, 14, 0, TAU); ctx.stroke();
+    var a = closed ? 0.8 : 0;
+    ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - Math.cos(a) * 14, y - 22 - Math.sin(a) * 14); ctx.lineTo(x + Math.cos(a) * 14, y - 22 + Math.sin(a) * 14); ctx.stroke();
+  }
   G.doorArt = {
     draw: function (ctx, area, vr, time) {
-      for (var i = 0; i < area.doors.length; i++) {
+      var i;
+      for (i = 0; area.rads && i < area.rads.length; i++) {
+        var r = area.rads[i];
+        if (r.x + r.w < vr.x0 || r.x > vr.x1 || r.y + r.h < vr.y0 - 80 || r.y > vr.y1) continue;
+        radPatch(ctx, r, time, !(r.leak && G.area.valveClosed(area, r.leak)));
+      }
+      for (i = 0; area.valves && i < area.valves.length; i++) {
+        var v = area.valves[i];
+        if (v.x > vr.x0 - 80 && v.x < vr.x1 + 80 && v.y > vr.y0 - 80 && v.y < vr.y1 + 80) valve(ctx, v, time);
+      }
+      for (i = 0; area.doors && i < area.doors.length; i++) {
         var d = area.doors[i];
         if (!d.art || d.x < vr.x0 - 160 || d.x > vr.x1 + 160 || d.y < vr.y0 - 160 || d.y > vr.y1 + 160) continue;
         if (d.art === 'hatch') hatch(ctx, d, time); else if (d.art === 'rad') radGate(ctx, d, time);
@@ -100,6 +139,11 @@
         cx2.globalCompositeOperation = 'source-over'; cx2.fillStyle = '#020304';
         for (i = 0; i < rooms.length; i++) { var q = rooms[i]; cx2.fillRect((q.x - camX) * sc, (q.y - 70 - camY) * sc, q.w * sc, (q.h + 70) * sc); }
       }
+      if (rooms) {                                                           // ... but not the boarded wall itself: it has to be seen, that is where you strike
+        cx2.globalCompositeOperation = 'destination-out'; cx2.fillStyle = '#000';
+        for (i = 0; i < area.structures.length; i++) { var bw = area.structures[i]; if (bw.room && bw.breakable && !bw.smashed) cx2.fillRect((bw.x - 6 - camX) * sc, (bw.y - 56 - camY) * sc, (bw.w + 12) * sc, (bw.h + 62) * sc); }
+        cx2.globalCompositeOperation = 'source-over';
+      }
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(cv, 0, 0, canvas.width, canvas.height);
     },
@@ -124,6 +168,21 @@
       g.fillStyle = d[1]; g.fillRect(-20, -2, 40, 5);
       g.fillStyle = '#b9a35a'; g.fillRect(-3, -4, 6, 8);
     });
+  });
+
+  // ---- a pipe along a wall (solid: false); with  (an id) it drips green until that valve is closed ----
+  if (G.placeArt && G.placeArt.register) G.placeArt.register('pipe', function (ctx, s, c, time, H) {
+    var live = s.valve && !(G.state.zone && G.area.valveClosed(G.state.zone, s.valve));
+    H.box(ctx, s, 0.05, s.k || 0.09, c, live ? '#6a6f58' : '#5e625e', live ? '#8a9070' : '#7a7e78');
+    var n = Math.max(2, Math.round(Math.max(s.w, s.h) / 110)), i, horiz = s.w >= s.h;
+    ctx.fillStyle = '#3a3e3a';
+    for (i = 0; i <= n; i++) { var u = i / n, p0 = horiz ? H.lift(s.x + s.w * u - 5, s.y - 2, (s.k || 0.09) + 0.002, c) : H.lift(s.x - 2, s.y + s.h * u - 5, (s.k || 0.09) + 0.002, c); ctx.fillRect(p0[0], p0[1], horiz ? 10 : s.w + 4, horiz ? s.h + 4 : 10); }
+    if (live) {                                                          // the leak: a slow green drip from the end of the pipe
+      var e = horiz ? H.lift(s.x + s.w, s.y + s.h / 2, (s.k || 0.09), c) : H.lift(s.x + s.w / 2, s.y + s.h, (s.k || 0.09), c);
+      for (i = 0; i < 4; i++) { var t = (time * 0.9 + i * 0.25) % 1; ctx.fillStyle = 'rgba(150,255,70,' + (0.75 * (1 - t)).toFixed(2) + ')'; ctx.beginPath(); ctx.ellipse(e[0] + (i - 1.5) * 3, e[1] + t * 40, 2.2, 3.5, 0, 0, TAU); ctx.fill(); }
+      var gr = ctx.createRadialGradient(e[0], e[1] + 14, 2, e[0], e[1] + 14, 36); gr.addColorStop(0, 'rgba(150,255,70,0.4)'); gr.addColorStop(1, 'rgba(150,255,70,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(e[0], e[1] + 14, 36, 0, TAU); ctx.fill();
+    }
   });
 
   // ---- a wall boarded up with planks and bolted straps: looks like it wants an axe ----

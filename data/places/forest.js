@@ -42,10 +42,14 @@
     f('safe', 1560, 1240, 90, 90, 0.07); f('shelf', 1530, 900, 60, 280, 0.09); f('shelf', 1900, 820, 160, 60, 0.09); f('locker', 1690, 1310, 150, 50, 0.09);
     f('table', 2200, 1000, 240, 90, 0.04); f('medcab', 2130, 900, 60, 160, 0.09); f('fridge', 2380, 820, 80, 60, 0.1); f('table', 2200, 1200, 240, 90, 0.04);
     f('rail', 140, 640, 14, 120, 0.05);
+    // leaking pipes: the generator room (north-east) and the pantry (south-west) each have a green pool across the way in;
+    // the valve by the door shuts the leak (E), and the pool dries. The lab has a patch by the medicine that only a hazmat suit crosses.
+    add({ kind: 'pipe', solid: false, x: 1930, y: 126, w: 540, h: 14, k: 0.09, valve: 'gen' });
+    add({ kind: 'pipe', solid: false, x: 124, y: 790, w: 14, h: 570, k: 0.09, valve: 'pantry' });
 
     // salvage: storage and workshop are plain, the pantry has food and water, the sealed rooms hold the good things
     L('crate', [[250, 600], [560, 300], [450, 480], [930, 440], [1010, 220], [1900, 1300], [1850, 1080]], 3);
-    L('scrap', [[820, 420], [1100, 300], [900, 500]], 2);
+    L('scrap', [[820, 420], [1100, 300], [900, 500], [2400, 275]], 2);
     L('tarp', [[1380, 400], [1620, 330]], 1);
     L('cargo', [[300, 1280], [520, 1280], [300, 1050], [720, 1340], [2240, 1345], [1900, 1330]], 2);
     L('radio', [[1250, 1220], [1330, 1150]], 1);
@@ -56,6 +60,8 @@
       id: 'forest_cellar', name: 'המרתף ביער', parent: 'forest', interior: true,
       seed: 3377, width: W, height: H, margin: 120,
       exit: null,
+      rads: [{ x: 1922, y: 300, w: 556, h: 90, leak: 'gen' }, { x: 122, y: 850, w: 678, h: 90, leak: 'pantry' }, { x: 2290, y: 1105, w: 120, h: 90 }],
+      valves: [{ id: 'gen', x: 2200, y: 520, r: 56, label: 'ברז הצינור' }, { id: 'pantry', x: 360, y: 810, r: 56, label: 'ברז הצינור' }],
       doors: [{ x: 150, y: 660, r: 52, to: 'forest', at: { x: 1330, y: 1210 }, face: PI / 2, label: 'עלייה ליער' },
         { x: 2420, y: 1325, r: 46, to: 'forest_deep', at: { x: 260, y: 660 }, face: 0, label: 'מעבר אל המנהרות' }],
       spawn: { x: 260, y: 660 }, clearing: 0, reach: 26,
@@ -150,6 +156,8 @@
       spawn: { x: 1500, y: 1960 }, clearing: 210, reach: 26,
       paths: [[[1500, 2200], [1500, 1500]]],
       roads: [], ponds: [], water: [], decks: [], structures: S,
+      rads: [{ x: 1480, y: 1290, w: 400, h: 90, leak: 'tank' }, { x: 640, y: 1060, w: 220, h: 120 }, { x: 2040, y: 1180, w: 200, h: 100 }],
+      valves: [{ id: 'tank', x: 1380, y: 1290, r: 56, label: 'ברז המיכל' }],
       enemyPlan: { glower: 4, shambler: 2, crawler: 2, screamer: 1 },
       border: null,
       theme: {

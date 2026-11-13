@@ -10,7 +10,7 @@ function storyGame() {
     ...fsS.readdirSync(pathS.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f),
     'data/interiors.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js', 'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js',
     'story/data/story-items.js', 'story/data/spots.js', 'story/data/quests.js', 'story/data/dialogue-1.js', 'story/data/dialogue-2.js',
-    'story/data/notes.js', 'story/data/triggers.js', 'story/data/endings.js', 'data/story-wire.js',
+    'story/data/notes.js', 'story/data/triggers.js', 'story/data/endings.js', 'story/data/cellar.js', 'data/story-wire.js',
     'js/input.js', 'js/inventory.js', 'js/dialogue.js', 'js/story.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js',
     'js/player.js', 'js/base.js', 'js/placing.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js'];
   for (const f of files) vmS.runInContext(fsS.readFileSync(pathS.join(ROOT, f), 'utf8'), ctx, { filename: f });

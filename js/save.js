@@ -141,10 +141,12 @@
       fence: { material: st.fence && st.fence.material },
       creative: !!st.creative,
       equip: st.equip ? JSON.parse(JSON.stringify(st.equip)) : undefined,       // worn clothes and the two weapon slots (js/gear.js)
+      fences: (st.fences || []).map(function (f) { return { o: f.o, cx: f.cx, cy: f.cy, m: f.m }; }),
+      felled: (st.felled || []).slice(0, 200),
       placed: (st.placed || []).map(function (p) { return { id: p.id, x: Math.round(p.x), y: Math.round(p.y) }; }),
       floor: { cell: G.placing.CELL, cells: Object.assign({}, st.floor && st.floor.cells) },
       chestAt: { x: Math.round(G.base.layout.chest.x), y: Math.round(G.base.layout.chest.y) },
-      vehicles: (function (list) { var o = {}; for (var vid in list) o[vid] = { fuel: Math.round(list[vid].fuel * 100) / 100, at: list[vid].at ? JSON.parse(JSON.stringify(list[vid].at)) : null }; return o; })(st.vehicles || {}), ride: st.ride || null,     // owned vehicles (fuel, where left) and the one being ridden
+      vehicles: (function (list) { var o = {}; for (var vid in list) o[vid] = { fuel: Math.round(list[vid].fuel * 100) / 100, at: list[vid].at ? JSON.parse(JSON.stringify(list[vid].at)) : null, up: Object.assign({}, list[vid].up), dirt: Math.round((list[vid].dirt || 0) * 1000) / 1000 }; return o; })(st.vehicles || {}), ride: st.ride || null, builds: JSON.parse(JSON.stringify(st.builds || {})),     // owned vehicles (fuel, where left) and the one being ridden
       tank: { amount: st.tank.amount, t: st.tank.t },
       visits: JSON.parse(JSON.stringify(st.visits)),
       guns: gunsOf(st.guns),
@@ -213,13 +215,16 @@
     d.fence = { material: data.fenceMaterials.hasOwnProperty(fm) ? fm : 'wood' };      // unknown or missing: wood
     d.creative = o.creative === true;
     d.equip = G.gear ? G.gear.clean(o.equip, items, data.weapons) : null;              // missing (old save): nothing worn, slots refill by themselves
+    d.fences = G.placing.cleanFences(o.fences);                                           // missing (old save): no fence, the old one is gone
+    d.felled = Array.isArray(o.felled) ? o.felled.filter(function (i) { return Number.isInteger(i) && i >= 0 && i < 400; }).slice(0, 200) : [];
     d.placed = G.placing.clean(o.placed, d.buildings);                                 // missing (old save): structures on their old spots
     d.floor = G.placing.cleanFloor(o.floor);
     d.chestAt = o.chestAt && isFinite(o.chestAt.x) && isFinite(o.chestAt.y) ? { x: o.chestAt.x, y: o.chestAt.y } : null;      // null = where the chest always stood
     d.vehicles = G.vehicles.clean(o.vehicles, d.buildings);                            // missing (old save): none built yet
     d.ride = typeof o.ride === 'string' && d.vehicles[o.ride] && !d.vehicles[o.ride].at ? o.ride : null;
+    d.builds = G.vehicles.cleanBuilds(o.builds, d.vehicles);                           // vehicles being assembled (old save: none)
     d.bag = cleanInventory(o.bag, G.crafting.bagSlots(d.buildings), items);
-    d.chest = cleanInventory(o.chest, G.crafting.chestSlots(d.buildings), items);
+    d.chest = cleanInventory(o.chest, G.crafting.chestSlots(d.buildings, d.placed), items);
 
     var cap = d.buildings.tank > 0 ? G.tank.cap(d.buildings.tank, Math.max(1, G.placing.count(d.placed, 'tank'))) : 0;
     var tk = o.tank && typeof o.tank === 'object' ? o.tank : {};

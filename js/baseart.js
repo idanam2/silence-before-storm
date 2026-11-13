@@ -60,7 +60,7 @@
 
   function drawFence(ctx, r, c, gate, lvl) {
     var horiz = r.w >= r.h, len = horiz ? r.w : r.h, o, up = lvl >= 2;
-    var fm = G.state && G.state.fence && FENCE_PAL[G.state.fence.material];
+    var fm = FENCE_PAL[r.mat] || (G.state && G.state.fence && FENCE_PAL[G.state.fence.material]);
     var wal = fm ? fm.w : (up ? WOOD2 : WOOD), pst = fm ? fm.p : (up ? POST2 : POST), hk = FENCE_H[Math.min(4, Math.max(1, lvl))];
     var bx = box(ctx, r, 0, H.fence * hk, c, wal, up ? 3 : 2);
     ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1;                 // plank gaps on the top face
@@ -143,36 +143,69 @@
     poly(ctx, pts, null, near ? 'rgba(170,185,150,0.95)' : 'rgba(18,14,10,0.85)');
   }
 
-  // Garages (vehicles): a long low shed with a ribbed roof and a roll-up door on the south face; level 2 is steel-grey and taller.
-  // Each kind has its own roof mark (stripe: bikes, plain: jeep, painted circle: helicopter, hazard stripes: tank).
-  H.garage = 0.075;
-  var GARAGE = { n: '#5c6159', w: '#585d55', s: '#34372f', e: '#2b2e28', top: '#6c7166' };
-  var GARAGE2 = { n: '#505e6b', w: '#4d5b68', s: '#2b333b', e: '#232a31', top: '#6b7b89' };
+  // Garages (vehicles): a roofless room. js/base.js splits it into parts (see roomParts): low walls on three sides, the open door on
+  // the south, a bench along the back wall. The concrete floor is painted on the ground (drawGarageFloors); this draws the walls and the bench.
+  // Level 2 is steel-grey and taller. Each kind has its own mark (bikes: red stripe, tank: hazard stripes, helicopter: landing circle on the floor).
+  H.garage = 0.052;
+  var GARAGE = { n: '#5c6159', w: '#585d55', s: '#3d4038', e: '#33362f', top: '#74796d' };
+  var GARAGE2 = { n: '#505e6b', w: '#4d5b68', s: '#33404b', e: '#2b353e', top: '#768694' };
 
   function drawGarage(ctx, r, c, near, lvl, kind) {
-    var cols = lvl >= 2 ? GARAGE2 : GARAGE, k = H.garage * (lvl >= 2 ? 1.2 : 1);
-    var bx = box(ctx, r, 0, k, c, cols), t = bx.t, b = bx.b, i, n = Math.max(4, Math.round(r.w / 34));
-    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.22)';
-    for (i = 1; i < n; i++) line(ctx, topPt(t, i / n, 0), topPt(t, i / n, 1));                  // roof ribs
-    var mid = topPt(t, 0.5, 0.5);
-    if (kind === 'garage_heli') {                                                              // painted landing circle
-      ctx.strokeStyle = 'rgba(225,215,170,0.55)'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.ellipse(mid[0], mid[1], r.w * 0.2, r.w * 0.2 * 0.55, 0, 0, TAU); ctx.stroke();
-      ctx.fillStyle = 'rgba(225,215,170,0.55)'; ctx.fillRect(mid[0] - 9, mid[1] - 6, 3, 12); ctx.fillRect(mid[0] + 6, mid[1] - 6, 3, 12); ctx.fillRect(mid[0] - 9, mid[1] - 1, 18, 3);
-    } else if (kind === 'garage_tank') {                                                       // hazard stripes along the front edge
-      for (i = 0; i < n; i += 2) poly(ctx, [topPt(t, i / n, 0.86), topPt(t, (i + 1) / n, 0.86), topPt(t, (i + 1) / n, 1), topPt(t, i / n, 1)], 'rgba(210,175,60,0.5)');
-    } else if (kind === 'garage_moto') {
-      poly(ctx, [topPt(t, 0.08, 0.42), topPt(t, 0.92, 0.42), topPt(t, 0.92, 0.5), topPt(t, 0.08, 0.5)], 'rgba(190,80,60,0.45)');
+    if (r.hollow) return;                                                  // the floor is on the ground layer
+    if (r.part === 'bench') { drawWorkbench(ctx, r, c, near, lvl); return; }
+    var cols = lvl >= 2 ? GARAGE2 : GARAGE, k = H.garage * (lvl >= 2 ? 1.25 : 1);
+    var bx = box(ctx, r, 0, k, c, cols, 0), t = bx.t, b = bx.b, i;
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    if (r.side) {                                                          // side walls: panel seams on the top
+      if (r.last) { poly(ctx, [t[3], t[2], b[2], b[3]], null, 'rgba(0,0,0,0.35)'); }
+    } else {                                                               // the back wall: its inner face is what you look at
+      var n = Math.max(4, Math.round(r.w / 30));
+      for (i = 1; i < n; i++) line(ctx, mix(t[0], t[1], i / n), mix(t[3], t[2], i / n));
+      if (bx.vis.s) {
+        var sp = function (u, f) { return mix(mix(b[3], b[2], u), mix(t[3], t[2], u), f); };
+        ctx.strokeStyle = 'rgba(190,198,185,0.18)'; line(ctx, sp(0.04, 0.55), sp(0.96, 0.55));
+        if (kind === 'garage_moto') poly(ctx, [sp(0.04, 0.12), sp(0.96, 0.12), sp(0.96, 0.24), sp(0.04, 0.24)], 'rgba(190,80,60,0.45)');
+        if (kind === 'garage_tank') for (i = 0; i < 12; i += 2) poly(ctx, [sp(0.04 + i * 0.08, 0.1), sp(0.04 + (i + 1) * 0.08, 0.1), sp(0.04 + (i + 1) * 0.08, 0.26), sp(0.04 + i * 0.08, 0.26)], 'rgba(210,175,60,0.5)');
+        ctx.lineCap = 'round'; ctx.lineWidth = 2;                          // tools hanging on the wall: spanner, saw, hammer
+        ctx.strokeStyle = '#9aa3a5'; line(ctx, sp(0.52, 0.5), sp(0.52, 0.86)); line(ctx, sp(0.5, 0.86), sp(0.54, 0.86));
+        ctx.strokeStyle = '#6e5a3c'; line(ctx, sp(0.6, 0.5), sp(0.6, 0.84)); ctx.strokeStyle = '#8c9496'; line(ctx, sp(0.58, 0.84), sp(0.64, 0.84));
+        ctx.strokeStyle = '#b4a56c'; line(ctx, sp(0.7, 0.5), sp(0.7, 0.84));
+        ctx.lineCap = 'butt';
+      }
     }
-    if (bx.vis.s) {                                                                            // roll-up door
-      var u0 = 0.1, u1 = 0.9, top = 0.78;
-      var sp = function (u, f) { return mix(mix(b[3], b[2], u), mix(t[3], t[2], u), f); };
-      poly(ctx, [sp(u0, 0), sp(u1, 0), sp(u1, top), sp(u0, top)], '#2c2f2a', 'rgba(0,0,0,0.65)');
-      ctx.strokeStyle = 'rgba(190,198,185,0.22)'; ctx.lineWidth = 1;
-      for (i = 1; i < 8; i++) line(ctx, sp(u0, top * i / 8), sp(u1, top * i / 8));
-      poly(ctx, [sp(0.47, 0.05), sp(0.53, 0.05), sp(0.53, 0.14), sp(0.47, 0.14)], '#8d958a');   // handle
+  }
+
+  // The concrete floor of every garage (painted under the shadows and the walls): joints, oil stains, bay lines, the threshold at the door.
+  function drawGarageFloors(ctx, b, vr) {
+    for (var i = 0; i < b.solids.length; i++) {
+      var r = b.solids[i];
+      if (r.part !== 'room' || !G.data.buildings[r.kind] || r.x > vr.x1 || r.x + r.w < vr.x0 || r.y > vr.y1 || r.y + r.h < vr.y0) continue;
+      var lv = (b.levels && b.levels[r.kind]) || 1, j, seed = (r.x * 7 + r.y * 13) | 0;
+      ctx.fillStyle = lv >= 2 ? '#7d8183' : '#6e706a'; ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(r.x, r.y + r.h * 0.5, r.w, r.h * 0.5);
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1;                                  // expansion joints
+      for (j = 1; j < r.w / 48; j++) { ctx.beginPath(); ctx.moveTo(r.x + j * 48, r.y); ctx.lineTo(r.x + j * 48, r.y + r.h); ctx.stroke(); }
+      for (j = 1; j < r.h / 48; j++) { ctx.beginPath(); ctx.moveTo(r.x, r.y + j * 48); ctx.lineTo(r.x + r.w, r.y + j * 48); ctx.stroke(); }
+      for (j = 0; j < 5; j++) {                                                                // oil stains
+        var ox = r.x + 24 + ((seed + j * 61) % 997) / 997 * (r.w - 48), oy = r.y + 34 + ((seed * 3 + j * 97) % 991) / 991 * (r.h - 46);
+        ctx.fillStyle = 'rgba(20,18,12,0.16)'; ctx.beginPath(); ctx.ellipse(ox, oy, 9 + j * 2, 5 + j, j, 0, TAU); ctx.fill();
+      }
+      ctx.strokeStyle = 'rgba(225,215,170,0.4)'; ctx.lineWidth = 2;
+      var mates = G.data.vehicleOrder.filter(function (o) { return G.data.vehicles[o].garage === r.kind; });
+      if (r.kind === 'garage_heli') {                                                          // landing circle with an H
+        var hp = G.vehicles.pad(r), hx = hp.x, hy = hp.y;                                       // the helicopter always rests in the middle of this circle
+        ctx.beginPath(); ctx.arc(hx, hy, Math.min(r.w, r.h) * 0.36, 0, TAU); ctx.stroke();
+        ctx.fillStyle = 'rgba(225,215,170,0.4)'; ctx.fillRect(hx - 12, hy - 11, 4, 22); ctx.fillRect(hx + 8, hy - 11, 4, 22); ctx.fillRect(hx - 12, hy - 2, 24, 4);
+      } else {                                                                                 // a painted bay for each vehicle
+        mates.forEach(function (o, n) {
+          var d = G.data.vehicles[o], bw = d.wid + 22, bh = d.len + 16, cx = r.x + r.w * (n + 0.5) / mates.length;
+          ctx.strokeRect(cx - bw / 2, r.y + r.h - bh - 4, bw, bh);
+        });
+      }
+      for (j = 0; j < r.w - 4; j += 16) {                                                      // hazard strip over the doorway
+        ctx.fillStyle = (j / 16) % 2 ? 'rgba(30,28,22,0.55)' : 'rgba(210,175,60,0.5)'; ctx.fillRect(r.x + 10 + j, r.y + r.h - 5, Math.min(16, r.w - 14 - j), 5);
+      }
     }
-    outline(ctx, t, near);
   }
 
   function drawWorkbench(ctx, r, c, near, lvl) {
@@ -524,10 +557,9 @@
       g.fill();
     }
     for (i = 0; i < 26; i++) blob(a.x + rand() * a.w, a.y + rand() * a.h, 50 + rand() * 110, rand() < 0.5 ? '0,0,0' : '132,110,78', 0.09);
-    var gx = L.gate.x + L.gate.w / 2, door = [L.cabin.x + L.cabin.w / 2, L.cabin.y + L.cabin.h + 16];
+    var gx = L.gate.x + L.gate.w / 2;
     var paths = [
       [[gx, 330], [gx, L.trail.y], [gx, a.y + 60], [gx, a.y + 190]],
-      [[gx, a.y + 150], [gx - 60, a.y + 232], [door[0] + 60, door[1] + 40], door],
       [[gx, a.y + 110], [L.chest.x - 30, L.chest.y + 74], [L.chest.x + 26, L.chest.y + 60]],
       [[gx, a.y + 190], [L.spawn.x, L.spawn.y]]
     ];
@@ -541,7 +573,6 @@
         g.stroke();
       });
     });
-    blob(L.cabin.x + L.cabin.w * 0.22, L.cabin.y + L.cabin.h + 60, 150, '214,160,84', 0.085);   // lamp light spilling out of the window
     var E = 420;
     function edge(x0, y0, x1, y1, rx, ry, rw, rh) {
       var gr = g.createLinearGradient(x0, y0, x1, y1);
@@ -556,14 +587,14 @@
   // One blurred layer with the cast shadows of every structure (they never move).
   function buildShadows(b) {
     var a = b.layout.area, M = 150, x0 = a.x - M, y0 = a.y - M, w = a.w + M * 2, h = a.h + M * 2;
-    var heights = { fence: 15, chest: 20, woodpile: 24, cabin: 62, workbench: 15, campfire: 8, bed: 9, tank: 26, rack: 16, garage_moto: 24, garage_jeep: 26, garage_heli: 28, garage_tank: 28 };
+    var heights = { fence: 15, chest: 20, box: 20, woodpile: 24, cabin: 62, workbench: 15, campfire: 8, bed: 9, tank: 26, rack: 16, garage_moto: 16, garage_jeep: 16, garage_heli: 16, garage_tank: 16 };
     var sp = K.mk(w, h, function (g) {
       g.translate(-(x0 + w / 2), -(y0 + h / 2));
       try { g.filter = 'blur(5px)'; } catch (e) { /* sharp shadows */ }
       g.fillStyle = '#000';
       b.solids.forEach(function (r) {
-        var hh = heights[r.kind], lv = (b.levels && b.levels[r.kind]) || 1;
-        if (!hh) return;
+        var hh = r.part === 'bench' ? 11 : heights[r.kind], lv = (b.levels && b.levels[r.kind]) || 1;
+        if (!hh || r.hollow) return;
         if (lv >= 2) hh *= r.kind === 'fence' || r.kind === 'tank' ? 1.45 : 1.2;
         var dx = SUN.x * hh, dy = SUN.y * hh;
         g.beginPath();                                   // rectangle swept along the light direction
@@ -645,6 +676,7 @@
     }
 
     drawFloorCells(ctx, opts.floor, vr);
+    drawGarageFloors(ctx, b, vr);
 
     ctx.globalAlpha = 0.5;
     K.blit(ctx, T.shadows.sp, T.shadows.x, T.shadows.y);
@@ -675,7 +707,7 @@
       if ((r.y + r.h > py) !== front) continue;
       if (r.kind === 'fence') drawFence(ctx, r, c, b.layout.gate, lv);
       else if (r.kind === 'cabin') T.smokeAt = drawCabin(ctx, r, c, time);
-      else if (r.kind === 'chest') drawChest(ctx, r, c, opts.near === 'chest', lv);
+      else if (r.kind === 'chest' || r.kind === 'box') drawChest(ctx, r, c, opts.near === r.kind, lv);
       else if (r.kind === 'woodpile') drawWoodpile(ctx, r, c);
       else if (r.kind === 'workbench') drawWorkbench(ctx, r, c, opts.near === 'workbench', lv);
       else if (r.kind === 'campfire') T.fireAt = drawCampfire(ctx, r, c, time, opts.near === 'campfire', lv);

@@ -21,6 +21,17 @@
     veh_jeep:       { name: "ג'יפ", stack: 1, color: '#5a6246', kind: 'material' },
     veh_heli:       { name: 'מסוק', stack: 1, color: '#3f4c58', kind: 'material' },
     veh_tank:       { name: 'טנק', stack: 1, color: '#4a5240', kind: 'material' },
+    // Garage workshop: made at a garage's own bench (data/recipes.js), the parts are fitted to a vehicle (data/vehicles.js, vehicleUpgrades).
+    rubber:         { name: 'גומי',            stack: 50, color: '#2c2e2d', kind: 'material' },
+    iron_rod:       { name: 'מוט ברזל',        stack: 50, color: '#6b7378', kind: 'material' },
+    // Parts: a vehicle is assembled from them in its garage (data/vehicles.js, vehicleBuild) and later upgraded with more of them (vehicleUpgrades).
+    part_frame:     { name: 'שלד',             stack: 50, color: '#4a5055', kind: 'material' },
+    part_wheels:    { name: 'גלגל',            stack: 50, color: '#2c2e2d', kind: 'material' },
+    part_engine:    { name: 'מנוע',            stack: 50, color: '#6d5d3a', kind: 'material' },
+    part_tank:      { name: 'מיכל דלק',        stack: 50, color: '#8a3a2e', kind: 'material' },
+    part_rotor:     { name: 'רוטור',           stack: 50, color: '#2e3438', kind: 'material' },
+    part_tracks:    { name: 'זחלים',           stack: 50, color: '#3a3d36', kind: 'material' },
+    part_turret:    { name: 'צריח',            stack: 50, color: '#4a5240', kind: 'material' },
     canned_food: { name: 'שימורים',    stack: 50,  color: '#7a6a4a', kind: 'food',  use: { hunger: 40 } },
     metal:       { name: 'מתכת',       stack: 50, color: '#5c6468', kind: 'resource' },
     cloth:       { name: 'בד',         stack: 50, color: '#6e6660', kind: 'resource' },

@@ -103,6 +103,7 @@
     helmet: { head: { col: [[66, 76, 52], [116, 130, 92]], r: 1.12, band: 'rgba(30,36,24,0.6)' } },
     jacket: { pal: { jacket: [[96, 66, 38], [150, 110, 66]] }, collar: 'rgba(52,36,20,0.9)' },
     vest:   { vest: [[58, 70, 50], [98, 114, 84]] },
+    hazsuit: { pal: { jacket: [[190, 160, 26], [244, 214, 64]], pants: [[176, 148, 24], [226, 196, 56]], boot: '#2c2a1a' }, collar: 'rgba(120,98,10,0.95)' },
     pants:  { pal: { pants: [[76, 76, 46], [118, 118, 78]] }, cargo: true },
     boots:  { pal: { boot: '#3b2a1c' }, tall: true }
   };
