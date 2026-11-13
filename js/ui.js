@@ -9,8 +9,17 @@
   var station = null;          // 'workbench' | 'campfire' while mode === 'craft'
   var craftCat = 'all';        // the open category tab of the crafting panel
   var mapSel = null;           // selected destination on the map
+  var flight = null;           // the helicopter's id while the map is open from its cockpit (flying, not walking)
   var dirty = true, promptShown = false, msgTimer = 0, toastTimer = 0, noteTimer = 0, chestChanged = false;
-  var els = {}, needEls = {}, needLast = {}, statusLast = '', weaponLast = {};
+  var els = {}, needEls = {}, needLast = {}, statusLast = '', weaponLast = {}, hotLast = '', doll = null;
+
+  // Small original icons for the needs bars (inline SVG, drawn in the bar's colour).
+  var NEED_ICON = {
+    health: '<svg viewBox="0 0 20 20"><path d="M10 17.2 3.4 10.6a4.1 4.1 0 0 1 5.8-5.8l.8.8.8-.8a4.1 4.1 0 0 1 5.8 5.8z" fill="currentColor"/><path d="M4.2 10h3l1.3-2.6 2 5 1.4-2.4h3.6" fill="none" stroke="#1c2124" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+    hunger: '<svg viewBox="0 0 20 20"><path d="M3 9.5h14a7 7 0 0 1-14 0z" fill="currentColor"/><path d="M7 7.2c-.9-1.2.9-1.8 0-3.2M10.2 7.2c-.9-1.2.9-1.8 0-3.2M13.4 7.2c-.9-1.2.9-1.8 0-3.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    thirst: '<svg viewBox="0 0 20 20"><path d="M10 2.5c3 3.9 5 6.500 5 9a5 5 0 0 1-10 0c0-2.500 2-5.100 5-9z" fill="currentColor"/></svg>',
+    energy: '<svg viewBox="0 0 20 20"><path d="M11.500 2 4.500 11.200h4.300L7.600 18l7.900-10h-4.700z" fill="currentColor"/></svg>'
+  };
 
   var REASON = {
     cost: 'חסרים חומרים', space: 'אין מקום בתיק ובמחסן', station: 'אין תחנה כזו בבסיס',
@@ -28,14 +37,43 @@
     return out.join(' · ');
   }
 
+  // The weapon (data/weapons.js) an item is, or null.
+  function weaponOf(itemId) {
+    var W = G.data.weapons;
+    for (var k in W) if (W[k].item === itemId) return W[k];
+    return null;
+  }
+  function armorText(d) { return d.wear ? 'שריון +' + Math.round(d.wear.armor * 100) + '%' : ''; }
+
   function slotHtml(owner, inv, i) {
     var s = inv.slots[i];
     if (!s) return '<button class="slot empty" data-owner="' + owner + '" data-i="' + i + '" tabindex="-1"></button>';
-    var d = items()[s.id], tip = d.name + ' ×' + s.n + (d.use ? ' · ' + useText(d) : '');
+    var d = items()[s.id], eq = G.state.equip, w = owner === 'bag' ? weaponOf(s.id) : null;
+    var extra = d.use ? useText(d) : (d.wear ? armorText(d) + ' · לחיצה: ללבוש' : (w ? 'לחיצה: נשק ראשי · קליק ימני: משני' : ''));
+    var tip = d.name + (s.n > 1 ? ' ×' + s.n : '') + (extra ? ' · ' + extra : '');
     var count = s.n > 1 ? '<span class="count">' + s.n + '</span>' : '';
-    return '<button class="slot' + (d.use ? ' usable' : '') + '" data-owner="' + owner + '" data-i="' + i + '" tabindex="-1" title="' + tip + '">' +
+    var mark = w && eq ? (eq.primary === w.id ? '<span class="mark">1</span>' : (eq.secondary === w.id ? '<span class="mark">2</span>' : '')) : '';
+    return '<button class="slot' + (d.use ? ' usable' : '') + (d.wear || w ? ' gearable' : '') + '" data-owner="' + owner + '" data-i="' + i + '" tabindex="-1" title="' + tip + '">' +
       '<span class="tile" style="background-image:url(' + G.icons.url(s.id) + ')"></span>' +
-      '<span class="name">' + d.name + '</span>' + count + '</button>';
+      '<span class="name">' + d.name + '</span>' + count + mark + '</button>';
+  }
+
+  // One equipment slot: a worn piece of clothing, or one of the two weapons.
+  function gearSlotHtml(slot) {
+    var eq = G.state.equip, L = G.data.gear.labels, id = eq[slot], isW = slot === 'primary' || slot === 'secondary';
+    var key = slot === 'primary' ? '<span class="mark">1</span>' : (slot === 'secondary' ? '<span class="mark">2</span>' : '');
+    if (!id) return '<button class="slot gslot empty" data-owner="gear" data-slot="' + slot + '" tabindex="-1" title="' + L[slot] + '"><span class="ph">' + L[slot] + '</span>' + key + '</button>';
+    var itemId = isW ? G.data.weapons[id].item : id, d = items()[itemId];
+    var tip = d.name + (isW ? ' · נזק ' + G.data.weapons[id].dmg + ' · לחיצה: לפנות את המשבצת' : ' · ' + armorText(d) + ' · לחיצה: להוריד');
+    return '<button class="slot gslot" data-owner="gear" data-slot="' + slot + '" tabindex="-1" title="' + tip + '">' +
+      '<span class="tile" style="background-image:url(' + G.icons.url(itemId) + ')"></span><span class="name">' + d.name + '</span>' + key + '</button>';
+  }
+
+  function gearStatsHtml() {
+    var st = G.state, eq = st.equip, W = G.data.weapons, w1 = eq.primary && W[eq.primary], w2 = eq.secondary && W[eq.secondary];
+    function chip(label, val) { return '<span class="gstat"><em>' + label + '</em><b>' + val + '</b></span>'; }
+    return chip('נזק ראשי', w1 ? w1.dmg : W.hands.dmg) + chip('נזק משני', w2 ? w2.dmg : '–') +
+      chip('שריון', Math.round(G.gear.armor(eq) * 100) + '%') + chip('בריאות', Math.ceil(st.needs.health));
   }
 
   function gridHtml(owner, inv) {
@@ -47,6 +85,7 @@
   // "3/4" chips for a cost, red where the player is short.
   function costHtml(cost) {
     var h = '', c = ctx();
+    if (G.crafting.free) return '<span class="cost ok">חינם (מצב יצירתי)</span>';
     for (var id in cost) {
       var have = G.crafting.have(c, id), ok = have >= cost[id];
       h += '<span class="cost ' + (ok ? 'ok' : 'lack') + '" title="' + items()[id].name + '">' +
@@ -148,16 +187,26 @@
       var pts = route.map(function (p) { return p[0] + ',' + p[1]; }).join(' ');
       lines = '<polyline class="glow" points="' + pts + '"/><polyline class="sel" points="' + pts + '"/>';
     }
+    var at = flight ? G.game.flight.here() : 'base';
     for (i = 0; i < W.order.length; i++) {
       var id = W.order[i], d = W.destinations[id], sel = id === mapSel;
       if (!G.story.isUnlocked(id)) continue;          // the story opens the map one place at a time
-      nodes += '<button class="mnode risk' + d.risk + (sel ? ' sel' : '') + '" data-dest="' + id + '" tabindex="-1" style="left:' + d.pos.x + '%;top:' + d.pos.y + '%">' +
-        '<i>' + G.mapArt.icon(id) + '</i><span>' + G.world.name(id) + '</span></button>';
+      nodes += '<button class="mnode risk' + d.risk + (sel ? ' sel' : '') + (flight && id === at ? ' here' : '') + '" data-dest="' + id + '" tabindex="-1" style="left:' + d.pos.x + '%;top:' + d.pos.y + '%">' +
+        '<i>' + G.mapArt.icon(id) + '</i><span>' + G.world.name(id) + (flight && id === at ? ' · אתם כאן' : '') + '</span></button>';
     }
-    nodes += '<div class="mhome" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i>' + G.mapArt.icon('base') + '</i><span>' + W.base.name + '</span></div>';
+    if (flight && at !== 'base') nodes += '<button class="mnode mhome' + (mapSel === 'base' ? ' sel' : '') + '" data-dest="base" tabindex="-1" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i>' + G.mapArt.icon('base') + '</i><span>' + W.base.name + '</span></button>';
+    else nodes += '<div class="mhome" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i>' + G.mapArt.icon('base') + '</i><span>' + W.base.name + (flight ? ' · אתם כאן' : '') + '</span></div>';
 
     var info = '';
-    if (mapSel && W.destinations[mapSel]) {
+    if (flight && mapSel && G.game.flight.can(mapSel)) {            // from the helicopter: fuel only, to any open place or home
+      var hv = st.vehicles[flight], need = G.game.flight.fuel(flight, mapSel), lack = !hv || hv.fuel < need, fs = W.destinations[mapSel];
+      info = '<div class="mi-head"><b>' + (fs ? G.world.name(mapSel) : W.base.name) + '</b>' + (fs ? pips(fs.risk, 5, 'סיכון', 'risk') + '<em>סיכון</em>' : '') + '</div>' +
+        '<p>' + (fs ? fs.blurb : 'חזרה הביתה. המסוק נוחת ליד ההאנגר.') + '</p>' +
+        '<div class="costs"><span class="cost ' + (lack ? 'lack' : 'ok') + '">טיסה: ' + need + ' דלק · במיכל ' + Math.floor(hv ? hv.fuel : 0) + '</span>' +
+        (fs ? '<span class="cost">משאבים: ' + G.world.loot(mapSel).join(' · ') + '</span>' : '') + '</div>' +
+        (lack ? '<div class="mi-warn">אין מספיק דלק במסוק. סגרו את המפה ותדלקו לידו (F).</div>' : '<div class="mi-warn"></div>') +
+        '<button class="act go' + (lack ? ' warn' : '') + '" data-act="go" data-id="' + mapSel + '" tabindex="-1">המראה</button>';
+    } else if (!flight && mapSel && W.destinations[mapSel]) {
       var s = W.destinations[mapSel], cost = G.world.cost(mapSel, diff), short = energy < cost;
       var rv = st.ride && st.vehicles && st.vehicles[st.ride], fuel = rv ? G.vehicles.tripFuel(st.ride, s.km) : 0, noFuel = !!rv && rv.fuel < fuel;
       if (rv) short = noFuel;                         // on a vehicle the trip costs fuel and no energy
@@ -172,7 +221,7 @@
           : short ? '<div class="mi-warn">האנרגיה לא מספיקה: תגיעו מותשים (איטיים וחלשים). אפשר לישון במיטה קודם.</div>' : '<div class="mi-warn"></div>') +
         '<button class="act go' + (short ? ' warn' : '') + '" data-act="go" data-id="' + mapSel + '" tabindex="-1">צאו לדרך</button>';
     }
-    return { lines: lines, nodes: nodes, info: info, energy: 'אנרגיה ' + energy + '/' + G.data.needs.max };
+    return { lines: flight ? '' : lines, nodes: nodes, info: info, energy: flight ? 'טיסה במסוק · בחרו יעד' : 'אנרגיה ' + energy + '/' + G.data.needs.max };
   }
 
   function fill(el, html) {      // keeps the scroll position when the list is rebuilt
@@ -185,6 +234,11 @@
     var st = G.state, used = G.inventory.usedSlots(st.bag), size = st.bag.slots.length;
     els.bagGrid.innerHTML = gridHtml('bag', st.bag);
     els.bagCount.textContent = used + '/' + size;
+    if (mode === 'bag' && st.equip) {
+      els.gearClothes.innerHTML = G.data.gear.slots.map(gearSlotHtml).join('');
+      els.gearWeapons.innerHTML = G.data.gear.weaponSlots.map(gearSlotHtml).join('');
+      els.gearStats.innerHTML = gearStatsHtml();
+    }
     els.chestGrid.innerHTML = gridHtml('chest', st.chest);
     els.chestCount.textContent = G.inventory.usedSlots(st.chest) + '/' + st.chest.slots.length;
     els.hudCount.textContent = used + '/' + size;
@@ -213,8 +267,9 @@
     if (mode === 'chest') return 'לחיצה: העבר הכל · קליק ימני: העבר אחד · E / Esc: סגירה';
     if (mode === 'craft') return 'חומרים נלקחים מהתיק ואז מהמחסן · לחיצה על פריט בתיק: שימוש · E / Esc: סגירה';
     if (mode === 'build') return 'מבנה חדש נבנה במקום המסומן בבסיס · B / Esc: סגירה';
+    if (mode === 'map' && flight) return 'בחרו יעד ולחצו "המראה" (או Enter). הטיסה עולה דלק בלבד · Esc: סגירה';
     if (mode === 'map') return 'בחרו יעד ולחצו "צאו לדרך" (או Enter). החזרה מכל יעד חינם · E / Esc: סגירה';
-    return 'לחיצה על פריט: שימוש (אוכל, שתייה, תחבושת) · I / Tab / Esc: סגירה';
+    return 'לחיצה: שימוש / לבישה / נשק ראשי · קליק ימני על נשק: משני · גרירה: סידור התיק והציוד · I / Esc: סגירה';
   }
 
   function applyMode() {
@@ -224,6 +279,7 @@
     els.buildPanel.classList.toggle('hidden', mode !== 'build');
     els.mapPanel.classList.toggle('hidden', mode !== 'map');
     els.bagPanel.classList.toggle('hidden', mode === 'build' || mode === 'map');
+    els.gearPanel.classList.toggle('hidden', mode !== 'bag');
     els.hint.textContent = hintFor();
     els.msg.textContent = '';
     els.msg.classList.remove('show');
@@ -272,19 +328,29 @@
       els.hudCount = document.getElementById('bag-hud-count');
       els.hudFill = document.getElementById('bag-hud-fill');
       els.area = document.getElementById('area-name');
+      els.gearPanel = document.getElementById('gear-panel');
+      els.gearClothes = document.getElementById('gear-clothes');
+      els.gearWeapons = document.getElementById('gear-weapons');
+      els.gearStats = document.getElementById('gear-stats');
+      els.doll = document.getElementById('gear-doll');
+      els.ghost = document.getElementById('drag-ghost');
+      els.hot = {};
+      [].forEach.call(document.querySelectorAll('#hotbar .hslot'), function (h) { els.hot[h.getAttribute('data-k')] = { el: h, ico: h.querySelector('i') }; });
+      var dd = Math.min(root.devicePixelRatio || 1, 2);
+      els.doll.width = Math.round(200 * dd); els.doll.height = Math.round(264 * dd); els.dollK = dd;
       els.weaponName = document.getElementById('weapon-name');
       els.weaponAmmo = document.getElementById('weapon-ammo');
 
       // needs bars, built from data/needs.js
       var nh = document.getElementById('needs-hud'), html = '';
       G.data.needs.order.forEach(function (k) {
-        html += '<div class="need ' + k + '" data-k="' + k + '"><span class="label">' + G.data.needs.labels[k] + '</span>' +
-          '<span class="meter"><i></i></span></div>';
+        html += '<div class="need ' + k + '" data-k="' + k + '" title="' + G.data.needs.labels[k] + '"><span class="ico">' + (NEED_ICON[k] || '') + '</span>' +
+          '<span class="meter"><i></i></span>' + (k === 'health' ? '<b class="val"></b>' : '') + '</div>';
       });
       nh.innerHTML = html + '<div class="status"></div>';
       G.data.needs.order.forEach(function (k) {
         var row = nh.querySelector('[data-k="' + k + '"]');
-        needEls[k] = { row: row, bar: row.querySelector('i') };
+        needEls[k] = { row: row, bar: row.querySelector('i'), val: row.querySelector('.val') };
       });
       els.status = nh.querySelector('.status');
 
@@ -319,10 +385,41 @@
         var btn = e.target.closest ? e.target.closest('.slot') : null;
         if (!btn) return;
         e.preventDefault();
+        if (dropped) return;                          // the click that ends a drag is not a click on the slot
         var owner = btn.getAttribute('data-owner'), idx = parseInt(btn.getAttribute('data-i'), 10);
-        if (mode === 'chest') ui.transfer(owner, idx, amount);
-        else if (owner === 'bag' && amount === Infinity) ui.use(idx);
+        if (owner === 'gear') { if (amount === Infinity) ui.gearClick(btn.getAttribute('data-slot')); }
+        else if (mode === 'chest') ui.transfer(owner, idx, amount);
+        else if (owner === 'bag') ui.bagClick(idx, amount !== Infinity);
       }
+
+      // Drag and drop between slots: backpack, chest and equipment. A small ghost follows the mouse (transform only).
+      var drag = null, dropped = false;
+      function desc(el) { return { owner: el.getAttribute('data-owner'), i: parseInt(el.getAttribute('data-i'), 10), slot: el.getAttribute('data-slot') }; }
+      els.layer.addEventListener('mousedown', function (e) {
+        var b = e.button === 0 && e.target.closest ? e.target.closest('.slot') : null;
+        if (!b || b.classList.contains('empty') || mode === 'none') return;
+        drag = { el: b, x: e.clientX, y: e.clientY, on: false };
+      });
+      root.addEventListener('mousemove', function (e) {
+        if (!drag) return;
+        if (!drag.on) {
+          if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 8) return;
+          drag.on = true;
+          var tile = drag.el.querySelector('.tile');
+          els.ghost.style.backgroundImage = tile ? tile.style.backgroundImage : 'none';
+          els.ghost.classList.add('on'); drag.el.classList.add('dragging');
+        }
+        els.ghost.style.transform = 'translate(' + (e.clientX - 30) + 'px,' + (e.clientY - 30) + 'px)';
+      });
+      root.addEventListener('mouseup', function (e) {
+        var d = drag; drag = null;
+        if (!d || !d.on) return;
+        els.ghost.classList.remove('on'); d.el.classList.remove('dragging');
+        dropped = true; root.setTimeout(function () { dropped = false; }, 0);
+        var t = document.elementFromPoint(e.clientX, e.clientY);
+        t = t && t.closest ? t.closest('.slot') : null;
+        if (t && t !== d.el) ui.drop(desc(d.el), desc(t));
+      });
       els.layer.addEventListener('click', function (e) { handle(e, Infinity); });
       els.layer.addEventListener('contextmenu', function (e) { handle(e, 1); });
       // click on the dark backdrop closes
@@ -330,6 +427,10 @@
       root.addEventListener('keydown', function (e) {
         if (mode === 'map' && e.code === 'Enter') { e.preventDefault(); if (mapSel) ui.depart(mapSel); }
       });
+      root.addEventListener('keydown', function (e) {       // H: show / hide the list of keys
+        if (e.code === 'KeyH' && !e.repeat && !document.body.classList.contains('menu')) document.body.classList.toggle('keys');
+      });
+      if (G.hud) G.hud.init();
       applyMode();
     },
 
@@ -340,16 +441,19 @@
     openBag: function () { mode = 'bag'; station = null; applyMode(); snd('pickup', { vol: 0.6 }); },
     openCraft: function (id) { mode = 'craft'; station = id; craftCat = 'all'; applyMode(); snd('ui'); },
     openBuild: function () { mode = 'build'; station = null; applyMode(); snd('ui'); },
-    openMap: function () {
+    // flightId: the helicopter the player just boarded (then every open place and home can be reached, for fuel).
+    openMap: function (flightId) {
       mode = 'map'; station = null; snd('ui');
-      if (!mapSel || !G.world.has(mapSel) || !G.story.isUnlocked(mapSel)) mapSel = G.data.world.order.filter(G.story.isUnlocked)[0] || G.data.world.order[0];
+      flight = flightId || null;
+      if (flight) { if (!mapSel || !G.game.flight.can(mapSel)) mapSel = G.game.flight.here() !== 'base' ? 'base' : (G.data.world.order.filter(G.story.isUnlocked)[0] || null); }
+      else if (!mapSel || !G.world.has(mapSel) || !G.story.isUnlocked(mapSel)) mapSel = G.data.world.order.filter(G.story.isUnlocked)[0] || G.data.world.order[0];
       applyMode();
     },
     close: function () {
       if (mode === 'none') return;
       var wasChest = mode === 'chest' && chestChanged;
       snd(mode === 'chest' ? 'close' : 'ui', { vol: 0.7 });
-      mode = 'none'; station = null; chestChanged = false; applyMode();
+      mode = 'none'; station = null; chestChanged = false; flight = null; applyMode();
       if (wasChest) game('save', 'chest');
     },
     toggleBag: function () { if (mode === 'bag') ui.close(); else if (mode === 'none') ui.openBag(); },
@@ -359,13 +463,16 @@
     selected: function () { return mapSel; },
 
     selectDest: function (id) {
-      if (mode !== 'map' || !G.world.has(id) || !G.story.isUnlocked(id)) return;
+      if (mode !== 'map') return;
+      if (flight ? !G.game.flight.can(id) : (!G.world.has(id) || !G.story.isUnlocked(id))) return;
       if (mapSel !== id) snd('ui', { vol: 0.6 });
       mapSel = id; dirty = true;
     },
 
     depart: function (id) {
-      if (mode !== 'map' || !G.world.has(id) || !G.story.isUnlocked(id)) return false;
+      if (mode !== 'map') return false;
+      if (flight) return G.game.fly(flight, id);
+      if (!G.world.has(id) || !G.story.isUnlocked(id)) return false;
       return G.game.depart(id);
     },
 
@@ -378,6 +485,65 @@
       var moved = G.inventory.move(from, idx, to, amount);
       if (moved) { dirty = true; chestChanged = true; snd('pickup', { gap: 0.06 }); }
       return moved;
+    },
+
+    // Click on a backpack item: clothes are put on, a weapon becomes the primary one (right click: the secondary), the rest is used.
+    bagClick: function (idx, alt) {
+      var st = G.state, s = st.bag.slots[idx];
+      if (!s) return;
+      var d = items()[s.id], w = weaponOf(s.id);
+      if (d.wear) { if (!alt) ui.wear(idx); }
+      else if (w) {
+        if (alt) G.gear.setWeapon(st.equip, 'secondary', w.id); else if (!G.gear.promote(st.equip, w.id)) G.gear.setWeapon(st.equip, 'secondary', w.id);
+        snd('pickup', { vol: 0.6 }); say(w.name + ': ' + (st.equip.primary === w.id ? 'נשק ראשי (מקש 1)' : 'נשק משני (מקש 2)'));
+        dirty = true; game('save', 'gear');
+      } else if (!alt) ui.use(idx);
+    },
+
+    wear: function (idx) {
+      var st = G.state, r = G.gear.wear(st.equip, st.bag, idx);
+      if (r.ok) { snd('pickup'); say('לבשתם: ' + items()[st.equip[r.slot]].name + ' · ' + armorText(items()[st.equip[r.slot]])); dirty = true; game('save', 'gear'); }
+      return r;
+    },
+
+    // Click on an equipment slot: clothes come off into the backpack, a weapon slot is cleared.
+    gearClick: function (slot) {
+      var st = G.state, id = st.equip[slot];
+      if (!id) return;
+      if (slot === 'primary' || slot === 'secondary') { G.gear.setWeapon(st.equip, slot, null); snd('ui'); }
+      else {
+        var r = G.gear.takeOff(st.equip, st.bag, slot, -1);
+        if (!r.ok) { snd('uiBad'); say('אין מקום בתיק'); return; }
+        snd('pickup', { vol: 0.6 }); say('הורדתם: ' + items()[id].name);
+      }
+      dirty = true; game('save', 'gear');
+    },
+
+    // The end of a drag: from one slot onto another (backpack, chest, equipment).
+    drop: function (a, b) {
+      var st = G.state, eq = st.equip, ok = false, isW = function (s) { return s === 'primary' || s === 'secondary'; };
+      function inv(o) { return o === 'bag' ? st.bag : (o === 'chest' && mode === 'chest' ? st.chest : null); }
+      if (a.owner !== 'gear' && b.owner !== 'gear') {
+        var A = inv(a.owner), B = inv(b.owner);
+        ok = !!A && !!B && G.inventory.swap(A, a.i, B, b.i);
+        if (ok && A !== B) chestChanged = true;
+      } else if (a.owner === 'bag' && b.owner === 'gear') {
+        var s = st.bag.slots[a.i], w = s && weaponOf(s.id);
+        if (isW(b.slot)) { if (w) ok = G.gear.setWeapon(eq, b.slot, w.id); }
+        else if (s && G.gear.slotOf(s.id) === b.slot) ok = G.gear.wear(eq, st.bag, a.i).ok;
+        if (!ok) { snd('uiBad'); say('זה לא מתאים למשבצת הזאת'); return; }
+      } else if (a.owner === 'gear' && b.owner === 'bag') {
+        if (isW(a.slot)) { G.gear.setWeapon(eq, a.slot, null); ok = true; }
+        else {
+          var t = st.bag.slots[b.i];
+          if (t && G.gear.slotOf(t.id) === a.slot) ok = G.gear.wear(eq, st.bag, b.i).ok;            // onto another piece of the same kind: they trade
+          else ok = G.gear.takeOff(eq, st.bag, a.slot, b.i).ok;
+          if (!ok) { snd('uiBad'); say('אין מקום בתיק'); return; }
+        }
+      } else if (a.owner === 'gear' && b.owner === 'gear' && isW(a.slot) && isW(b.slot)) {
+        ok = G.gear.setWeapon(eq, b.slot, eq[a.slot]);
+      }
+      if (ok) { snd('pickup', { gap: 0.06, vol: 0.7 }); dirty = true; if (mode !== 'chest') game('save', 'gear'); }
     },
 
     // Uses one unit of a backpack item (food, drink, bandage).
@@ -470,6 +636,7 @@
           needEls[k].bar.style.transform = 'scaleX(' + v.toFixed(3) + ')';
           needLast[k] = v;
         }
+        if (needEls[k].val && needLast[k + 'N'] !== Math.ceil(n[k])) { needLast[k + 'N'] = Math.ceil(n[k]); needEls[k].val.textContent = Math.ceil(n[k]); }
         low = n[k] < D.low;
         if (needEls[k].row.classList.contains('low') !== low) needEls[k].row.classList.toggle('low', low);
       }
@@ -488,7 +655,34 @@
       }
     },
 
-    update: function () { if (dirty) render(); }
+    // The two weapon slots at the bottom of the screen (keys 1 and 2) and the hands (3); the one in the hands is lit.
+    setHotbar: function (eq, held) {
+      if (!eq || !els.hot) return;
+      var key = (eq.primary || '') + '|' + (eq.secondary || '') + '|' + held;
+      if (hotLast === key) return;
+      hotLast = key;
+      ['primary', 'secondary'].forEach(function (k) {
+        var h = els.hot[k], id = eq[k];
+        h.ico.style.backgroundImage = id ? 'url(' + G.icons.url(G.data.weapons[id].item) + ')' : 'none';
+        h.el.classList.toggle('empty', !id);
+        h.el.classList.toggle('on', !!id && held === id);
+      });
+      els.hot.hands.el.classList.toggle('on', held === 'hands');
+    },
+
+    // The figure in the equipment panel: the player's own body, drawn large, wearing what is worn.
+    drawDoll: function () {
+      var st = G.state, g = els.doll.getContext('2d'), k = els.dollK;
+      if (!doll) doll = G.player.create(0, 0);
+      doll.outfit = st.equip; doll.held = st.player.held; doll.heldK = 1;
+      doll.angle = doll.prevAngle = doll.face = doll.pFace = Math.PI / 2 - 0.3;
+      g.setTransform(k, 0, 0, k, 0, 0);
+      g.clearRect(0, 0, 200, 264);
+      g.translate(100, 226); g.scale(3.9, 3.9);
+      G.player.draw(g, doll, 1, (root.performance ? root.performance.now() : 0) / 1000);
+    },
+
+    update: function () { if (dirty) render(); if (mode === 'bag' && G.state.equip) ui.drawDoll(); }
   };
 
   G.ui = ui;

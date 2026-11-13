@@ -26,9 +26,41 @@
     return best;
   }
 
+  // ---- the helicopter: it is not driven around, it only flies between places on the world map ----
+
+  // Where the player is on the world map: 'base', or the destination this area belongs to (a room counts as its building's place).
+  function here() { return st.area === 'base' || !st.zone ? 'base' : (G.data.areas[st.zone.id].parent || st.zone.id); }
+
+  function flightKm(to) {
+    var D = G.data.world.destinations, from = here(), a = D[from] ? D[from].km : 0, b = D[to] ? D[to].km : 0;
+    if (from === 'base' || to === 'base') return Math.max(a, b);
+    return Math.max(3, Math.abs(a - b) + Math.min(a, b) * 0.5);        // place to place: not through home
+  }
+  function flightFuel(id, to) { return Math.ceil(G.data.vehicles[id].perKm * flightKm(to)); }
+  function canFlyTo(to) { return to !== here() && (to === 'base' || (G.world.has(to) && G.story.isUnlocked(to))); }
+
+  // Takes off for `to` ('base' or a destination). The helicopter lands next to where the player arrives and waits there.
+  function fly(id, to) {
+    var v = st.vehicles[id], d = G.data.vehicles[id];
+    if (!v || !d || !d.transport || st.scene !== 'play' || st.paused || st.fade || !canFlyTo(to)) return false;
+    var fuel = flightFuel(id, to);
+    if (v.fuel < fuel) { snd('uiBad'); G.ui.toast('אין מספיק דלק לטיסה (' + fuel + ' דרושים, יש ' + Math.floor(v.fuel) + ') · F לתדלוק', 2600); return false; }
+    snd('travel');
+    return X.startFade(0.55, function () {
+      v.fuel = Math.max(0, v.fuel - fuel);
+      X.setArea(to);
+      if (to === 'base') v.at = null;                                  // back on its pad at the hangar
+      else v.at = { area: to, x: Math.round(st.zone.spawn.x + 104), y: Math.round(st.zone.spawn.y - 30), angle: -0.45 };
+    }, function () {
+      save('arrive');
+      G.ui.toast(to === 'base' ? 'נחתתם בבסיס' : 'נחתתם: ' + G.world.name(to) + ' · המסוק מחכה כאן (V לטיסה הבאה)', 3200);
+    });
+  }
+
   function mount(id) {
     var v = st.vehicles[id], q = pos(id), p = st.player;
     if (!v || !q) return;
+    if (G.data.vehicles[id].transport) { snd('door'); G.ui.openMap(id); return; }      // boarding the helicopter = choosing where to fly
     if (v.fuel < 0.5) { snd('uiBad'); G.ui.toast('אין דלק ב' + G.data.vehicles[id].name + ' · F לתדלוק מג׳ריקנים', 2200); return; }
     v.at = null; st.ride = id; angle = q.angle || 0;
     snd('door'); G.ui.toast('על ' + G.data.vehicles[id].name + ' · V לרדת, F לתדלוק', 1800);
@@ -69,6 +101,7 @@
 
   // Walking speed while riding: the vehicle's, no running, and no energy cost (needs.drain gets `moving` false, see game-tick).
   function speed(pcfg, base) {
+    st.player.seat = !!st.ride && !G.vehicleArt.covers(st.ride);          // bike / quad: the rider sits (player.js SEATED), legs do not walk
     if (!st.ride) { pcfg.runMult = X.cfg.player.runMult; return false; }
     pcfg.walkSpeed = base * G.data.vehicles[st.ride].speed;
     pcfg.runMult = 1;
@@ -78,6 +111,7 @@
   // After the player moved and collided: heading, fuel use, ramming, out-of-fuel.
   function step(dt, p) {
     if (!st.ride) return;
+    if (G.data.vehicles[st.ride].transport) { dismount(); return; }    // an old save that was flying it around: set it down here
     var id = st.ride, d = G.data.vehicles[id], v = st.vehicles[id];
     var dx = p.x - p.prevX, dy = p.y - p.prevY, moved = Math.sqrt(dx * dx + dy * dy);
     if (moved > 0.4) {                                              // the heading follows the way it drives, smoothly
@@ -109,6 +143,7 @@
     var id = nearVehicle(p);
     if (!id) return null;
     var v = st.vehicles[id];
+    if (G.data.vehicles[id].transport) return 'V · ' + G.data.vehicles[id].name + ': בחירת יעד טיסה · דלק ' + Math.round(v.fuel) + '/' + V().cap(id, st.buildings) + ' · F לתדלוק';
     return 'V · עלייה ל' + G.data.vehicles[id].name + ' · דלק ' + Math.round(v.fuel) + '/' + V().cap(id, st.buildings) + ' · F לתדלוק';
   }
 
@@ -157,5 +192,6 @@
   }
 
   X.vehNear = nearVehicle; X.vehKeys = keys; X.vehSpeed = speed; X.vehStep = step; X.vehPrompt = prompt; X.vehItems = items; X.vehHides = hidesRider; X.vehFlying = flying;
+  X.vehFly = fly; X.vehHere = here; X.vehFlightFuel = flightFuel; X.vehCanFlyTo = canFlyTo;
   X.vehGauge = gauge; X.vehDismount = dismount; X.vehAreaChanged = areaChanged; X.vehMount = mount; X.vehRefuel = refuel;
 })(window);

@@ -8,6 +8,7 @@
   var escBack = false;          // this Esc already closed the settings screen (the game must not also unpause)
   var back = 'main';            // where the settings screen returns to (main menu or pause)
   var picked = null;            // difficulty id chosen on the difficulty screen
+  var mode = 'survival';        // 'survival' | 'creative' for the new game
   var els = {};
 
   var WHY = {
@@ -29,7 +30,7 @@
   // One line about the saved game for the Continue button.
   function summaryText(d) {
     var where = d.area === 'base' ? 'בבסיס' : inPlace(G.world.name(d.area));
-    return G.data.difficulty.levels[d.diff].name + ' · ' + where + ' · ' + playTimeText(d.playTime);
+    return (d.creative ? 'יצירתי' : G.data.difficulty.levels[d.diff].name) + ' · ' + where + ' · ' + playTimeText(d.playTime);
   }
 
   function show(name) {
@@ -68,6 +69,14 @@
     els.diffWarn.classList.toggle('on', r.ok || r.reason === 'corrupt');
     els.diffWarn.textContent = r.ok ? 'השמירה הקיימת תוחלף במשחק החדש.' : (r.reason === 'corrupt' ? 'השמירה הפגומה תוחלף במשחק החדש.' : '');
     pick(picked || G.data.difficulty.default);
+    pickMode(mode);
+  }
+
+  function pickMode(m) {
+    mode = m === 'creative' ? 'creative' : 'survival';
+    var b = els.modes.querySelectorAll('.dmode');
+    for (var i = 0; i < b.length; i++) b[i].classList.toggle('sel', b[i].getAttribute('data-mode') === mode);
+    els.cards.classList.toggle('off', mode === 'creative');          // the difficulty does not matter there
   }
 
   function pick(id) {
@@ -88,6 +97,11 @@
       els.newBtn = document.getElementById('mb-new');
       els.mainNote = document.getElementById('mm-note');
       els.cards = document.getElementById('diff-cards');
+      els.modes = document.getElementById('mode-cards');
+      els.modes.addEventListener('click', function (e) {
+        var c = e.target.closest ? e.target.closest('.dmode') : null;
+        if (c) pickMode(c.getAttribute('data-mode'));
+      });
       els.diffWarn = document.getElementById('diff-warn');
       els.start = document.getElementById('mb-start');
       els.resume = document.getElementById('mb-resume');
@@ -123,7 +137,7 @@
       });
       els.cards.addEventListener('dblclick', function (e) {
         var c = e.target.closest ? e.target.closest('.dcard') : null;
-        if (c) { pick(c.getAttribute('data-id')); G.game.newGame(picked); }
+        if (c) { pick(c.getAttribute('data-id')); G.game.newGame(picked, mode); }
       });
 
       els.cont.addEventListener('click', function () {
@@ -132,7 +146,7 @@
       });
       els.newBtn.addEventListener('click', function () { show('diff'); });
       document.getElementById('mb-exit').addEventListener('click', function () { G.game.exit(); });
-      els.start.addEventListener('click', function () { G.game.newGame(picked || D.default); });
+      els.start.addEventListener('click', function () { G.game.newGame(picked || D.default, mode); });
       document.getElementById('mb-back').addEventListener('click', function () { show('main'); });
       els.resume.addEventListener('click', function () { G.game.setPaused(false); });
       document.getElementById('mb-save').addEventListener('click', function () {

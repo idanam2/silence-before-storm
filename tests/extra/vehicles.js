@@ -58,6 +58,17 @@ if (G.vehicles) {
     if (!(G.vehicles.tripFuel('motorcycle', 12) < G.vehicles.tripFuel('tank', 12))) throw new Error('a tank should drink more than a bike');
   });
 
+  test('fuel balance: a full tank lasts a good while at its own speed (bike and quad at least 80 s, the others at least 60 s)', () => {
+    const walk = G.config.player.walkSpeed;
+    for (const id of VO) {
+      if (VD[id].transport) continue;                                // the helicopter is paid by the km on the map
+      const px = VD[id].fuelCap / VD[id].per1000 * 1000, secs = px / (walk * VD[id].speed);
+      const need = id === 'motorcycle' || id === 'atv' ? 80 : 60;
+      if (secs < need) throw new Error(id + ' runs dry after ' + Math.round(secs) + ' s');
+      if (secs > 400) throw new Error(id + ' fuel is almost free: ' + Math.round(secs) + ' s');
+    }
+  });
+
   test('parked position: in front of the garage at home, where it was left elsewhere, nowhere in another area', () => {
     const placed = [{ id: 'garage_moto', x: 900, y: 1330 }];
     const p1 = G.vehicles.position('motorcycle', { fuel: 3, at: null }, 'base', placed), p2 = G.vehicles.position('atv', { fuel: 3, at: null }, 'base', placed);

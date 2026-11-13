@@ -16,6 +16,7 @@
 
   // { itemId: missingAmount } or null when the whole cost is covered.
   function missing(list, cost) {
+    if (crafting.free) return null;                    // creative mode: nothing costs anything
     var m = null;
     for (var id in cost) {
       var lack = cost[id] - have(list, id);
@@ -30,6 +31,7 @@
   function restore(list, snap) { for (var i = 0; i < list.length; i++) list[i].slots = snap[i]; }
 
   function pay(list, cost) {
+    if (crafting.free) return;
     for (var id in cost) {
       var need = cost[id];
       for (var i = 0; i < list.length && need > 0; i++) need -= G.inventory.remove(list[i], id, need);
@@ -37,7 +39,7 @@
   }
 
   // A recipe with `unlock` (a story flag) shows only after that flag is set. Without the story layer everything shows.
-  function unlocked(r) { return !r.unlock || !G.story || !G.story.S || G.story.hasFlag(r.unlock); }
+  function unlocked(r) { return crafting.free || !r.unlock || !G.story || !G.story.S || G.story.hasFlag(r.unlock); }
 
   function recipeById(id) {
     var r = G.data.recipes;
@@ -46,6 +48,7 @@
   }
 
   var crafting = {
+    free: false,                                       // creative mode (set by the game): costs are neither checked nor paid
     levelOf: levelOf,
     have: function (ctx, id) { return have(invs(ctx), id); },
     recipe: recipeById,

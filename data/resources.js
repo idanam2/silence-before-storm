@@ -26,6 +26,12 @@
     radio:     { action: 'פירוק מכשיר קשר', item: 'electronics', yield: [1, 2], time: 1.6, tool: null, r: 16, solid: 0, fx: 'metal' },
     vend_snack: { action: 'שבירת מכונת החטיפים', item: 'canned_food', yield: [1, 3], time: 1.4, tool: null, r: 18, solid: 0, fx: 'metal' },
     vend_drink: { action: 'שבירת מכונת השתייה', item: 'water_clean', yield: [1, 3], time: 1.4, tool: null, r: 18, solid: 0, fx: 'water' },
+    // what is kept in a sealed room (behind a wall that only an axe breaks): always there, richer than loose salvage
+    stash_food:  { action: 'פתיחת מחבוא: מזון',  item: 'canned_food', yield: [3, 5], time: 1.4, tool: null, r: 18, solid: 0, fx: 'wood' },
+    stash_med:   { action: 'פתיחת מחבוא: תרופות', item: 'bandage',     yield: [3, 4], time: 1.4, tool: null, r: 18, solid: 0, fx: 'cloth' },
+    stash_ammo:  { action: 'פתיחת מחבוא: תחמושת', item: 'ammo_556',    yield: [14, 20], time: 1.6, tool: null, r: 18, solid: 0, fx: 'metal' },
+    stash_arms:  { action: 'פתיחת מחבוא: נשק',    item: 'm16',         yield: [1, 1],  time: 2.0, tool: null, r: 18, solid: 0, fx: 'metal' },
+    stash_parts: { action: 'פתיחת מחבוא: חלקים',  item: 'electronics', yield: [2, 3], time: 1.5, tool: null, r: 18, solid: 0, fx: 'metal' },
     fueldrum:  { action: "מילוי ג'ריקנים מחבית דלק", item: 'fuel', yield: [2, 3], time: 1.1, tool: null, r: 16, solid: 0, fx: 'water' },
     barrel:    { action: 'מילוי מחבית גשם', item: 'water_dirty', yield: [2, 3], time: 0.9, tool: null, r: 16, solid: 0, fx: 'water' },
     water:     { action: 'מילוי מים',     item: 'water_dirty', yield: [1, 1], time: 0.9, tool: null, r: 0,  solid: 0,  infinite: true, fx: 'water' }

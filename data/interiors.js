@@ -80,6 +80,36 @@
     return false;
   }
 
+  // A sealed room: in one free corner of the floor, 190 x 170 behind two inner walls, one of them with a boarded opening
+  // ('bwall', breakable: only an axe opens it, js/area.js). Inside: a stash that is always there. Most floors get one; not
+  // the ones that story spots stand in (SKIP). Returns { type, spot } or null.
+  var SKIP = { farm_in1: true };
+  function nook(b, o, doors, inside) {
+    if (o.nook === false || SKIP[o.id]) return null;
+    var W = b.W, H = b.H, r = G.util.rng((o.seed | 0) * 17 + 5), NW = 170, NH = 150;
+    if (r() < 0.25 || W < 1100) return null;
+    var solids = solidsOf(b.S), cand = [], cy, cx, nx, k;
+    for (cy = 0; cy < 2; cy++) for (cx = 0; cx < 2; cx++) for (nx = 122; nx <= W - 122 - NW; nx += 40) cand.push({ cx: cx, cy: cy, nx: nx });
+    cand.sort(function () { return r() - 0.5; });
+    for (k = 0; k < cand.length; k++) {
+      cx = cand[k].cx; cy = cand[k].cy; nx = cand[k].nx;
+      var ny = cy ? H - 62 - NH : 122;
+      var ux = nx + 16, uy = cy ? ny - 110 : ny + 16, uw = NW - 32, uh = NH + 94, ok = true, x, y, d;      // the nook and the space in front of its opening
+      for (x = ux; x <= ux + uw && ok; x += 30) for (y = uy; y <= uy + uh && ok; y += 30) if (blocked(solids, x, y, 4)) ok = false;
+      for (d = 0; d < doors.length && ok; d++) if (doors[d].x > ux - 70 && doors[d].x < ux + uw + 70 && doors[d].y > uy - 70 && doors[d].y < uy + uh + 70) ok = false;
+      if (ok && inside && Math.abs(inside.x - (nx + NW / 2)) < NW && Math.abs(inside.y - (ny + NH / 2)) < NH + 110) ok = false;
+      if (ok) for (d = 0; d < b.S.length && ok; d++) { var q = b.S[d]; if (q.solid !== false && !q.legs && cx === 0 && q.x < nx + NW + T && q.x + q.w > nx + NW && q.y < ny + NH && q.y + q.h > ny) ok = false; if (q.solid !== false && !q.legs && cx === 1 && q.x < nx && q.x + q.w > nx - T && q.y < ny + NH && q.y + q.h > ny) ok = false; }
+      if (!ok) continue;
+      var wy = cy ? ny - T : ny + NH, wx = cx ? nx - T : nx + NW, mid = nx + NW / 2;
+      b.S.push({ kind: 'iwall', x: wx, y: ny, w: T, h: NH, k: K });                                           // the side wall
+      b.S.push({ kind: 'iwall', x: nx, y: wy, w: mid - 50 - nx, h: T, k: K }, { kind: 'iwall', x: mid + 50, y: wy, w: nx + NW - mid - 50 + (cx ? 0 : T), h: T, k: K },
+        { kind: 'bwall', x: mid - 50, y: wy, w: 100, h: T, k: K, breakable: true, hp: 4, room: { x: nx, y: ny, w: NW, h: NH } });                    // the boarded opening
+      var type = ['stash_food', 'stash_med', 'stash_parts'][Math.floor(r() * 3)];
+      return { type: type, spot: [Math.round(nx + NW / 2 + (cx ? 20 : -20)), Math.round(ny + NH / 2)] };
+    }
+    return null;
+  }
+
   // Outer walls with the way out, then the area definition. counts: { type: how many of its spots get loot }.
   function finish(b, o) {
     var W = b.W, H = b.H, north = o.exitNorth, ex = b.mx(o.exitX || W / 2);
@@ -93,6 +123,7 @@
       inside = north ? { x: ex, y: 220 } : { x: ex, y: H - 150 };
       doors.push({ x: ex, y: north ? 112 : H - 52, r: 56, to: o.exit.to, at: o.exit.at, face: o.exit.face, label: o.exit.label });
     }
+    var nk = nook(b, o, doors, inside);                    // a corner room boarded up: only an axe opens it
     // keep loot spots that are free, inside the walls and away from the doors
     var solids = solidsOf(b.S), byType = {};
     b.spots.forEach(function (p) {
@@ -107,6 +138,7 @@
       var n = byType[t].length, want = o.counts && o.counts[t] !== undefined ? o.counts[t] : Math.ceil(n * 0.6);
       if (want > 0) loot.push({ type: t, count: Math.min(n, want), spots: byType[t] });
     });
+    if (nk) loot.push({ type: nk.type, count: 1, spots: [nk.spot] });     // the stash: always there
     var lights = [];
     for (var lx = 300; lx < W - 200; lx += 600) { lights.push([lx, 140, 240]); lights.push([lx, H - 80, 200]); }
     return {

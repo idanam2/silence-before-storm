@@ -8,22 +8,43 @@
 </head>
 <body class="menu">
   <canvas id="game" aria-label="מסך המשחק"></canvas>
+  <!-- Daylight grade: the art is painted dark, this curve lifts the whole canvas to a bright day (css: #game) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="daygrade" color-interpolation-filters="sRGB">
+      <feComponentTransfer>
+        <feFuncR type="gamma" amplitude="1.02" exponent="0.56"/>
+        <feFuncG type="gamma" amplitude="1.02" exponent="0.56"/>
+        <feFuncB type="gamma" amplitude="1.0" exponent="0.56"/>
+      </feComponentTransfer>
+      <feColorMatrix type="saturate" values="1.12"/>
+    </filter>
+  </svg>
 
-  <div class="hud title">
-    <h1>השקט שלפני הסערה</h1>
+  <div class="hud mapbox">
+    <canvas id="minimap" class="minimap" aria-label="מפה קטנה"></canvas>
     <p id="area-name">הבסיס</p>
   </div>
+
+  <div id="target-hud" class="targethud">
+    <span id="target-name" class="tname"></span>
+    <span class="tmeter"><i id="target-bar"></i></span>
+    <b id="target-num" class="tnum"></b>
+  </div>
+
+  <div class="hud keyshint"><kbd>H</kbd>מקשים</div>
 
   <div class="hud controls">
     <span><kbd>WASD</kbd>תנועה</span>
     <span><kbd>Shift</kbd>ריצה</span>
     <span><kbd>עכבר</kbd>כיוון</span>
     <span><kbd>לחיצה</kbd>תקיפה / ירי</span>
-    <span><kbd>1-9</kbd>נשק</span>
+    <span><kbd>1</kbd>נשק ראשי</span>
+    <span><kbd>2</kbd>נשק משני</span>
+    <span><kbd>3</kbd>ידיים</span>
     <span><kbd>Q</kbd>נשק הבא</span>
     <span><kbd>R</kbd>טעינה</span>
     <span><kbd>E</kbd>פעולה · החזקה לאיסוף</span>
-    <span><kbd>I</kbd>תיק</span>
+    <span><kbd>I</kbd>תיק וציוד</span>
     <span><kbd>J</kbd>יומן</span>
     <span><kbd>B</kbd>בנייה</span>
     <span><kbd>V</kbd>כלי רכב</span>
@@ -45,6 +66,13 @@
     <b id="weapon-name"></b>
     <span id="weapon-ammo" class="num"></span>
   </div>
+
+  <div id="hotbar" class="hud hotbar">
+    <span class="hslot" data-k="primary"><kbd>1</kbd><i></i></span>
+    <span class="hslot" data-k="secondary"><kbd>2</kbd><i></i></span>
+    <span class="hslot hands" data-k="hands"><kbd>3</kbd><i></i></span>
+  </div>
+  <div id="drag-ghost" class="dragghost"></div>
 
   <div id="prompt" class="prompt"></div>
   <div id="toast" class="toast"></div>
@@ -78,6 +106,15 @@
         <header><h2>תיק</h2><span id="bag-count" class="cap"></span></header>
         <div id="bag-grid" class="grid bag"></div>
       </section>
+      <section id="gear-panel" class="panel gear hidden">
+        <header><h2>ציוד</h2><span id="gear-cap" class="cap"></span></header>
+        <div class="gearbody">
+          <div id="gear-clothes" class="gcol"></div>
+          <canvas id="gear-doll" class="doll"></canvas>
+          <div id="gear-weapons" class="gcol"></div>
+        </div>
+        <div id="gear-stats" class="gstats"></div>
+      </section>
     </div>
     <p id="inv-msg" class="inv-msg"></p>
     <p id="inv-hint" class="inv-hint"></p>
@@ -97,7 +134,11 @@
     </section>
 
     <section id="ms-diff" class="mscreen">
-      <h2 class="mhead">בחרו רמת קושי</h2>
+      <h2 class="mhead">משחק חדש</h2>
+      <div id="mode-cards" class="dmodes">
+        <button class="dmode" data-mode="survival"><b>הישרדות</b><span>המשחק הרגיל: אוספים, בונים ושורדים</span></button>
+        <button class="dmode" data-mode="creative"><b>יצירתי</b><span>לבדיקה: הכול חינם ופתוח, בלי רעב ובלי מוות</span></button>
+      </div>
       <div id="diff-cards" class="dcards"></div>
       <p id="diff-warn" class="mnote warn">שמירה קיימת תוחלף במשחק החדש.</p>
       <div class="mrow">
@@ -155,6 +196,7 @@
   <script src="data/world.js"></script>
   <script src="data/weapons.js"></script>
   <script src="data/enemies.js"></script>
+  <script src="data/gear.js"></script>
   <script src="story/data/story-items.js"></script>
   <script src="story/data/spots.js"></script>
   <script src="story/data/quests.js"></script>
@@ -167,6 +209,7 @@
   <script src="js/input.js"></script>
   <script src="js/inventory.js"></script>
   <script src="js/crafting.js"></script>
+  <script src="js/gear.js"></script>
   <script src="js/needs.js"></script>
   <script src="js/tank.js"></script>
   <script src="js/world.js"></script>
@@ -201,6 +244,7 @@
   <script src="js/sfx.js"></script>
   <script src="js/ambience.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/hud.js"></script>
   <script src="js/storyui.js"></script>
   <script src="js/storyart.js"></script>
   <script src="js/menu.js"></script>

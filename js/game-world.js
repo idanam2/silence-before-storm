@@ -87,6 +87,9 @@
   // on each floor is kept for the rest of the trip (st.trip), so nothing refills by walking in and out.
   function goThrough(door) {
     if (!G.data.areas[door.to]) return false;
+    if (door.need && G.inventory.count(st.bag, door.need) === 0) {      // a locked way in: needs an item in the bag (the gas mask)
+      snd('uiBad'); G.ui.toast(door.needText || 'צריך ציוד מיוחד כדי להיכנס', 2600); return false;
+    }
     if (!st.fade) snd('door');
     return startFade(DOOR_FADE, function () {
       X.vehDismount('כלי רכב לא נכנסים לבניין · נשארו בחוץ');   // no riding indoors: it stays at the door
@@ -194,6 +197,8 @@
     st.needs = G.needs.create();
     st.buildings = G.crafting.startBuildings();
     st.fence = { material: 'wood' };
+    st.creative = false; G.crafting.free = false;
+    st.equip = G.gear.create(); st.player.outfit = st.equip;
     st.placed = []; st.floor = G.placing.createFloor(); st.placing = null; G.base.setChest(null);
     st.vehicles = {}; st.ride = null;
     st.tank = G.tank.create();
@@ -221,11 +226,19 @@
     audioScene();
   }
 
-  function newGame(diffId) {
+  // mode 'creative': a game for looking around. Everything is free and open, the needs never drop, the bag is full of gear.
+  function newGame(diffId, mode) {
     resetWorld(diffId);
+    if (mode === 'creative') {
+      st.creative = true; G.crafting.free = true;
+      st.buildings.bag = G.data.buildings.bag.levels.length; st.buildings.chest = G.data.buildings.chest.levels.length;
+      st.bag = G.inventory.fromList(G.crafting.bagSlots(st.buildings), G.data.creativeKit);
+      applyBuildings();
+    }
     setScene('play');
     G.menu.hide();
-    G.story.begin();
+    if (st.creative) { G.story.S = G.story.legacyState(); G.story.begin(true); G.ui.toast('מצב יצירתי: הכול חינם, כל המפה פתוחה, בלי רעב ובלי מוות', 5200); }
+    else G.story.begin();
     save('new');
   }
 
@@ -235,7 +248,7 @@
     if (!r.ok) return r;
     var d = r.data;
     resetWorld(d.diff);
-    st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings; st.fence = d.fence; st.placed = d.placed; st.floor = d.floor; st.placing = null; G.base.setChest(d.chestAt);
+    st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings; st.fence = d.fence; st.creative = !!d.creative; G.crafting.free = st.creative; st.equip = d.equip || G.gear.create(); st.player.outfit = st.equip; st.placed = d.placed; st.floor = d.floor; st.placing = null; G.base.setChest(d.chestAt);
     st.tank = d.tank; st.visits = d.visits; st.playTime = d.playTime;
     st.vehicles = d.vehicles || {}; st.ride = d.ride && st.vehicles[d.ride] ? d.ride : null;
     st.guns = d.guns;                                  // missing in older saves: a gun in the bag then starts with an empty magazine

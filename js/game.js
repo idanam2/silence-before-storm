@@ -34,19 +34,22 @@
     var cx = c.width / 2, cy = c.height / 2;
     var grad = g.createRadialGradient(cx, cy, Math.min(cx, cy) * 0.35, cx, cy, Math.hypot(cx, cy));
     grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(0.6, 'rgba(0,0,0,0.35)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+    grad.addColorStop(0.6, 'rgba(0,0,0,0.07)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.42)');
     g.fillStyle = grad;
     g.fillRect(0, 0, c.width, c.height);
     vignette = c;
   }
 
   function resize() {
-    view.dpr = Math.min(root.devicePixelRatio || 1, 2);
-    view.w = canvas.clientWidth;
-    view.h = canvas.clientHeight;
-    canvas.width = Math.round(view.w * view.dpr);
-    canvas.height = Math.round(view.h * view.dpr);
+    // The zoom is folded into the view: a smaller world window (w, h) drawn with a larger scale (dpr), so the rest of
+    // the game keeps thinking in world pixels and the canvas keeps its real size.
+    var real = Math.min(root.devicePixelRatio || 1, 2), z = cfg.view.zoom || 1;
+    view.dpr = real * z;
+    view.w = canvas.clientWidth / z;
+    view.h = canvas.clientHeight / z;
+    canvas.width = Math.round(canvas.clientWidth * real);
+    canvas.height = Math.round(canvas.clientHeight * real);
     buildVignette();
     hurtVig = G.combatArt.buildHurt(view.w, view.h, view.dpr);
   }
@@ -77,6 +80,7 @@
       lo = items[i].y;
       if (items[i].veh) { G.vehicleArt.draw(ctx, items[i].veh, time); continue; }
       if (items[i].e === st.player && X.vehHides()) continue;       // inside a closed cab
+      if (items[i].e !== st.player && G.darkArt) G.darkArt.halo(ctx, items[i].e, time);   // the irradiated glow under a glower
       G.player.draw(ctx, items[i].e, alpha, time);
       if (items[i].e.hurtK > 0 && G.feel.enabled && items[i].e !== st.player) G.combatArt.drawHit(ctx, items[i].e);   // feel: hit flash
     }
@@ -144,6 +148,7 @@
     X.vehGauge();                                    // the fuel gauge (DOM; only touched when its text changes)
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (st.area !== 'base' && st.zone && G.darkArt && G.darkArt.needed(st.zone)) G.darkArt.draw(ctx, st.zone, canvas, cx, cy, view.dpr, p, py, time);   // a dark cellar: only light near you and the lamps
     if (st.fade) {                                   // travel / sleep: smooth fade through black
       var f = st.fade, ft = f.t + alpha * cfg.stepMs / 1000;
       var a = ft < f.dur ? ft / f.dur : 1 - (ft - f.dur) / f.dur;
@@ -174,8 +179,10 @@
       wlow = mc <= G.data.wear.warn;
     }
     G.ui.setWeapon(wd ? wd.name : '', wtxt, wlow);
+    G.ui.setHotbar(st.equip, p.held);
     if (st.needs) G.ui.setNeeds(st.needs);
     G.ui.update();
+    if (G.hud) G.hud.frame(st, alpha);
   }
 
   var lastAudio = 0;
@@ -213,10 +220,21 @@
       canvas = document.getElementById('game');
       ctx = canvas.getContext('2d', { alpha: false });
       G.input.attach(canvas);
+      try { var zs = parseFloat(root.localStorage.getItem('sbs_zoom')); if (zs >= cfg.view.zoomMin && zs <= cfg.view.zoomMax) cfg.view.zoom = zs; } catch (e) { /* default zoom */ }
+      canvas.addEventListener('wheel', function (ev) {            // mouse wheel: camera closer / further
+        ev.preventDefault();
+        if (st.scene !== 'play' || st.paused) return;
+        var nz = G.util.clamp(Math.round((cfg.view.zoom + (ev.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10, cfg.view.zoomMin, cfg.view.zoomMax);
+        if (nz === cfg.view.zoom) return;
+        cfg.view.zoom = nz; resize();
+        var ct = cameraTarget(); cam.x = ct.x; cam.y = ct.y;
+        try { root.localStorage.setItem('sbs_zoom', String(nz)); } catch (e) { /* not saved */ }
+      }, { passive: false });
       resize();
       root.addEventListener('resize', resize);
-      G.forestArt.init(ctx, view.dpr);
-      G.placeArt.init(ctx, view.dpr);
+      var artK = Math.min(root.devicePixelRatio || 1, 2) * 1.5;   // sprites are painted once: sharp enough for a zoomed-in camera
+      G.forestArt.init(ctx, artK);
+      G.placeArt.init(ctx, artK);
       // Paint the forest terrain now, so the first trip does not hitch during the fade.
       G.forestArt.prepare(G.area.generate(G.data.areas.forest, G.data.resources, 0));
       st.buildings = G.crafting.startBuildings();
@@ -259,6 +277,8 @@
     render: render,
     travel: travel,
     depart: depart,
+    fly: function (veh, to) { return X.vehFly(veh, to); },            // the helicopter (js/game-vehicles.js)
+    flight: { here: function () { return X.vehHere(); }, fuel: function (veh, to) { return X.vehFlightFuel(veh, to); }, can: function (to) { return X.vehCanFlyTo(to); } },
     setArea: setArea,
     sleep: sleep,
     save: save,

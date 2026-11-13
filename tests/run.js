@@ -25,8 +25,8 @@ function eq(a, b, msg) { if (a !== b) throw new Error((msg || '') + ` expected $
 function near(a, b, eps, msg) { if (Math.abs(a - b) > (eps || 1e-6)) throw new Error((msg || '') + ` expected ~${b}, got ${a}`); }
 
 const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', ...fs.readdirSync(path.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f), 'data/interiors.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js',
-  'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js',
-  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
+  'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js', 'data/gear.js',
+  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/gear.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
 // Fixed item table for the inventory tests, so balance changes in data/items.js do not break them.
 const IT = { wood: { stack: 20 }, stone: { stack: 20 }, axe: { stack: 1 } };
 const world = { width: 1000, height: 800 };

@@ -139,6 +139,8 @@
       bag: slotsOf(st.bag), chest: slotsOf(st.chest),
       buildings: JSON.parse(JSON.stringify(st.buildings)),
       fence: { material: st.fence && st.fence.material },
+      creative: !!st.creative,
+      equip: st.equip ? JSON.parse(JSON.stringify(st.equip)) : undefined,       // worn clothes and the two weapon slots (js/gear.js)
       placed: (st.placed || []).map(function (p) { return { id: p.id, x: Math.round(p.x), y: Math.round(p.y) }; }),
       floor: { cell: G.placing.CELL, cells: Object.assign({}, st.floor && st.floor.cells) },
       chestAt: { x: Math.round(G.base.layout.chest.x), y: Math.round(G.base.layout.chest.y) },
@@ -209,6 +211,8 @@
 
     var fm = o.fence && typeof o.fence.material === 'string' ? o.fence.material : '';
     d.fence = { material: data.fenceMaterials.hasOwnProperty(fm) ? fm : 'wood' };      // unknown or missing: wood
+    d.creative = o.creative === true;
+    d.equip = G.gear ? G.gear.clean(o.equip, items, data.weapons) : null;              // missing (old save): nothing worn, slots refill by themselves
     d.placed = G.placing.clean(o.placed, d.buildings);                                 // missing (old save): structures on their old spots
     d.floor = G.placing.cleanFloor(o.floor);
     d.chestAt = o.chestAt && isFinite(o.chestAt.x) && isFinite(o.chestAt.y) ? { x: o.chestAt.x, y: o.chestAt.y } : null;      // null = where the chest always stood

@@ -53,7 +53,7 @@
 
     // How many of each type for an area (a list of type names). rand: random function.
     plan: function (area, risk, rand) {
-      var table = D().spawn[Math.max(1, Math.min(5, Math.floor(risk) || 1))], out = [], type, n, i;
+      var table = area.enemyPlan || D().spawn[Math.max(1, Math.min(5, Math.floor(risk) || 1))], out = [], type, n, i;   // enemyPlan: a hand-made mix for one area
       for (type in table) {
         if (area.interior && D().types[type].indoor === false) continue;       // too big for rooms
         n = area.interior ? Math.floor(table[type] * D().interiorFactor + rand()) : Math.round(table[type] * (0.8 + rand() * 0.5));

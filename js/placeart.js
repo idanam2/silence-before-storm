@@ -1426,6 +1426,7 @@
     if (front) T.last = time;
     for (var i = 0; i < T.order.length; i++) {
       var s = T.order[i], wet = s.kind === 'ship' || s.kind === 'boat', base = s.y + s.h;
+      if (s.smashed) continue;                                                                        // a wall that was broken down (js/area.js)
       if (ranged) { if (wet || s.kind === 'crane' || base <= lo || base > hi) continue; }
       else {
         var isFront = s.kind === 'crane' ? true : (wet ? false : base > py);

@@ -33,13 +33,14 @@
   var GY = 0.8;          // the body's own depth is foreshortened a little (camera looks down at an angle)
   var FOOT = 1.6;        // sole thickness: joints sit this much above the ground
   var SUN = { x: 0.62, y: 0.78 };                       // same light as js/baseart.js (shadows fall south-east)
-  var R = { hipW: 4.4, shW: 8.2, thigh: 10.8, shin: 10.6, torso: 14.5, upper: 8.6, fore: 8.4, neck: 7.8, headR: 6.4 };
+  var R = { hipW: 4.2, shW: 7.8, thigh: 11.8, shin: 11.6, torso: 15, upper: 9, fore: 8.8, neck: 7.3, headR: 5.4 };   // adult proportions: long legs, a small head
+  var LINE = 'rgba(12,14,14,0.58)', EDGE = 1.3;         // the outline: thin and soft, not a cartoon ink line
   // Palettes. The same rig draws the player and the infected (p.look): only colors, posture and face change.
   var PALS = {
     player: {
       line: '#141615',
-      jacket: [[77, 85, 80], [112, 122, 112]], pants: [[45, 50, 54], [72, 78, 82]], pack: [[82, 68, 46], [122, 103, 76]],
-      skin: [[160, 136, 112], [203, 177, 149]], boot: '#2b2622', hair: '#4a3d33', strap: '#3a3024'
+      jacket: [[50, 82, 96], [84, 128, 144]], pants: [[42, 52, 74], [70, 84, 114]], pack: [[96, 76, 44], [146, 120, 78]],
+      skin: [[164, 132, 104], [212, 180, 148]], boot: '#3a3430', hair: '#42342a', strap: '#3a3024'
     },
     // story characters (js/storyart.js draws them standing): no backpack
     rachel: {
@@ -50,33 +51,75 @@
     // the infected: grey-green skin, worn clothes in a few variants (chosen by p.variant), no backpack, hollow eyes
     shambler: {
       line: '#121413', dead: true,
-      jackets: [[[70, 64, 52], [104, 96, 80]], [[58, 66, 70], [88, 100, 104]], [[74, 58, 54], [108, 88, 82]]],
-      pants: [[40, 42, 40], [62, 64, 60]], skin: [[110, 126, 102], [152, 170, 140]], boot: '#26231f', hair: '#34302b'
+      jackets: [[[56, 64, 74], [90, 100, 114]], [[84, 56, 50], [124, 88, 80]], [[92, 86, 60], [134, 126, 92]]],
+      pants: [[44, 44, 46], [70, 70, 72]], skin: [[98, 110, 92], [148, 160, 136]], boot: '#26231f', hair: '#2a2622'
     },
     runner: {
       line: '#121413', dead: true,
-      jackets: [[[96, 92, 84], [134, 128, 116]], [[86, 70, 66], [122, 100, 92]], [[70, 82, 90], [102, 116, 126]]],
-      pants: [[52, 54, 56], [80, 82, 84]], skin: [[120, 136, 108], [164, 182, 150]], boot: '#2a2622', hair: '#3c362f'
+      jackets: [[[128, 124, 112], [176, 172, 158]], [[104, 58, 52], [150, 90, 80]], [[58, 82, 84], [92, 124, 126]]],
+      pants: [[50, 52, 58], [80, 84, 92]], skin: [[110, 120, 98], [160, 170, 142]], boot: '#2a2622', hair: '#342e28'
     },
     // brute: bloated, darker and redder flesh, heavy torn dark clothes
     brute: {
       line: '#110f0e', dead: true,
       jackets: [[[52, 46, 42], [82, 72, 64]], [[44, 50, 48], [70, 78, 74]], [[62, 44, 40], [96, 70, 62]]],
-      pants: [[34, 33, 31], [54, 52, 48]], skin: [[128, 112, 96], [172, 150, 128]], boot: '#201c19', hair: '#2a2622'
+      pants: [[40, 36, 34], [66, 60, 54]], skin: [[112, 96, 110], [164, 140, 154]], boot: '#201c19', hair: '#2a2622'
     },
     // crawler: muddy, dirty rags close to the ground, sickly olive skin
     crawler: {
       line: '#121413', dead: true,
       jackets: [[[62, 58, 44], [92, 86, 66]], [[50, 56, 50], [78, 86, 76]], [[66, 54, 46], [98, 82, 70]]],
-      pants: [[46, 42, 36], [70, 64, 54]], skin: [[104, 118, 84], [146, 162, 120]], boot: '#2a251f', hair: '#2f2b24'
+      pants: [[58, 50, 38], [88, 78, 60]], skin: [[98, 110, 78], [146, 158, 116]], boot: '#2a251f', hair: '#2f2b24'
+    },
+    // glower: irradiated, sickly green flesh, scorched rags
+    glower: {
+      line: '#0e140d', dead: true,
+      jackets: [[[44, 54, 40], [74, 98, 62]], [[60, 66, 44], [96, 112, 66]], [[40, 50, 52], [66, 90, 84]]],
+      pants: [[38, 44, 36], [62, 72, 56]], skin: [[96, 150, 80], [160, 230, 120]], boot: '#1c2119', hair: '#202a1c'
     },
     // screamer: pale, bleached, thin pale clothes: stands out from far away
     screamer: {
       line: '#171918', dead: true,
       jackets: [[[128, 126, 120], [176, 174, 166]], [[112, 118, 124], [160, 168, 176]], [[130, 118, 112], [180, 166, 158]]],
-      pants: [[70, 72, 74], [104, 106, 108]], skin: [[150, 156, 138], [200, 206, 186]], boot: '#2c2926', hair: '#4a4640'
+      pants: [[70, 72, 74], [104, 106, 108]], skin: [[150, 156, 148], [204, 210, 198]], boot: '#2c2926', hair: '#1c1a1e'
     }
   };
+  // Build of each look: thickness of the torso, arms and legs, head size; bare = no shirt (skin torso), bareArms = torn
+  // sleeves (true, or 'left' for one arm), blood = stains on the chest, spikes = bone growths on the back, mouth = gape,
+  // mane = long hair down the back.
+  var BODY = {
+    player:   { torso: 1, arm: 1, leg: 1, head: 1 },
+    // ribs = an open wound with the ribs showing, stump = some of them lost a forearm, drag = some drag a leg
+    shambler: { torso: 1.05, arm: 1, leg: 1, head: 1, bareArms: 'left', blood: 2, ribs: true, stump: true, drag: true },
+    runner:   { torso: 0.86, arm: 0.86, leg: 0.9, head: 0.96, bareArms: true, blood: 2, ribs: true },
+    brute:    { torso: 1.5, arm: 1.4, leg: 1.25, head: 0.92, bare: true, bareArms: true, blood: 3, spikes: true, ribs: true },
+    glower:   { torso: 1.12, arm: 1.05, leg: 1, head: 1.05, bareArms: true, blood: 1, ribs: true, drag: true },
+    crawler:  { torso: 0.95, arm: 0.95, leg: 0.9, head: 1, bareArms: true, blood: 2, stump: true },
+    screamer: { torso: 0.82, arm: 0.8, leg: 0.85, head: 1.1, mouth: 1.9, mane: true, blood: 1 }
+  };
+  // What each piece of clothing (data/gear.js) changes on the body: palette entries, or an extra drawn part.
+  var OUTFIT = {
+    cap:    { head: { col: [[44, 48, 58], [80, 86, 100]], r: 0.97, band: 'rgba(170,178,196,0.55)' } },
+    helmet: { head: { col: [[66, 76, 52], [116, 130, 92]], r: 1.12, band: 'rgba(30,36,24,0.6)' } },
+    jacket: { pal: { jacket: [[96, 66, 38], [150, 110, 66]] }, collar: 'rgba(52,36,20,0.9)' },
+    vest:   { vest: [[58, 70, 50], [98, 114, 84]] },
+    pants:  { pal: { pants: [[76, 76, 46], [118, 118, 78]] }, cargo: true },
+    boots:  { pal: { boot: '#3b2a1c' }, tall: true }
+  };
+  var NOWEAR = {}, outfitCache = {};
+  function outfitOf(eq) {
+    var key = (eq.head || '') + '|' + (eq.body || '') + '|' + (eq.legs || '') + '|' + (eq.feet || '');
+    if (outfitCache[key]) return outfitCache[key];
+    var o = { pal: null }, k, kk, d;
+    ['head', 'body', 'legs', 'feet'].forEach(function (slot) {
+      d = OUTFIT[eq[slot]];
+      if (!d) return;
+      for (k in d) {
+        if (k === 'pal') { o.pal = o.pal || {}; for (kk in d.pal) o.pal[kk] = d.pal[kk]; } else o[k] = d[k];
+      }
+    });
+    return (outfitCache[key] = o);
+  }
   var PAL = PALS.player;
   function palFor(p) {
     var b = PALS[p.look] || PALS.player;
@@ -177,13 +220,14 @@
       return { rh: [7 + ss, 4.4, 1.5 + 0.6 * idle], lh: [7 - ss, -4.4, 1.2 + 0.6 * idle], wd: [0, 0, 1],
         twist: 0.16 * gait * Math.sin(ph) + 0.2 * Math.sin(time * 1.6 + v) * (1 - gait), lean: 0.06 + 0.05 * Math.sin(time * 1.3 + v), crouch: 0 };
     }
-    var sw = Math.sin(ph) * 1.8 * gait;
-    return { rh: [9 + sw, 5.5, -2.5 + 0.6 * idle], lh: [9 - sw, -5.5, -3.2 + 0.6 * idle], wd: [0, 0, 1],
-      twist: 0.2 * gait * Math.sin(ph) + 0.14 * Math.sin(time * 0.9 + v) * (1 - gait), lean: 0.22 + 0.06 * Math.sin(time * 1.2 + v), crouch: 0 };
+    var sw = Math.sin(ph) * 1.8 * gait, dead = (p.variant || 0) % 3 === 0;       // every third one has an arm that hangs dead
+    return { rh: [9 + sw, 5.5, -2.5 + 0.6 * idle + 1.2 * Math.sin(time * 2.3 + v)], lh: dead ? [1.2 - sw * 0.5, -(R.shW + 2.2), -15.6] : [8 - sw, -6, -5.2 + 0.6 * idle], wd: [0, 0, 1],
+      twist: 0.24 * gait * Math.sin(ph) + 0.16 * Math.sin(time * 0.9 + v) * (1 - gait) + (dead ? 0.22 : 0), lean: 0.3 + 0.07 * Math.sin(time * 1.2 + v), crouch: 0.05 };
   }
   // One attack of the infected: arms up, a heavy slam at u = hu, back to the shuffle.
   var SCREAM = { rh: [4, 8.4, 9], lh: [4, -8.4, 9], wd: [0, 0, 1], twist: 0, lean: -0.42, crouch: 0 };        // head thrown back, arms flung up
   var CRAWL_UP = { rh: [8, 6, -9], lh: [8, -6, -9], wd: [0, 0, 1], twist: 0.2, lean: 0.6, crouch: 0.85 };
+  var SEATED = { rh: [12, 8.5, -11], lh: [12, -8.5, -11], wd: [0, 0, 1], twist: 0, lean: 0.2, crouch: 0 };   // riding pose (arms to the handlebars)
   var CRAWL_HIT = { rh: [17, 3, -13], lh: [17, -3, -13], wd: [0, 0, 1], twist: -0.2, lean: 0.95, crouch: 0.95 };   // a low snap at the legs
   // look 'scream' (p.screaming): the scream is not a blow but a held pose (atk runs over the scream's length).
   function atkPose(u, hu, from, look) {
@@ -237,12 +281,16 @@
     }
     var w = smooth(p.work);
     if (w > 0) pose = lerpPose(pose, p.workTool ? chopPose(workPh) : grabPose(workPh), w);
+    if (p.seat) pose = SEATED;                                              // on a bike or quad: both hands on the bars, no walking arms
 
     // legs: thigh swings, the knee bends while that leg travels forward; the pelvis rides on the lower foot
     var amp = gait * (0.6 + 0.3 * p.runK), bend = gait * (0.85 + 0.75 * p.runK), cr = pose.crouch;
+    var dragLeg = hostile && (BODY[p.look] || BODY.player).drag && (p.variant || 0) % 2 === 0;
     function leg(sg) {
       var q = ph + (sg > 0 ? 0 : Math.PI);
-      var th = amp * Math.sin(q) + cr * 1.1, kn = bend * Math.max(0, Math.cos(q)) + cr * 2.2, sa = th - kn;
+      var lame = dragLeg && sg < 0 ? 0.35 : 1;                               // a dragged leg hardly swings and stays stiff
+      var th = amp * lame * Math.sin(q) + cr * 1.1 - (lame < 1 ? 0.16 : 0), kn = bend * lame * Math.max(0, Math.cos(q)) + cr * 2.2, sa = th - kn;
+      if (p.seat) { th = 1.12; kn = 1.3; sa = th - kn; }                    // seated: thighs forward, shins hanging down, legs still
       var knee = [Math.sin(th) * R.thigh, sg * R.hipW, -Math.cos(th) * R.thigh];
       return { knee: knee, foot: [knee[0] + Math.sin(sa) * R.shin, sg * R.hipW, knee[2] - Math.cos(sa) * R.shin], sa: sa };
     }
@@ -263,6 +311,7 @@
     S.armR = ik(S.shR, S.toBody(pose.rh), S.dir([-0.35, 0.6, -0.72]));
     S.armL = ik(S.shL, S.toBody(pose.lh), S.dir([-0.35, -0.6, -0.72]));
     S.head = add(C, [Math.sin(lean) * R.neck + 0.6, 0, Math.cos(lean) * R.neck]);
+    if (hostile && PALS[p.look] && PALS[p.look].dead && p.look !== 'screamer') S.head = add(S.head, S.dir([1.4, ((p.variant || 0) % 2 ? 2 : -2), -1.3]));   // the head hangs forward and to one side
     return S;
   }
 
@@ -274,11 +323,16 @@
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.lineWidth = (w + 2.4) * SC; ctx.strokeStyle = PAL.line; ctx.stroke();
+    ctx.lineWidth = (w + EDGE) * SC; ctx.strokeStyle = LINE; ctx.stroke();
     ctx.lineWidth = w * SC; ctx.strokeStyle = col; ctx.stroke();
+    if (w >= 4) {                                       // a soft light along the north-west side gives the limb some volume
+      ctx.save(); ctx.translate(-w * 0.14 * SC, -w * 0.18 * SC);
+      ctx.lineWidth = w * 0.42 * SC; ctx.strokeStyle = 'rgba(255,250,235,0.085)'; ctx.stroke();
+      ctx.restore();
+    }
   }
   function dotAt(ctx, q, r, col) {
-    ctx.beginPath(); ctx.arc(q.x, q.y, (r + 1.1) * SC, 0, TAU); ctx.fillStyle = PAL.line; ctx.fill();
+    ctx.beginPath(); ctx.arc(q.x, q.y, (r + 0.65) * SC, 0, TAU); ctx.fillStyle = LINE; ctx.fill();
     ctx.beginPath(); ctx.arc(q.x, q.y, r * SC, 0, TAU); ctx.fillStyle = col; ctx.fill();
   }
   function shape(ctx, pts, fill, lw) {
@@ -287,7 +341,7 @@
     for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
     ctx.fillStyle = fill; ctx.fill();
-    ctx.lineWidth = lw || 1.1; ctx.strokeStyle = PAL.line; ctx.stroke();
+    ctx.lineWidth = (lw || 1.1) * 0.7; ctx.strokeStyle = LINE; ctx.stroke();
   }
 
   var player = {
@@ -415,6 +469,11 @@
       var atkU = p.atk < 0 ? -1 : clamp(lerp(Math.max(0, p.patk), p.atk, alpha), 0, 1);
       var w0 = p.pWorkPh > p.workPh ? p.pWorkPh - 1 : p.pWorkPh, workPh = ((lerp(w0, p.workPh, alpha) % 1) + 1) % 1;
       PAL = palFor(p); SC = p.scale || 1;
+      var B = BODY[p.look] || BODY.player, O = NOWEAR;
+      if (p.outfit && !PAL.dead) {
+        O = outfitOf(p.outfit);
+        if (O.pal) { var bp = PAL, pk; PAL = {}; for (pk in bp) PAL[pk] = bp[pk]; for (pk in O.pal) PAL[pk] = O.pal[pk]; }
+      }
       var S = build(p, face, stride, swingU, workPh, time || 0, atkU);
       var ca = Math.cos(face), sa = Math.sin(face), parts = [], shade = [];
       // a collapsing body is the whole rig tipped over about the feet (backward or forward), lying flat when fall = 1
@@ -434,8 +493,14 @@
       // legs and boots
       [[S.legR, 1], [S.legL, -1]].forEach(function (e) {
         var l = e[0], a = P(l.hip), b = P(l.knee), c = P(l.foot), t = P(l.toe), col = tone(PAL.pants, lit(e[1]) * 0.8);
-        shade.push({ p: [a, b, c, t], w: 5.6 });
-        part((b.k + c.k) / 2, function () { tube(ctx, [a, b, c], 5.6, col); tube(ctx, [c, t], 5.2, PAL.boot); });
+        var shin = O.tall ? P(mix3(l.knee, l.foot, 0.42)) : null, pocket = O.cargo ? P(mix3(l.hip, l.knee, 0.6)) : null;
+        shade.push({ p: [a, b, c, t], w: 5.6 * B.leg });
+        part((b.k + c.k) / 2, function () {
+          tube(ctx, [a, b, c], 5.6 * B.leg, col);
+          if (pocket) { ctx.beginPath(); ctx.arc(pocket.x, pocket.y, 2 * SC, 0, TAU); ctx.fillStyle = 'rgba(30,30,16,0.3)'; ctx.fill(); }
+          if (shin) tube(ctx, [shin, c], 6.2, PAL.boot);                     // tall boots cover the shin
+          tube(ctx, [c, t], 5.2 * B.leg, PAL.boot);
+        });
       });
 
       // backpack
@@ -447,17 +512,73 @@
           var f0 = P(S.toBody([-6.2, -3.4, -5.4])), f1 = P(S.toBody([-6.2, 3.4, -5.4]));
           ctx.beginPath(); ctx.moveTo(f0.x, f0.y); ctx.lineTo(f1.x, f1.y); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(20,16,10,0.55)'; ctx.stroke();
         });
+        // the weapon that is not in the hands hangs across the back
+        var spare = p.outfit ? (p.outfit.primary && p.outfit.primary !== p.held ? p.outfit.primary : (p.outfit.secondary && p.outfit.secondary !== p.held ? p.outfit.secondary : null)) : null;
+        if (spare) {
+          var s0 = P(S.toBody([-9.4, 5.6, 2.2])), s1 = P(S.toBody([-9.4, -5.2, -12.6])), wood = !!MELEE[spare];
+          shade.push({ p: [s0, s1], w: 2.6 });
+          part((s0.k + s1.k) / 2 - 0.5, function () {
+            tube(ctx, [s0, s1], wood ? 2.4 : 3, wood ? '#7a6548' : '#2b2f32');
+            if (wood) dotAt(ctx, s0, 2.2, spare === 'club' ? '#6b5840' : '#8b9491');
+          });
+        }
+      }
+      if (B.mane) {                                    // long matted hair down the back
+        var m0 = P(S.head), m1 = P(S.toBody([-4.6, 0, -7.5]));
+        part((m0.k + m1.k) / 2 - 3, function () { tube(ctx, [m0, m1], 6.4, PAL.hair); });
+      }
+      if (B.spikes) {                                  // bone growths on the shoulders and the back
+        [-5.4, 0, 5.4].forEach(function (sy, i) {
+          var k0 = P(S.toBody([-4.4, sy, -2.4 - (i === 1 ? 3.5 : 0)])), k1 = P(S.toBody([-9.2, sy * 1.55, 0.8 - (i === 1 ? 3 : 0)]));
+          part((k0.k + k1.k) / 2, function () {
+            tube(ctx, [k0, k1], 2.4, '#8e7f86');
+            ctx.beginPath(); ctx.moveTo(k0.x, k0.y); ctx.lineTo(k1.x, k1.y); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(120,100,80,0.5)'; ctx.stroke();
+          });
+        });
       }
 
       // torso
       var q = [P(S.shL), P(S.shR), P(S.hipR), P(S.hipL)], cK = P(S.chest).k - 2;
-      shade.push({ p: q, w: 6.5, closed: true });
+      shade.push({ p: q, w: 6.5 * B.torso, closed: true });
       part(cK, function () {
-        var col = tone(PAL.jacket, 0.5);
+        var col = tone(B.bare ? PAL.skin : PAL.jacket, 0.5);
         ctx.beginPath(); ctx.moveTo(q[0].x, q[0].y); ctx.lineTo(q[1].x, q[1].y); ctx.lineTo(q[2].x, q[2].y); ctx.lineTo(q[3].x, q[3].y); ctx.closePath();
-        ctx.lineWidth = 8.9 * SC; ctx.strokeStyle = PAL.line; ctx.stroke();
+        ctx.lineWidth = (6.5 * B.torso + EDGE) * SC; ctx.strokeStyle = LINE; ctx.stroke();
         ctx.fillStyle = col; ctx.fill();
-        ctx.lineWidth = 6.5 * SC; ctx.strokeStyle = col; ctx.stroke();
+        ctx.lineWidth = 6.5 * B.torso * SC; ctx.strokeStyle = col; ctx.stroke();
+        var mx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, my = (q[0].y + q[1].y + q[2].y + q[3].y) / 4, vi;
+        if (O.vest) {                                                         // a padded vest over the shirt
+          ctx.beginPath();
+          for (vi = 0; vi < 4; vi++) ctx[vi ? 'lineTo' : 'moveTo'](q[vi].x + (mx - q[vi].x) * 0.1, q[vi].y + (my - q[vi].y) * 0.1);
+          ctx.closePath();
+          ctx.lineWidth = 4.2 * SC; ctx.strokeStyle = tone(O.vest, 0.5); ctx.stroke(); ctx.fillStyle = tone(O.vest, 0.5); ctx.fill();
+          ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(20,26,16,0.55)';
+          ctx.beginPath(); ctx.moveTo((q[0].x + q[3].x) / 2, (q[0].y + q[3].y) / 2); ctx.lineTo((q[1].x + q[2].x) / 2, (q[1].y + q[2].y) / 2); ctx.stroke();
+        }
+        if (O.collar) {                                                       // jacket collar along the shoulders
+          ctx.beginPath(); ctx.moveTo(q[0].x + (q[1].x - q[0].x) * 0.2, q[0].y + (q[1].y - q[0].y) * 0.2); ctx.lineTo(q[0].x + (q[1].x - q[0].x) * 0.8, q[0].y + (q[1].y - q[0].y) * 0.8);
+          ctx.lineWidth = 3 * SC; ctx.strokeStyle = O.collar; ctx.stroke();
+        }
+        if (B.ribs && (p.variant || 0) % 2 === 0) {                           // torn open on one side: dark flesh and three ribs
+          var rs = (p.variant || 0) % 4 === 0 ? 0.74 : 0.26;
+          var r0x = q[0].x + (q[1].x - q[0].x) * rs, r0y = q[0].y + (q[1].y - q[0].y) * rs, r1x = q[3].x + (q[2].x - q[3].x) * rs, r1y = q[3].y + (q[2].y - q[3].y) * rs;
+          var wx = r0x + (r1x - r0x) * 0.5, wy = r0y + (r1y - r0y) * 0.5, wa = Math.atan2(r1y - r0y, r1x - r0x);
+          ctx.beginPath(); ctx.ellipse(wx, wy, 4.4 * SC * B.torso, 2.7 * SC, wa, 0, TAU); ctx.fillStyle = '#3c0e0c'; ctx.fill();
+          ctx.lineWidth = 1 * SC; ctx.strokeStyle = 'rgba(214,206,184,0.9)';
+          for (vi = -1; vi <= 1; vi++) {
+            var ox = Math.cos(wa) * vi * 2.3 * SC, oy = Math.sin(wa) * vi * 2.3 * SC, nx2 = -Math.sin(wa) * 2 * SC, ny2 = Math.cos(wa) * 2 * SC;
+            ctx.beginPath(); ctx.moveTo(wx + ox - nx2, wy + oy - ny2); ctx.lineTo(wx + ox + nx2, wy + oy + ny2); ctx.stroke();
+          }
+        }
+        if (B.blood) {                                                        // old stains on the chest (the same ones for one body)
+          var bv = (p.variant || 0) + 3;
+          ctx.fillStyle = 'rgba(104,22,18,0.78)';
+          for (vi = 0; vi < B.blood; vi++) {
+            var bu = 0.25 + ((bv * (vi + 2) * 37) % 50) / 100, bw = 0.2 + ((bv * (vi + 5) * 53) % 55) / 100;
+            var tx = q[0].x + (q[1].x - q[0].x) * bu, ty = q[0].y + (q[1].y - q[0].y) * bu, ux = q[3].x + (q[2].x - q[3].x) * bu, uy = q[3].y + (q[2].y - q[3].y) * bu;
+            ctx.beginPath(); ctx.ellipse(tx + (ux - tx) * bw, ty + (uy - ty) * bw, (2 + (bv + vi) % 3 * 0.7) * SC, (1.6 + (bv + vi) % 2) * SC, bv + vi, 0, TAU); ctx.fill();
+          }
+        }
         var front = Math.sin(face + S.twist) * 0.67 + 0.2;                    // pack straps, only seen from the front
         if (front > 0 && !PAL.dead && !PAL.nopack) {
           ctx.globalAlpha = clamp(front * 4, 0, 1); ctx.lineWidth = 1.7; ctx.strokeStyle = PAL.strap;
@@ -474,9 +595,16 @@
       // arms and hands
       [[S.armR, S.shR, 1], [S.armL, S.shL, -1]].forEach(function (e) {
         var a = P(e[1]), b = P(e[0].elbow), c = P(e[0].hand), l = lit(e[2]);
-        shade.push({ p: [a, b, c], w: 4.8 });
+        var bareArm = B.bareArms === true || (B.bareArms === 'left' && e[2] < 0);
+        var stump = !!B.stump && e[2] > 0 === ((p.variant || 0) % 2 === 0) && (p.variant || 0) % 4 === 1;
+        shade.push({ p: stump ? [a, b] : [a, b, c], w: 4.8 * B.arm });
         part((a.k + b.k + c.k * 2) / 4 + 0.5, function () {
-          tube(ctx, [a, b, c], 4.8, tone(PAL.jacket, 0.15 + l * 0.85));
+          var acol = tone(bareArm ? PAL.skin : PAL.jacket, (bareArm ? 0.05 : 0.15) + l * 0.85);
+          if (stump) { tube(ctx, [a, b], 4.8 * B.arm, acol); dotAt(ctx, b, 2.2, '#5a1612'); return; }   // torn off at the elbow
+          tube(ctx, [a, b, c], 4.8 * B.arm, acol);
+          if (PAL.dead && bareArm) {                                          // a bite on the forearm
+            ctx.beginPath(); ctx.arc((b.x + c.x) / 2, (b.y + c.y) / 2, 1.7 * SC, 0, TAU); ctx.fillStyle = 'rgba(96,20,16,0.85)'; ctx.fill();
+          }
           dotAt(ctx, c, 2.3, tone(PAL.skin, 0.3 + l * 0.7));
         });
       });
@@ -565,7 +693,7 @@
             if (id === 'pickaxe') {
               var e0 = P(add(tip, add(mul(blade, 8.6), mul(wd, -2.8)))), e1 = P(add(tip, add(mul(blade, -8.6), mul(wd, -2.8)))), em = P(add(tip, mul(wd, 1.6)));
               ctx.beginPath(); ctx.moveTo(e0.x, e0.y); ctx.quadraticCurveTo(em.x, em.y, e1.x, e1.y);
-              ctx.lineWidth = 5; ctx.strokeStyle = PAL.line; ctx.stroke();
+              ctx.lineWidth = 4; ctx.strokeStyle = LINE; ctx.stroke();
               ctx.lineWidth = 2.8; ctx.strokeStyle = '#8b9491'; ctx.stroke();
             } else {
               var h = mk([add(tip, mul(wd, -4.6)), add(tip, mul(wd, 0.6)), add(tip, add(mul(blade, 6.8), mul(wd, 2.4))), add(tip, add(mul(blade, 6.8), mul(wd, -6.2)))]);
@@ -583,12 +711,18 @@
       } else if (p.held !== 'hands') item(p.held, hk);
 
       // head: hair from above, and the visible part of the face (a cap on a sphere, clipped at the horizon)
-      var hc = P(S.head), hr = R.headR * SC;
+      var hc = P(S.head), hr = R.headR * SC * B.head;
       var hy = face + clamp(angDiff(p.angle, face), -1, 1) + S.twist * 0.3;
       shade.push({ p: [hc], w: R.headR * 2 });
       part(hc.k + 3, function () {
-        ctx.beginPath(); ctx.arc(hc.x, hc.y, hr + 1.2, 0, TAU); ctx.fillStyle = PAL.line; ctx.fill();
+        ctx.beginPath(); ctx.arc(hc.x, hc.y, hr + 0.7, 0, TAU); ctx.fillStyle = LINE; ctx.fill();
         ctx.beginPath(); ctx.arc(hc.x, hc.y, hr, 0, TAU); ctx.fillStyle = PAL.hair; ctx.fill();
+        if (PAL.dead && !B.mane) {                                           // the hair has fallen out in patches
+          var hv = (p.variant || 0) * 2.4;
+          ctx.fillStyle = tone(PAL.skin, 0.4);
+          ctx.beginPath(); ctx.ellipse(hc.x + Math.cos(hv) * hr * 0.3, hc.y - hr * 0.2 + Math.sin(hv) * hr * 0.25, hr * 0.5, hr * 0.36, hv, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(hc.x - Math.cos(hv) * hr * 0.42, hc.y - hr * 0.42, hr * 0.26, hr * 0.2, -hv, 0, TAU); ctx.fill();
+        }
         var n = norm([Math.cos(hy), Math.sin(hy), -0.12]), e1 = norm(cross(n, [0, 0, 1])), e2 = cross(n, e1);
         var cT = Math.cos(1.12), sT = Math.sin(1.12), vy = 0.819, vz = 0.574, N = 20, i, ring = [], start = -1;
         for (i = 0; i < N; i++) {
@@ -638,15 +772,19 @@
         [-1, 1].forEach(function (sd) {
           seg(sd * 0.18, 0.44, sd * 0.52, 0.4, Math.max(1, hr * 0.11), PAL.hair);                  // brows
           if (PAL.dead) {                                                                          // hollow eyes with a faint glint
-            dot(sd * 0.34, 0.24, eyeR * 1.7, 'rgba(14,18,12,0.85)');
-            dot(sd * 0.34, 0.24, eyeR * 0.7, 'rgba(196,188,110,0.7)');
+            dot(sd * 0.34, 0.22, eyeR * 2.3, 'rgba(18,14,14,0.9)');                                 // sunken socket
+            dot(sd * 0.34, 0.22, eyeR * 0.85, 'rgba(226,228,214,0.9)');                             // clouded white eye
           } else {
             dot(sd * 0.34, 0.24, eyeR * 1.25, 'rgba(214,204,186,0.75)');                           // eye white
             dot(sd * 0.34, 0.24, eyeR, '#1d1712');                                                 // pupil
           }
         });
         seg(0.02, 0.16, 0.06, -0.06, Math.max(1, hr * 0.1), tone(PAL.skin, 0.32));                  // nose
-        if (PAL.dead) seg(-0.2, -0.3, 0.2, -0.3, Math.max(1.4, hr * 0.26), 'rgba(28,10,8,0.95)');   // open mouth
+        if (PAL.dead) {                                                                             // slack jaw, a row of teeth, blood down the chin
+          seg(-0.24, -0.32 - (B.mouth ? 0.1 : 0), 0.24, -0.32 - (B.mouth ? 0.1 : 0), Math.max(1.6, hr * 0.3 * (B.mouth || 1)), 'rgba(30,8,8,0.96)');
+          seg(-0.17, -0.25, 0.17, -0.25, Math.max(0.8, hr * 0.08), 'rgba(222,214,190,0.85)');
+          seg(0.06, -0.42, 0.1, -0.66, Math.max(1, hr * 0.14), 'rgba(110,22,18,0.8)');
+        }
         else seg(-0.18, -0.28, 0.18, -0.28, Math.max(1, hr * 0.1), 'rgba(96,52,44,0.9)');           // mouth
         if (!PAL.dead) {
           seg(-0.48, -0.2, -0.2, -0.56, Math.max(1, hr * 0.14), 'rgba(60,46,36,0.35)');            // stubble along the jaw
@@ -654,6 +792,15 @@
         }
         ctx.beginPath(); ctx.arc(hc.x - hr * 0.3, hc.y - hr * 0.35, hr * 0.42, 0, TAU);            // soft light on the hair
         ctx.fillStyle = 'rgba(190,170,140,0.13)'; ctx.fill();
+        if (O.head) {                                                        // beanie / helmet: sits on the back and top of the head, the face stays free
+          var npx = n[0], npy = n[1] * vz - n[2] * vy, cr = hr * O.head.r;
+          var kx = hc.x - npx * hr * 0.5, ky = hc.y - npy * hr * 0.5 - hr * 0.22;
+          ctx.beginPath(); ctx.arc(kx, ky, cr + 0.7, 0, TAU); ctx.fillStyle = LINE; ctx.fill();
+          ctx.beginPath(); ctx.arc(kx, ky, cr, 0, TAU); ctx.fillStyle = tone(O.head.col, 0.55 + 0.45 * lit(0)); ctx.fill();
+          var ba = Math.atan2(npy + 0.3, npx);
+          ctx.beginPath(); ctx.arc(kx, ky, cr - 1.1, ba - 1.15, ba + 1.15); ctx.lineWidth = 2; ctx.strokeStyle = O.head.band; ctx.stroke();
+          ctx.beginPath(); ctx.arc(kx - cr * 0.3, ky - cr * 0.35, cr * 0.38, 0, TAU); ctx.fillStyle = 'rgba(230,236,220,0.14)'; ctx.fill();
+        }
       });
 
       // ---- paint: shadow first, then the parts from far to near ----

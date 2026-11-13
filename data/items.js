@@ -28,6 +28,7 @@
     bandage:     { name: 'תחבושת',     stack: 50,  color: '#8a857a', kind: 'medical', use: { health: 25 } },
     axe:         { name: 'גרזן',       stack: 1,  color: '#756a5c', kind: 'tool' },
     pickaxe:     { name: 'מכוש',       stack: 1,  color: '#6c7572', kind: 'tool' },
+    gasmask:     { name: 'מסכת גז',    stack: 1,  color: '#3c4640', kind: 'tool', key: true },   // needed to enter the irradiated zone; never lost on death
     // crafted at the workbench / campfire (data/recipes.js)
     plank:       { name: 'קרשים',      stack: 50, color: '#7a6648', kind: 'resource' },
     nails:       { name: 'מסמרים',     stack: 50, color: '#5c6468', kind: 'resource' },
@@ -52,6 +53,11 @@
     dried_mushroom: { name: 'פטריות מיובשות', stack: 50, color: '#8a7a5e', kind: 'food', use: { hunger: 14 } },
     ration:      { name: 'מנת שדה',     stack: 50, color: '#7a6a44', kind: 'food',  use: { hunger: 42, energy: 8 } }
   };
+
+  // Creative mode (a new game for looking around): everything is free, and the backpack starts with this.
+  G.data.creativeKit = [['axe', 1], ['pickaxe', 1], ['club', 1], ['pistol', 1], ['uzi', 1], ['m16', 1], ['ak47', 1], ['sniper', 1],
+    ['ammo', 50], ['ammo_556', 50], ['ammo_762', 50], ['bandage', 10], ['canned_food', 10], ['water_clean', 10], ['fuel', 30],
+    ['cap', 1], ['helmet', 1], ['jacket', 1], ['vest', 1], ['pants', 1], ['boots', 1]];
 
   G.data.inventory = {
     bagSlots: 12,

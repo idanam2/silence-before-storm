@@ -9,6 +9,7 @@
   var terrains = {};         // per-area prerendered terrain: macro overlay, pond sprites, decor
 
   function hsl(h, s, l, a) {
+    if (h > 64 && h < 172 && s > 12) s = Math.min(70, s * 1.75);      // daylight: foliage and grass are properly green
     return 'hsla(' + h.toFixed(0) + ',' + s.toFixed(0) + '%,' + l.toFixed(1) + '%,' + (a === undefined ? 1 : a) + ')';
   }
 
@@ -61,6 +62,7 @@
         g[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
       }
       g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(4,10,6,0.5)'; g.lineWidth = 0.9; g.stroke();    // a crisp edge under every tier of branches
       g.strokeStyle = hsl(hue - 6, 18, L + 8, 0.55); g.lineWidth = 1.1;     // needle ridges
       g.beginPath();
       for (i = 0; i < tips.length; i++) {
@@ -74,7 +76,7 @@
   }
 
   function drawOak(g, R, rand, autumn) {
-    var hue = autumn ? 38 + rand() * 10 : 92 + rand() * 30, sat = autumn ? 22 : 20;
+    var hue = autumn ? 34 + rand() * 12 : 92 + rand() * 30, sat = autumn ? 38 : 20;
     var passes = [
       { n: 12, dist: 0.55, r: 0.36, L: 11 },
       { n: 10, dist: 0.4, r: 0.33, L: 15.5 },
@@ -88,13 +90,21 @@
         var a = rot + i / P.n * TAU + rand() * 0.4, d = R * P.dist * (0.8 + rand() * 0.4);
         var x = Math.cos(a) * d - (k === 3 ? R * 0.14 : 0), y = Math.sin(a) * d - (k === 3 ? R * 0.16 : 0);
         g.fillStyle = hsl(hue + rand() * 8, sat, P.L + rand() * 2);
-        g.beginPath(); g.arc(x, y, R * P.r * (0.85 + rand() * 0.3), 0, TAU); g.fill();
+        var cr = R * P.r * (0.85 + rand() * 0.3), cn = 13, cj, c0 = rand() * TAU;      // a lumpy clump of leaves with a crisp edge, not a soft ball
+        g.beginPath();
+        for (cj = 0; cj < cn; cj++) {
+          var ca = c0 + cj / cn * TAU, crr = cr * (cj % 2 ? 0.86 + rand() * 0.1 : 1 + rand() * 0.1);
+          g[cj ? 'lineTo' : 'moveTo'](x + Math.cos(ca) * crr, y + Math.sin(ca) * crr);
+        }
+        g.closePath(); g.fill();
+        if (k < 3) { g.strokeStyle = 'rgba(4,8,4,0.4)'; g.lineWidth = 0.9; g.stroke(); }
       }
     }
-    for (i = 0; i < 150; i++) {                                              // leaf texture
-      var la = rand() * TAU, ld = Math.sqrt(rand()) * R * 0.86;
-      g.fillStyle = rand() < 0.5 ? hsl(hue, sat, 30, 0.35) : 'rgba(0,0,0,0.22)';
-      g.beginPath(); g.ellipse(Math.cos(la) * ld, Math.sin(la) * ld, 2.4, 1.3, rand() * 3, 0, TAU); g.fill();
+    for (i = 0; i < 620; i++) {                                              // leaves: light ones toward the sun (north-west), dark ones away from it
+      var la = rand() * TAU, ld = Math.sqrt(rand()) * R * 0.9, lx = Math.cos(la) * ld, ly = Math.sin(la) * ld;
+      var sun = 0.5 - (lx * 0.6 + ly * 0.8) / (R * 1.8);
+      g.fillStyle = rand() < sun ? hsl(hue + rand() * 10, sat + 6, 27 + rand() * 9, 0.6) : 'rgba(0,0,0,0.3)';
+      g.beginPath(); g.ellipse(lx, ly, 2.3, 1.05, rand() * 3, 0, TAU); g.fill();
     }
     shade(g, R, true);
   }
@@ -430,8 +440,8 @@
     c.width = c.height = size * S;
     var g = c.getContext('2d');
     g.scale(S, S);
-    g.fillStyle = '#171d16'; g.fillRect(0, 0, size, size);
-    var tones = ['0,0,0,0.22', '50,74,42,0.17', '76,60,38,0.15', '34,52,36,0.2'];
+    g.fillStyle = '#284a17'; g.fillRect(0, 0, size, size);                      // daylight grass (the canvas is graded brighter, see index.html)
+    var tones = ['0,0,0,0.09', '70,124,38,0.2', '112,112,40,0.12', '26,84,30,0.2'];
     for (i = 0; i < 46; i++) {                         // soft patches, wrapped so the tile seams vanish
       var px = rand() * size, py = rand() * size, pr = 30 + rand() * 80, tone = tones[Math.floor(rand() * tones.length)];
       for (var ox = -size; ox <= size; ox += size) {
@@ -563,10 +573,10 @@
       gr.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)');
       g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
     }
-    var tones = (area.theme && area.theme.tones) || [['44,78,42', 0.14], ['86,66,40', 0.12], ['0,0,0', 0.22], ['0,0,0', 0.16], ['36,62,44', 0.14], ['170,180,140', 0.045]];
+    var tones = (area.theme && area.theme.tones) || [['58,122,36', 0.16], ['104,96,40', 0.1], ['0,0,0', 0.2], ['0,0,0', 0.14], ['30,92,40', 0.15], ['190,200,120', 0.05]];
     for (i = 0; i < 120; i++) {
       var t = tones[Math.floor(rand() * tones.length)];
-      blob(rand() * W, rand() * H, 140 + rand() * 330, t[0], t[1] * (0.5 + rand() * 0.5));
+      blob(rand() * W, rand() * H, 140 + rand() * 330, t[0], t[1] * (0.5 + rand() * 0.5) * (t[0] === '0,0,0' ? 0.4 : 1));
     }
     var trail = !(area.theme && area.theme.trail === false);                  // built places draw roads instead
     if (trail) blob(area.spawn.x, area.spawn.y - 40, 330, '112,92,62', 0.13);   // trodden clearing at the trailhead
@@ -587,7 +597,7 @@
     var E = 420;                                                                // the forest closes in at the edges
     function edge(x0, y0, x1, y1, rx, ry, rw, rh) {
       var gr = g.createLinearGradient(x0, y0, x1, y1);
-      gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      gr.addColorStop(0, 'rgba(0,0,0,0.26)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = gr; g.fillRect(rx, ry, rw, rh);
     }
     edge(0, 0, E, 0, 0, 0, E, H); edge(W, 0, W - E, 0, W - E, 0, E, H);
@@ -818,6 +828,7 @@
       blit(ctx, list[n.variant % list.length], n.x + ox, n.y, n.type === 'boulder' ? n.scale : 1);
     }
     ctx.globalAlpha = 1;
+    if (G.doorArt && !area.interior && area.doors && area.doors.length) G.doorArt.draw(ctx, area, vr, time);   // hatches and gates in the open (js/art/forest.js)
     if (PA) PA.drawStructures(ctx, area, st, vr, time, sorted ? -Infinity : py, false);   // sorted: only the ships and boats on the water
     if (!sorted) drawTreeTrunks(ctx, area.nodes, vr, py, false);
   }
@@ -917,6 +928,14 @@
         ctx.drawImage(G.icons.canvas(f.item), f.x - 25, y - 13, 26, 26);
         ctx.fillStyle = '#d6dcc6';
         ctx.strokeText(txt, f.x + 14, y); ctx.fillText(txt, f.x + 14, y);
+      } else if (/-\d+$/.test(f.text)) {                 // damage: a big number that pops, white on the infected, red on the player
+        var pop = k < 0.14 ? 1.25 - 0.25 * (k / 0.14) : 1, sneak = f.color === '#d8c07a', mine = f.color === '#e08a7c';
+        var jx = ((Math.round(f.x * 7 + f.y * 13) % 5) - 2) * 6;
+        ctx.direction = /^-\d+$/.test(f.text) ? 'ltr' : 'rtl';
+        ctx.font = '700 ' + Math.round((sneak ? 21 : 18) * pop) + 'px "Segoe UI", Arial, sans-serif';
+        ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(8,10,9,0.85)';
+        ctx.fillStyle = sneak ? '#ffcf3a' : (mine ? '#ff5a48' : '#ffffff');
+        ctx.strokeText(f.text, f.x + jx, y - 8); ctx.fillText(f.text, f.x + jx, y - 8);
       } else {
         ctx.direction = 'rtl';
         ctx.fillStyle = f.color || '#d2a878';

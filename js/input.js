@@ -41,8 +41,9 @@
       root.addEventListener('blur', input.clear);
       canvas.addEventListener('mousemove', function (e) {
         var r = canvas.getBoundingClientRect();
-        input.mouse.x = e.clientX - r.left;
-        input.mouse.y = e.clientY - r.top;
+        var z = (G.config.view && G.config.view.zoom) || 1;      // the game works in world pixels: undo the camera zoom
+        input.mouse.x = (e.clientX - r.left) / z;
+        input.mouse.y = (e.clientY - r.top) / z;
         input.mouse.inside = true;
       });
       canvas.addEventListener('mouseleave', function () { input.mouse.inside = false; });

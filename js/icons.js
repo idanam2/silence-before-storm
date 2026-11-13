@@ -31,6 +31,23 @@
     g.beginPath(); g.moveTo(16, parts[1][1] + 1.6); g.lineTo(parts[1][0] + parts[1][2] - 3, parts[1][1] + 1.6); g.stroke();
     g.restore();
   }
+  // A jacket (with sleeves) or a vest (without), seen from the front.
+  function coat(g, c0, c1, sleeves) {
+    shadow(g, 32, 55, 21, 3.5);
+    if (sleeves) {
+      g.fillStyle = c1;
+      [[-1, 0], [1, 0]].forEach(function (s) {
+        g.beginPath(); g.moveTo(32 + s[0] * 13, 14); g.lineTo(32 + s[0] * 25, 22); g.lineTo(32 + s[0] * 22, 46); g.lineTo(32 + s[0] * 15, 45); g.closePath(); g.fill();
+        g.strokeStyle = '#15120c'; g.lineWidth = 1.5; g.stroke();
+      });
+    }
+    var gr = g.createLinearGradient(16, 10, 48, 52); gr.addColorStop(0, c0); gr.addColorStop(1, c1);
+    g.fillStyle = gr; g.beginPath(); g.moveTo(19, 13); g.lineTo(27, 10); g.lineTo(32, 16); g.lineTo(37, 10); g.lineTo(45, 13); g.lineTo(47, 51); g.lineTo(17, 51); g.closePath(); g.fill();
+    g.strokeStyle = '#15120c'; g.lineWidth = 1.6; g.stroke();
+    g.strokeStyle = 'rgba(15,12,8,0.6)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(32, 16); g.lineTo(32, 51); g.stroke();
+    g.fillStyle = 'rgba(0,0,0,0.22)'; rr(g, 20, 34, 9, 10, 1.5); g.fill(); rr(g, 35, 34, 9, 10, 1.5); g.fill();
+    if (!sleeves) { g.fillStyle = 'rgba(0,0,0,0.22)'; rr(g, 20, 20, 9, 7, 1.5); g.fill(); rr(g, 35, 20, 9, 7, 1.5); g.fill(); }
+  }
   // A few cartridges: case colour, tip colour, case length, case width.
   function cartridges(g, c0, c1, c2, tip, len, w) {
     shadow(g, 32, 53, 22, 4);
@@ -382,6 +399,15 @@
       g.beginPath(); g.ellipse(24, 36, 8, 10, 0, 0, TAU); g.stroke(); g.beginPath(); g.ellipse(24, 36, 3.5, 5, 0, 0, TAU); g.stroke();
       g.fillStyle = '#8a4a42'; g.fillRect(41, 30, 4, 12); g.fillRect(37, 34, 12, 4);
     },
+    gasmask: function (g) {
+      shadow(g, 32, 54, 19, 4);
+      g.fillStyle = '#3c4640'; g.beginPath(); g.ellipse(32, 30, 15, 17, 0, 0, TAU); g.fill();
+      g.strokeStyle = '#161918'; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = 'rgba(150,190,170,0.75)'; g.beginPath(); g.ellipse(25, 26, 5, 4, 0, 0, TAU); g.ellipse(39, 26, 5, 4, 0, 0, TAU); g.fill();
+      g.fillStyle = '#566058'; g.fillRect(25, 36, 14, 10); g.strokeRect(25, 36, 14, 10);
+      g.fillStyle = '#6d756f'; for (var q = 0; q < 3; q++) g.fillRect(28 + q * 4, 38, 2, 6);
+      g.strokeStyle = '#252a27'; g.lineWidth = 3; g.beginPath(); g.moveTo(17, 28); g.lineTo(9, 26); g.moveTo(47, 28); g.lineTo(55, 26); g.stroke();
+    },
     axe: function (g) {
       shadow(g, 32, 54, 19, 4);
       g.save(); g.translate(32, 32); g.rotate(0.7);
@@ -407,6 +433,42 @@
       g.strokeStyle = '#161918'; g.lineWidth = 1.5; g.stroke();
       g.fillStyle = '#3d4442'; rr(g, -5, -25, 10, 9, 2); g.fill(); g.stroke();
       g.restore();
+    },
+    // clothes (data/gear.js)
+    cap: function (g) {                                    // knit beanie with a folded cuff
+      shadow(g, 32, 52, 18, 4);
+      g.fillStyle = '#4a5060'; g.beginPath(); g.moveTo(14, 42); g.quadraticCurveTo(14, 12, 32, 12); g.quadraticCurveTo(50, 12, 50, 42); g.closePath(); g.fill();
+      g.strokeStyle = '#15171a'; g.lineWidth = 1.6; g.stroke();
+      g.strokeStyle = 'rgba(190,198,216,0.3)'; g.lineWidth = 1.2;
+      [22, 27, 32, 37, 42].forEach(function (x) { g.beginPath(); g.moveTo(x, 18 + Math.abs(x - 32) * 0.5); g.lineTo(x, 38); g.stroke(); });
+      g.fillStyle = '#6a7186'; rr(g, 11, 38, 42, 11, 4); g.fill(); g.strokeStyle = '#15171a'; g.lineWidth = 1.6; g.stroke();
+    },
+    helmet: function (g) {                                 // steel helmet with a strap
+      shadow(g, 32, 52, 21, 4);
+      var gr = g.createLinearGradient(12, 14, 52, 44); gr.addColorStop(0, '#8a9a6e'); gr.addColorStop(1, '#4e5a3c');
+      g.fillStyle = gr; g.beginPath(); g.moveTo(10, 40); g.quadraticCurveTo(10, 12, 32, 12); g.quadraticCurveTo(54, 12, 54, 40); g.quadraticCurveTo(32, 46, 10, 40); g.closePath(); g.fill();
+      g.strokeStyle = '#161a12'; g.lineWidth = 1.6; g.stroke();
+      g.strokeStyle = '#2c2418'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(18, 42); g.quadraticCurveTo(32, 56, 46, 42); g.stroke();
+      g.strokeStyle = 'rgba(230,240,210,0.35)'; g.lineWidth = 2; g.beginPath(); g.arc(30, 30, 14, Math.PI * 1.1, Math.PI * 1.55); g.stroke();
+    },
+    jacket: function (g) { coat(g, '#a07444', '#6a4a28', true); },
+    vest: function (g) { coat(g, '#6c7e5a', '#46543a', false); },
+    pants: function (g) {                                  // cargo trousers with a pocket on each leg
+      shadow(g, 32, 55, 18, 3.5);
+      g.fillStyle = '#7e7e50'; g.beginPath(); g.moveTo(18, 10); g.lineTo(46, 10); g.lineTo(49, 52); g.lineTo(36, 52); g.lineTo(32, 26); g.lineTo(28, 52); g.lineTo(15, 52); g.closePath(); g.fill();
+      g.strokeStyle = '#1c1c10'; g.lineWidth = 1.6; g.stroke();
+      g.fillStyle = '#5c5c38'; rr(g, 17, 10, 30, 5, 1.5); g.fill(); g.stroke();
+      g.fillStyle = '#6a6a42'; rr(g, 17.5, 30, 8, 9, 1.5); g.fill(); g.lineWidth = 1.1; g.stroke(); rr(g, 38.5, 30, 8, 9, 1.5); g.fill(); g.stroke();
+    },
+    boots: function (g) {                                  // a pair of laced boots
+      shadow(g, 32, 54, 22, 4);
+      [[10, 0], [30, 4]].forEach(function (o) {
+        g.fillStyle = '#5a3e28'; g.beginPath(); g.moveTo(o[0] + 4, 14 + o[1]); g.lineTo(o[0] + 15, 14 + o[1]); g.lineTo(o[0] + 15, 34 + o[1]); g.quadraticCurveTo(o[0] + 26, 36 + o[1], o[0] + 25, 46 + o[1]); g.lineTo(o[0] + 3, 46 + o[1]); g.closePath(); g.fill();
+        g.strokeStyle = '#1a120a'; g.lineWidth = 1.6; g.stroke();
+        g.fillStyle = '#2a1e14'; rr(g, o[0] + 2, 45 + o[1], 24, 4, 1.5); g.fill();
+        g.strokeStyle = 'rgba(226,210,180,0.6)'; g.lineWidth = 1.1;
+        [20, 25, 30].forEach(function (y) { g.beginPath(); g.moveTo(o[0] + 9, y + o[1]); g.lineTo(o[0] + 15, y + 1.5 + o[1]); g.stroke(); });
+      });
     },
     fuel: function (g) {                                                  // fuel can (jerrycan)
       shadow(g, 32, 55, 19, 4);

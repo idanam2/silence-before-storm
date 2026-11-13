@@ -160,6 +160,13 @@
     var p = st.player, k, n = st.needs;
     G.tank.step(st.tank, st.buildings.tank || 0, dt, G.placing.count(st.placed, 'tank'));
     if (st.fade || G.ui.isOpen()) return;
+    if (st.creative) {                                // creative mode: nothing drains, and a blow never sticks
+      for (k in n) if (typeof n[k] === 'number') n[k] = Math.min(G.data.needs.max, n[k] + (k === 'health' ? 30 * dt : G.data.needs.max));
+      if (n.health < 1) n.health = 1;
+      st.sinceSave += dt;
+      if (st.sinceSave >= AUTOSAVE) save('auto');
+      return;
+    }
     if (n.health <= 0) { faint(); return; }          // a blow took the last health this step: no slow regeneration first
     G.needs.drain(n, dt, { moving: p.moving && !st.ride, running: p.running && !st.ride, gathering: st.gathering }, diffLevel());   // riding costs no energy (it burns fuel instead)
     for (k in LOW_NOTE) {
@@ -223,8 +230,10 @@
 
     // 1-5 pick up a weapon from the backpack (hands always work). Losing the item puts the hands back to empty.
     if (!st.fade && !ui.isOpen()) {
-      var wk = G.data.weaponKeys;
-      for (var hk in wk) if (inp.wasPressed(hk)) equip(wk[hk]);
+      // 1 = primary weapon, 2 = secondary (both chosen in the backpack screen), 3 = empty hands
+      if (inp.wasPressed('Digit1')) { if (st.equip.primary) equip(st.equip.primary); else ui.toast('אין נשק ראשי · בחרו בתיק (I)', 1600); }
+      if (inp.wasPressed('Digit2')) { if (st.equip.secondary) equip(st.equip.secondary); else ui.toast('אין נשק משני · בחרו בתיק (I)', 1600); }
+      if (inp.wasPressed('Digit3')) equip('hands');
       if (inp.wasPressed('KeyR')) startReload(false);
       if (inp.wasPressed('KeyQ')) cycleWeapon();
     }

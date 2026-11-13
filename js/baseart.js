@@ -510,7 +510,7 @@
       gr.addColorStop(0, 'rgba(' + rgb + ',' + al + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)');
       g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
     }
-    var tones = [['44,78,42', 0.13], ['86,66,40', 0.11], ['0,0,0', 0.2], ['0,0,0', 0.14], ['36,62,44', 0.13], ['170,180,140', 0.04]];
+    var tones = [['58,122,36', 0.15], ['104,96,40', 0.09], ['0,0,0', 0.08], ['0,0,0', 0.06], ['30,92,40', 0.14], ['190,200,120', 0.05]];
     for (i = 0; i < 100; i++) {
       var t = tones[Math.floor(rand() * tones.length)];
       blob(rand() * W, rand() * Hh, 140 + rand() * 320, t[0], t[1] * (0.5 + rand() * 0.5));
@@ -545,7 +545,7 @@
     var E = 420;
     function edge(x0, y0, x1, y1, rx, ry, rw, rh) {
       var gr = g.createLinearGradient(x0, y0, x1, y1);
-      gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      gr.addColorStop(0, 'rgba(0,0,0,0.26)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = gr; g.fillRect(rx, ry, rw, rh);
     }
     edge(0, 0, E, 0, 0, 0, E, Hh); edge(W, 0, W - E, 0, W - E, 0, E, Hh);

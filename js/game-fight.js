@@ -41,6 +41,7 @@
   function checkHeld() {
     var h = st.player.held, W = G.data.weapons, id;
     if (h !== 'hands' && !G.combat.canHold(st.bag, h)) G.player.setHeld(st.player, 'hands');
+    if (st.equip && G.gear.refresh(st.equip, G.data.weaponOrder, function (wid) { return G.combat.canHold(st.bag, wid); })) G.ui.markDirty();   // weapon slots follow the backpack
     for (id in W) {
       if (W[id].kind === 'gun' && !st.guns[id] && G.inventory.count(st.bag, W[id].item) > 0) st.guns[id] = G.combat.newGun(W[id], Math.random, false);
     }
@@ -105,7 +106,7 @@
     else snd('growl', at(e.x, e.y, { kind: e.type, mood: 'hurt', gap: 0.35, key: e.uid }));
     G.forestArt.spawnFx(st.particles, 'blood', fx, fy, res.killed ? 12 : 6, fxRand);
     if (w.kind !== 'gun') G.feel.kick(st.shake, e.x - from.x, e.y - from.y, G.feel.meleeKick(res.killed));   // feel: a tiny camera kick along the blow
-    floater(e.x, e.y + 26, null, 0, (res.sneak ? 'מכה שקטה ' : '') + '-' + Math.round(res.dealt), res.sneak ? '#d8c07a' : '#d8a496');
+    floater(e.x, e.y + 14, null, 0, (res.sneak ? 'מכה שקטה ' : '') + '-' + Math.round(res.dealt), res.sneak ? '#d8c07a' : '#d8a496');
     if (res.killed) { st.kills++; lootEnemy(e, res.sneak, from); }
   }
 
@@ -181,7 +182,7 @@
   function damagePlayer(dmg, from) {
     var p = st.player;
     if (st.invuln > 0 || st.needs.health <= 0) return;
-    var dealt = G.needs.hurt(st.needs, dmg, diffLevel());
+    var dealt = G.needs.hurt(st.needs, dmg * (1 - G.gear.armor(st.equip)), diffLevel());    // worn clothes take a share of the blow
     snd('hurt');
     st.invuln = G.data.hurt.invuln; st.hurtGoal = 1; st.lastHitAt = st.playTime;
     floater(p.x, p.y - 22, null, 0, '-' + Math.round(dealt), '#e08a7c');
@@ -197,6 +198,15 @@
     var p = st.player, i;
     var w = G.data.weapons[p.held];
     if (w && w.kind !== 'gun' && G.player.swingHit(p, w.hitU)) {
+      if (st.zone && st.area !== 'base') {              // a sealed room: only an axe breaks the wall (hp blows, then it is open)
+        var wl = G.area.wallNear(st.zone, p, w.range || 60);
+        if (wl && w.id === 'axe') {
+          var wr = G.area.hitWall(st.zone, wl.idx);
+          snd('hit', at(wl.s.x + wl.s.w / 2, wl.s.y + wl.s.h / 2, { mat: 'wood', heavy: wr === 'broke' }));
+          G.feel && G.feel.addShake && G.feel.addShake(st.shake, wr === 'broke' ? 5 : 2);
+          if (wr === 'broke') { G.ui.toast('הקיר נשבר. החדר פתוח', 2000); }
+        } else if (wl && !st.wallHint) { st.wallHint = true; G.ui.toast('הקיר חסום בקרשים. אפשר לשבור אותו רק בגרזן', 2600); }
+      }
       var list = G.combat.meleeTargets(fightArea(), p, w, st.enemies);
       var cond = G.combat.meleeCondition(st.wear, st.wearLife, w);
       var mult = G.needs.attackMult(st.needs) * G.combat.wearDamageMult(cond);   // a worn tool hits weaker

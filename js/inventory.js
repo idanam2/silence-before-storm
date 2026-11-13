@@ -85,6 +85,19 @@
       return moved;
     },
 
+    // Drag and drop: slot i of `a` onto slot j of `b` (the same inventory or another one). The same item merges into the
+    // target stack (what does not fit stays behind); anything else trades places. Returns true when something moved.
+    swap: function (a, i, b, j, items) {
+      var s = a.slots[i], t = b.slots[j];
+      if (!s || j < 0 || j >= b.slots.length || (a === b && i === j)) return false;
+      if (t && t.id === s.id) {
+        var take = Math.min(maxStack(s.id, items) - t.n, s.n);
+        if (take > 0) { t.n += take; s.n -= take; if (s.n === 0) a.slots[i] = null; return true; }
+      }
+      a.slots[i] = t || null; b.slots[j] = s;
+      return true;
+    },
+
     // Grows an inventory to `size` slots (never shrinks, so nothing can be lost).
     resize: function (inv, size) {
       while (inv.slots.length < size) inv.slots.push(null);

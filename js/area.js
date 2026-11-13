@@ -72,13 +72,14 @@
       exit: def.exit || null, doors: def.doors || [], interior: !!def.interior, parent: def.parent || null, spawn: def.spawn, paths: def.paths, reach: def.reach, theme: def.theme,
       ponds: [], nodes: [], visit: visit || 0,
       seed: def.seed, lots: def.lots || [], pads: def.pads || [], crops: def.crops || [], terraces: def.terraces || [], floors: def.floors || [], lights: def.lights || [], footprint: def.footprint || null,
-      water: def.water || [], decks: def.decks || [], structures: def.structures || [], roads: def.roads || [], solids: []
+      water: def.water || [], decks: def.decks || [], structures: (def.structures || []).map(function (q) { return q.breakable ? Object.assign({}, q) : q; }), roads: def.roads || [], solids: [],
+      dark: def.dark || null, enemyPlan: def.enemyPlan || null, need: def.need || null
     };
     var i, k;
     for (i = 0; i < A.structures.length; i++) {          // flat collision: whole box, or only its feet
       var so = A.structures[i];
       if (so.legs) for (k = 0; k < so.legs.length; k++) A.solids.push({ x: so.legs[k].x, y: so.legs[k].y, w: so.legs[k].w, h: so.legs[k].h, kind: so.kind });
-      else if (so.solid !== false) A.solids.push({ x: so.x, y: so.y, w: so.w, h: so.h, kind: so.kind });
+      else if (so.solid !== false) A.solids.push({ x: so.x, y: so.y, w: so.w, h: so.h, kind: so.kind, src: so });
     }
 
     for (i = 0; i < def.ponds.length; i++) {
@@ -282,17 +283,49 @@
       var n = area.nodes[i];
       if (n.dead || n.amount !== n.a0) out.push([i, n.dead ? 0 : n.amount]);
     }
+    for (i = 0; i < area.structures.length; i++) if (area.structures[i].smashed) out.push([WALL_BASE + i, 0]);   // walls broken down
     return out;
   }
 
   function applyDelta(area, list) {
     for (var k = 0; k < list.length; k++) {
+      if (list[k][0] >= WALL_BASE) { breakWall(area, list[k][0] - WALL_BASE); continue; }
       var n = area.nodes[list[k][0]];
       if (!n || n.border) continue;
       n.amount = list[k][1];
       if (n.amount <= 0) { n.amount = 0; n.dead = true; n.deadT = 9; }   // deadT 9: the fall animation is over
     }
     return area;
+  }
+
+  // ---- sealed rooms: a structure { kind: 'bwall', breakable: true, hp } is a solid wall that only an axe breaks. ----
+  var WALL_BASE = 100000;                                   // delta entries >= this are broken walls (index - WALL_BASE)
+  function breakWall(area, idx) {
+    var s = area.structures[idx];
+    if (!s || !s.breakable || s.smashed) return false;
+    s.smashed = true; s.hp = 0;
+    for (var i = area.solids.length - 1; i >= 0; i--) if (area.solids[i].src === s) area.solids.splice(i, 1);
+    return true;
+  }
+  // The nearest unbroken breakable wall in front of the player within `reach` px of its edge, as { idx, s }, or null.
+  function wallNear(area, p, reach) {
+    var best = null, bd = reach, i, s, cx, cy, dx, dy, d;
+    for (i = 0; i < area.structures.length; i++) {
+      s = area.structures[i];
+      if (!s.breakable || s.smashed) continue;
+      cx = Math.max(s.x, Math.min(p.x, s.x + s.w)); cy = Math.max(s.y, Math.min(p.y, s.y + s.h));
+      dx = cx - p.x; dy = cy - p.y; d = Math.sqrt(dx * dx + dy * dy) - (p.radius || 0);
+      if (d <= bd && (d <= 6 || Math.cos(Math.atan2(dy, dx) - p.angle) > 0.2)) { bd = d; best = { idx: i, s: s }; }
+    }
+    return best;
+  }
+  // One blow lands on the wall: 'hit', 'broke' (the room behind it is open now) or null.
+  function hitWall(area, idx) {
+    var s = area.structures[idx];
+    if (!s || !s.breakable || s.smashed) return null;
+    s.hp = (s.hp === undefined ? 4 : s.hp) - 1;
+    if (s.hp <= 0) { breakWall(area, idx); return 'broke'; }
+    return 'hit';
   }
 
   function newGather() { return { node: null, t: 0, time: 0 }; }
@@ -335,7 +368,7 @@
   G.area = {
     HIT: HIT, generate: generate, collide: collide, findTarget: findTarget, check: check,
     harvest: harvest, newGather: newGather, gatherStep: gatherStep, updateVisuals: updateVisuals,
-    delta: delta, applyDelta: applyDelta,
+    delta: delta, applyDelta: applyDelta, wallNear: wallNear, hitWall: hitWall, breakWall: breakWall,
     inWater: inWater, inSea: inSea, inSolid: inSolid, pathDist: pathDist
   };
 })(typeof window !== 'undefined' ? window : globalThis);

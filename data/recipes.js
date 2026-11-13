@@ -25,6 +25,7 @@
     { id: 'v_jeep',       station: 'garage_jeep', level: 1, cat: 'vehicles', out: ['veh_jeep', 1],       vehicle: 'jeep',       cost: { metal: 40, plank: 6, nails: 12, electronics: 4, cloth: 6 } },
     { id: 'v_heli',       station: 'garage_heli', level: 1, cat: 'vehicles', out: ['veh_heli', 1],       vehicle: 'heli',       cost: { metal: 70, nails: 20, electronics: 12, cloth: 8 } },
     { id: 'v_tank',       station: 'garage_tank', level: 1, cat: 'vehicles', out: ['veh_tank', 1],       vehicle: 'tank',       cost: { metal: 120, plank: 10, nails: 30, electronics: 10 } },
+    { id: 'gasmask',    station: 'workbench', level: 2, cat: 'home',    out: ['gasmask', 1],      cost: { cloth: 4, metal: 3, plank: 1 } },
     { id: 'plank',      station: 'workbench', level: 1, cat: 'home',    out: ['plank', 2],        cost: { wood: 2 } },
     { id: 'axe',        station: 'workbench', level: 1, cat: 'home',    out: ['axe', 1],          cost: { wood: 2, stone: 3 } },
     { id: 'pickaxe',    station: 'workbench', level: 1, cat: 'home',    out: ['pickaxe', 1],      cost: { wood: 2, stone: 4, plank: 1 } },

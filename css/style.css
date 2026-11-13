@@ -3,8 +3,8 @@
   --text: #c9ccc6;
   --text-dim: #7c827b;
   --accent: #8f9a7e;
-  --panel: rgba(14, 17, 18, 0.72);
-  --line: rgba(150, 160, 150, 0.14);
+  --panel: rgba(24, 29, 32, 0.84);
+  --line: rgba(190, 200, 190, 0.18);
 }
 
 * { box-sizing: border-box; }
@@ -28,6 +28,7 @@ html, body {
   display: block;
   cursor: crosshair;
   background: var(--bg);
+  filter: url(#daygrade);            /* daylight grade, defined in index.html */
 }
 
 /* Static HUD: never re-laid-out per frame, so nothing jumps. */
@@ -40,27 +41,82 @@ html, body {
 body.ready .hud { opacity: 1; }
 body.menu .hud { opacity: 0; }
 
-.title {
-  top: 22px;
-  right: 28px;
-  text-align: right;
+/* ---- minimap (top right) with the name of the place under it ---- */
+.mapbox {
+  top: 20px;
+  right: 24px;
+  width: 184px;
+  padding: 4px 4px 0;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
-.title h1 {
+.minimap {
+  display: block;
+  width: 176px;
+  height: 176px;
+  border-radius: 11px;
+}
+.mapbox p {
   margin: 0;
-  font-size: 20px;
+  height: 26px;
+  line-height: 26px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  text-align: center;
   color: var(--text);
-}
-.title p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* ---- target plate: the infected you are fighting (top center). Only opacity and the bar's transform change. ---- */
+.targethud {
+  position: fixed;
+  left: 50%;
+  top: 66px;
+  transform: translateX(-50%);
+  width: 300px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  direction: rtl;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.targethud.show { opacity: 1; }
+body.menu .targethud { opacity: 0; }
+.targethud .tname { min-width: 64px; font-size: 14px; font-weight: 600; color: #f1ede4; white-space: nowrap; }
+.targethud .tmeter { flex: 1; height: 9px; border-radius: 5px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.targethud .tmeter i { display: block; width: 100%; height: 100%; background: linear-gradient(#e2584a, #b83a30); transform-origin: right center; transition: transform 0.18s ease; }
+.targethud .tnum { min-width: 30px; padding: 1px 6px; font-size: 13px; text-align: center; color: #fff; background: #a8352c; border-radius: 5px; font-variant-numeric: tabular-nums; }
+
+/* ---- "H = keys" hint; the full list of keys shows only while body.keys ---- */
+.keyshint {
+  bottom: 20px;
+  right: 24px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.keyshint kbd { margin-left: 6px; padding: 1px 6px; font-family: inherit; font-size: 11px; color: var(--text); border: 1px solid var(--line); border-radius: 4px; }
+body.keys .keyshint { opacity: 0; }
+body.ready .hud.controls { opacity: 0; }
+body.ready.keys:not(.menu) .hud.controls { opacity: 1; }
+
 .controls {
-  bottom: 22px;
-  right: 28px;
+  bottom: 20px;
+  right: 24px;
+  transition: opacity 0.2s ease;
   display: flex;
   flex-wrap: wrap;                      /* many keys: wrap into a second line instead of overflowing */
   gap: 6px 16px;
@@ -172,7 +228,7 @@ body.menu .hud { opacity: 0; }
 .cap { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
 .grid { display: grid; gap: 7px; }
-.grid.bag { grid-template-columns: repeat(4, 74px); max-height: min(70vh, 520px); overflow-y: auto; scrollbar-width: thin; }
+.grid.bag { grid-template-columns: repeat(5, 74px); max-height: min(70vh, 520px); overflow-y: auto; scrollbar-width: thin; }
 .grid.chest { grid-template-columns: repeat(6, 74px); }
 
 .slot {
@@ -211,6 +267,75 @@ body.menu .hud { opacity: 0; }
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+.slot .mark {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #1a1d1e;
+  background: #e0b64a;
+  border-radius: 4px;
+}
+.slot.gearable { border-color: rgba(224, 182, 74, 0.3); }
+.slot.dragging { opacity: 0.35; }
+.dragghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 60px;
+  height: 60px;
+  z-index: 60;
+  background: center / contain no-repeat;
+  pointer-events: none;
+  opacity: 0;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5));
+}
+.dragghost.on { opacity: 0.95; }
+
+/* ---- equipment panel: clothes, the figure, the two weapons ---- */
+.panel.gear { width: 412px; }
+.gearbody { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gcol { display: flex; flex-direction: column; gap: 7px; }
+.doll { width: 200px; height: 264px; border-radius: 10px; background: radial-gradient(ellipse at 50% 78%, rgba(120, 150, 90, 0.34), rgba(40, 48, 44, 0.2) 62%, rgba(0, 0, 0, 0) 74%); }
+.gslot .ph { font-size: 11px; color: var(--text-dim); opacity: 0.7; }
+.gslot.empty { cursor: default; border-style: dashed; }
+.gstats { display: flex; gap: 6px; margin-top: 12px; }
+.gstat { flex: 1; padding: 6px 4px; text-align: center; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 8px; }
+.gstat em { display: block; font-size: 10px; font-style: normal; color: var(--text-dim); }
+.gstat b { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---- hotbar: primary, secondary, hands (bottom center) ---- */
+.hotbar {
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  direction: ltr;
+}
+.hslot {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  background: var(--panel);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.hslot.hands { width: 44px; }
+.hslot i { position: absolute; inset: 6px; background: center / contain no-repeat; }
+.hslot.hands i { background-image: none; }
+.hslot.hands::after { content: "✋"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; opacity: 0.8; }
+.hslot.empty i { opacity: 0; }
+.hslot kbd { position: absolute; top: 2px; left: 5px; font-family: inherit; font-size: 10px; color: var(--text-dim); }
+.hslot.on { border-color: #e0b64a; background: rgba(60, 54, 30, 0.9); }
+.hslot.on kbd { color: #e0b64a; }
+
 .inv-hint { margin: 0; font-size: 12px; color: var(--text-dim); }
 .inv-msg {
   margin: 0;
@@ -311,8 +436,8 @@ body.menu .hud { opacity: 0; }
 
 /* ---- backpack meter (top-left). Only the bar's transform changes, so nothing re-flows. ---- */
 .baghud {
-  top: 176px;
-  left: 28px;
+  bottom: 26px;
+  right: calc(50% + 104px);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -352,8 +477,8 @@ body.menu .hud { opacity: 0; }
 
 /* ---- held weapon + ammo (under the backpack meter). Text only changes when the weapon or the count does. ---- */
 .weaponhud {
-  top: 220px;
-  left: 28px;
+  bottom: 26px;
+  left: calc(50% + 104px);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -378,45 +503,53 @@ body.menu .hud { opacity: 0; }
 
 /* ---- needs bars (top-left). Only the transform of the bars changes, so nothing re-flows. ---- */
 .needshud {
-  top: 22px;
-  left: 28px;
-  width: 196px;
-  padding: 10px 14px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+  top: 20px;
+  left: 24px;
+  width: 264px;
+  padding: 10px 12px 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 10px;
   font-size: 12px;
   color: var(--text-dim);
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  direction: rtl;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  direction: ltr;
 }
-.need { display: flex; align-items: center; gap: 10px; }
-.need .label { width: 52px; transition: color 0.4s ease; }
+.need { display: flex; align-items: center; gap: 6px; }
+.need .ico { flex: none; width: 16px; height: 16px; color: var(--bar, var(--accent)); transition: color 0.4s ease; }
+.need .ico svg { display: block; width: 100%; height: 100%; }
 .need .meter {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
+/* health: the wide bar on top, with a pulse-heart icon and the number */
+.need.health { grid-column: 1 / -1; gap: 8px; }
+.need.health .ico { width: 24px; height: 24px; }
+.need.health .meter { height: 14px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.need.health .meter i { background: linear-gradient(#e86a58, #c2463a); }
+.need.health .val { min-width: 30px; font-size: 15px; font-weight: 700; text-align: right; color: #f3efe6; font-variant-numeric: tabular-nums; }
+.needshud .status { grid-column: 1 / -1; text-align: center; direction: rtl; }
 .need .meter i {
   display: block;
   width: 100%;
   height: 100%;
   background: var(--bar, var(--accent));
   transform: scaleX(1);
-  transform-origin: right center;
+  transform-origin: left center;
   transition: transform 0.3s ease, background-color 0.5s ease;
 }
-.need.health { --bar: #a86a62; }
-.need.hunger { --bar: #b39560; }
-.need.thirst { --bar: #6f98a3; }
-.need.energy { --bar: #96a26c; }
-.need.low { --bar: #c98a52; }
-.need.health.low { --bar: #c0645a; }
-.need.low .label { color: #d2a878; }
+.need.health { --bar: #e2584a; }
+.need.hunger { --bar: #e0a84a; }
+.need.thirst { --bar: #58b4dc; }
+.need.energy { --bar: #a6d04e; }
+.need.low { --bar: #f08a3c; }
+.need.health.low { --bar: #ff5040; }
 .needshud .status {
   height: 16px;
   line-height: 16px;
@@ -696,3 +829,95 @@ body.menu .savenote, body.menu .toast { opacity: 0; }
 .jn-b em { font-style: normal; font-size: 11px; color: var(--text-dim); }
 .jn-b:hover { background: rgba(143, 154, 126, 0.14); }
 body.menu #story-layer { display: none; }
+
+/* ==== flat pass: a quieter, less cartoon-like interface (thin bars, square corners, no boxes around the HUD) ==== */
+:root { --panel: rgba(16, 18, 20, 0.8); --line: rgba(255, 255, 255, 0.09); --text: #dcdad3; --text-dim: #8d918c; --accent: #b9b39a; }
+.hud, .prompt, .toast, .targethud { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
+
+/* needs: no box, a thin health bar with the number, three hair-thin bars under it */
+.needshud { width: 250px; padding: 0; gap: 7px 12px; background: none; border: 0; box-shadow: none; border-radius: 0; }
+.need .ico { width: 13px; height: 13px; color: #e6e3da; opacity: 0.9; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7)); }
+.need .meter { height: 3px; border-radius: 0; background: rgba(0, 0, 0, 0.55); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.need.health .ico { width: 16px; height: 16px; }
+.need.health .meter { height: 6px; border-radius: 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45); }
+.need.health .meter i { background: #c9483b; }
+.need.health .val { min-width: 26px; font-size: 13px; font-weight: 600; }
+.need.health { --bar: #c9483b; } .need.hunger { --bar: #c9a35a; } .need.thirst { --bar: #7fb0c8; } .need.energy { --bar: #a9b97a; }
+.need.low { --bar: #e08a3c; } .need.health.low { --bar: #e8503e; }
+.need.low .ico { color: var(--bar); }
+.needshud .status { font-size: 11px; text-align: left; direction: rtl; }
+
+/* minimap: a plain circle with a thin ring */
+.mapbox { width: 168px; padding: 0; background: none; border: 0; box-shadow: none; border-radius: 0; }
+.minimap { width: 168px; height: 168px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.4); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.4); }
+.mapbox p { height: 24px; line-height: 24px; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; }
+
+/* target: name and number over one thin bar, no box */
+.targethud { top: 26px; width: 340px; padding: 0; gap: 0 10px; flex-wrap: wrap; background: none; border: 0; border-radius: 0; }
+.targethud .tname { flex: 1; order: 1; font-size: 15px; font-weight: 500; }
+.targethud .tnum { order: 2; min-width: 34px; padding: 0 6px; font-size: 13px; font-weight: 600; border-radius: 0; background: rgba(150, 44, 36, 0.9); text-shadow: none; }
+.targethud .tmeter { order: 3; flex: none; width: 100%; height: 5px; margin-top: 4px; border-radius: 0; background: rgba(0, 0, 0, 0.6); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.targethud .tmeter i { background: #d0523f; }
+#fuel-hud { top: 64px; border-radius: 3px; }
+
+/* hotbar and the small plates next to it */
+.hslot { width: 50px; height: 50px; border-width: 1px; border-color: rgba(255, 255, 255, 0.16); border-radius: 3px; background: rgba(12, 14, 15, 0.62); }
+.hslot.hands { width: 38px; }
+.hslot.hands::after { content: ""; inset: 11px 8px; background: #d6d3ca; opacity: 0.75;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 24'><path d='M4 11V4.500a1.300 1.300 0 0 1 2.600 0V10h.8V2.800a1.300 1.300 0 0 1 2.600 0V10h.8V3.600a1.300 1.300 0 0 1 2.600 0V11h.8V6.500a1.300 1.300 0 0 1 2.600 0V15c0 4-2.600 7-6.500 7C7 22 5.200 20.500 3.600 17.800L1.300 13.600a1.400 1.400 0 0 1 2.300-1.500z'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 24'><path d='M4 11V4.500a1.300 1.300 0 0 1 2.600 0V10h.8V2.800a1.300 1.300 0 0 1 2.600 0V10h.8V3.600a1.300 1.300 0 0 1 2.600 0V11h.8V6.500a1.300 1.300 0 0 1 2.600 0V15c0 4-2.600 7-6.500 7C7 22 5.200 20.500 3.600 17.800L1.300 13.600a1.400 1.400 0 0 1 2.300-1.500z'/></svg>") center / contain no-repeat; }
+.hslot.on { border-color: rgba(232, 226, 204, 0.9); background: rgba(40, 42, 40, 0.8); }
+.hslot.on kbd { color: #e8e2cc; }
+.baghud, .weaponhud { bottom: 30px; padding: 0; background: none; border: 0; border-radius: 0; }
+.baghud .meter { height: 3px; border-radius: 0; background: rgba(0, 0, 0, 0.55); }
+.baghud { right: calc(50% + 96px); } .weaponhud { left: calc(50% + 96px); }
+.keyshint, .controls, .prompt, .toast { border-radius: 3px; }
+.keyshint { background: none; border: 0; }
+.prompt { background: rgba(12, 14, 15, 0.7); border: 0; font-size: 13px; letter-spacing: 0.02em; }
+.toast { background: rgba(12, 14, 15, 0.78); border: 0; font-size: 14px; }
+
+/* panels: flat slate, square corners, icons only (the name is in the tooltip) */
+.inv-layer { background: rgba(6, 8, 9, 0.62); }
+.panel { padding: 14px 16px 16px; background: rgba(22, 25, 27, 0.96); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 4px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6); }
+.panel header { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.panel h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.12em; color: #b9bcb6; }
+.grid { gap: 4px; }
+.grid.bag { grid-template-columns: repeat(5, 66px); }
+.grid.chest { grid-template-columns: repeat(6, 66px); }
+.slot { width: 66px; height: 66px; border-radius: 2px; background: rgba(0, 0, 0, 0.3); border-color: rgba(255, 255, 255, 0.07); }
+.slot.empty { background: rgba(0, 0, 0, 0.18); }
+.slot .tile { width: 46px; height: 46px; }
+.slot .name { display: none; }
+.slot .count { top: auto; left: auto; bottom: 3px; right: 5px; font-size: 12px; text-shadow: 0 1px 2px #000; }
+.slot .mark { top: 3px; left: 3px; right: auto; min-width: 14px; height: 14px; line-height: 14px; font-size: 10px; border-radius: 1px; background: #d8d2bc; }
+.slot:not(.empty):hover { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.3); }
+.slot.usable, .slot.gearable { border-color: rgba(255, 255, 255, 0.07); }
+.gcol { gap: 4px; }
+.gslot.empty { border-style: solid; }
+.gslot .ph { font-size: 10px; letter-spacing: 0.04em; }
+.panel.gear { width: 380px; }
+.doll { background: radial-gradient(ellipse at 50% 80%, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0) 68%); border-radius: 0; }
+.gstats { gap: 4px; }
+.gstat { border-radius: 2px; background: rgba(0, 0, 0, 0.25); border-color: rgba(255, 255, 255, 0.06); }
+.gstat b { font-size: 14px; font-weight: 600; }
+.row, .act, .tab, .cost { border-radius: 2px; }
+.row { background: rgba(0, 0, 0, 0.22); }
+.act { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.18); }
+.act:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.tab.on { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.35); }
+.pips u.on { background: #d8d2bc; border-color: #d8d2bc; }
+
+/* new game: survival or creative */
+.dmodes { display: flex; gap: 10px; }
+.dmode { width: 250px; padding: 12px 14px; font: inherit; text-align: right; color: var(--text); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 3px; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+.dmode b { display: block; font-size: 15px; font-weight: 600; }
+.dmode span { display: block; margin-top: 4px; font-size: 12px; color: var(--text-dim); }
+.dmode:hover { background: rgba(255, 255, 255, 0.08); }
+.dmode.sel { background: rgba(255, 255, 255, 0.12); border-color: rgba(232, 226, 204, 0.85); }
+.dcards { transition: opacity 0.2s ease; }
+.dcards.off { opacity: 0.3; pointer-events: none; }
+
+/* world map opened from the helicopter: home is a destination too, the place you are in is dimmed */
+.mnode.mhome { cursor: pointer; }
+.mnode.here { opacity: 0.45; cursor: default; }
+.mnode.here:hover i { transform: none; }
