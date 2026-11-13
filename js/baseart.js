@@ -143,6 +143,38 @@
     poly(ctx, pts, null, near ? 'rgba(170,185,150,0.95)' : 'rgba(18,14,10,0.85)');
   }
 
+  // Garages (vehicles): a long low shed with a ribbed roof and a roll-up door on the south face; level 2 is steel-grey and taller.
+  // Each kind has its own roof mark (stripe: bikes, plain: jeep, painted circle: helicopter, hazard stripes: tank).
+  H.garage = 0.075;
+  var GARAGE = { n: '#5c6159', w: '#585d55', s: '#34372f', e: '#2b2e28', top: '#6c7166' };
+  var GARAGE2 = { n: '#505e6b', w: '#4d5b68', s: '#2b333b', e: '#232a31', top: '#6b7b89' };
+
+  function drawGarage(ctx, r, c, near, lvl, kind) {
+    var cols = lvl >= 2 ? GARAGE2 : GARAGE, k = H.garage * (lvl >= 2 ? 1.2 : 1);
+    var bx = box(ctx, r, 0, k, c, cols), t = bx.t, b = bx.b, i, n = Math.max(4, Math.round(r.w / 34));
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    for (i = 1; i < n; i++) line(ctx, topPt(t, i / n, 0), topPt(t, i / n, 1));                  // roof ribs
+    var mid = topPt(t, 0.5, 0.5);
+    if (kind === 'garage_heli') {                                                              // painted landing circle
+      ctx.strokeStyle = 'rgba(225,215,170,0.55)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(mid[0], mid[1], r.w * 0.2, r.w * 0.2 * 0.55, 0, 0, TAU); ctx.stroke();
+      ctx.fillStyle = 'rgba(225,215,170,0.55)'; ctx.fillRect(mid[0] - 9, mid[1] - 6, 3, 12); ctx.fillRect(mid[0] + 6, mid[1] - 6, 3, 12); ctx.fillRect(mid[0] - 9, mid[1] - 1, 18, 3);
+    } else if (kind === 'garage_tank') {                                                       // hazard stripes along the front edge
+      for (i = 0; i < n; i += 2) poly(ctx, [topPt(t, i / n, 0.86), topPt(t, (i + 1) / n, 0.86), topPt(t, (i + 1) / n, 1), topPt(t, i / n, 1)], 'rgba(210,175,60,0.5)');
+    } else if (kind === 'garage_moto') {
+      poly(ctx, [topPt(t, 0.08, 0.42), topPt(t, 0.92, 0.42), topPt(t, 0.92, 0.5), topPt(t, 0.08, 0.5)], 'rgba(190,80,60,0.45)');
+    }
+    if (bx.vis.s) {                                                                            // roll-up door
+      var u0 = 0.1, u1 = 0.9, top = 0.78;
+      var sp = function (u, f) { return mix(mix(b[3], b[2], u), mix(t[3], t[2], u), f); };
+      poly(ctx, [sp(u0, 0), sp(u1, 0), sp(u1, top), sp(u0, top)], '#2c2f2a', 'rgba(0,0,0,0.65)');
+      ctx.strokeStyle = 'rgba(190,198,185,0.22)'; ctx.lineWidth = 1;
+      for (i = 1; i < 8; i++) line(ctx, sp(u0, top * i / 8), sp(u1, top * i / 8));
+      poly(ctx, [sp(0.47, 0.05), sp(0.53, 0.05), sp(0.53, 0.14), sp(0.47, 0.14)], '#8d958a');   // handle
+    }
+    outline(ctx, t, near);
+  }
+
   function drawWorkbench(ctx, r, c, near, lvl) {
     var LEG = { n: '#4c4132', w: '#473d2f', s: '#2c251b', e: '#251f16', top: '#5d5240' }, i, up = lvl >= 2;
     var legs = [[0, 0], [r.w - 9, 0], [0, r.h - 9], [r.w - 9, r.h - 9]];
@@ -524,7 +556,7 @@
   // One blurred layer with the cast shadows of every structure (they never move).
   function buildShadows(b) {
     var a = b.layout.area, M = 150, x0 = a.x - M, y0 = a.y - M, w = a.w + M * 2, h = a.h + M * 2;
-    var heights = { fence: 15, chest: 20, woodpile: 24, cabin: 62, workbench: 15, campfire: 8, bed: 9, tank: 26, rack: 16 };
+    var heights = { fence: 15, chest: 20, woodpile: 24, cabin: 62, workbench: 15, campfire: 8, bed: 9, tank: 26, rack: 16, garage_moto: 24, garage_jeep: 26, garage_heli: 28, garage_tank: 28 };
     var sp = K.mk(w, h, function (g) {
       g.translate(-(x0 + w / 2), -(y0 + h / 2));
       try { g.filter = 'blur(5px)'; } catch (e) { /* sharp shadows */ }
@@ -650,6 +682,7 @@
       else if (r.kind === 'rack') drawRack(ctx, r, c, opts.near === 'rack', lv, time);
       else if (r.kind === 'bed') drawBed(ctx, r, c, lv, opts.near === 'bed');
       else if (r.kind === 'tank') drawTank(ctx, r, c, opts.near === 'tank', time, lv);
+      else if (r.kind.indexOf('garage_') === 0) drawGarage(ctx, r, c, opts.near === r.kind, lv, r.kind);
     }
   }
 

@@ -538,7 +538,8 @@
         { type: 'pallet', count: 4, spots: [[1960, 880], [1450, 1180], [2550, 1000], [1000, 1180], [2450, 760]] },
         { type: 'tarp', count: 3, spots: [[1270, 1060], [2450, 1030], [1700, 1060], [860, 1050]] },
         { type: 'scrap', count: 3, spots: [[1260, 1000], [2550, 940], [2100, 980], [700, 1100]] },
-        { type: 'barrel', count: 3, spots: [[480, 860], [960, 820], [2400, 700], [1950, 1100]] }
+        { type: 'barrel', count: 3, spots: [[480, 860], [960, 820], [2400, 700], [1950, 1100]] },
+        { type: 'radio', count: 2, spots: [[650, 890], [1075, 1120], [2260, 980], [1700, 1100]] }      // old farm radios: electronics for the story's radio repair
       ]
     });
   }

@@ -119,7 +119,7 @@ test('save combat: an old save without any combat field still loads, with defaul
   eq(JSON.stringify(r.data.enemyKeep), '{}'); eq(JSON.stringify(r.data.wear), '{}'); eq(JSON.stringify(r.data.wearLife), '{}');
   const base = G.save.parse(JSON.stringify(G.save.snapshot(mkState(), 1))).data;     // at the base: no zone, no enemies
   eq(base.enemies, null); eq(base.zone, null);
-  eq(G.save.VERSION, 1);
+  eq(G.save.VERSION, 2);                              // 2 = the story layer (tests/extra/story.js)
   const noEnemies = G.save.parse(JSON.stringify(Object.assign(G.save.snapshot(inLake(), 1), { enemies: [] }))).data;
   eq(noEnemies.enemies.length, 0);                    // an empty list is a real answer: a cleared zone stays cleared
 });

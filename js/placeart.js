@@ -153,6 +153,16 @@
     g.fillStyle = 'rgba(110,70,40,0.5)'; g.beginPath(); g.arc(9, 7, 3, 0, TAU); g.fill();         // rust
   }
 
+  function drawFuelDrum(g, rand) {
+    shadowBlob(g, 6, 8, 24, 20, 0.6);
+    g.fillStyle = '#141615'; g.beginPath(); g.ellipse(0, 4, 15, 14, 0, 0, TAU); g.fill();
+    g.fillStyle = rand() < 0.5 ? '#8a3a2a' : '#7a3326'; g.beginPath(); g.arc(0, 0, 15, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 13, 0, TAU); g.stroke();
+    g.fillStyle = '#2a1a16'; g.beginPath(); g.arc(0, 0, 9, 0, TAU); g.fill();
+    g.fillStyle = '#c9a23a'; g.beginPath(); g.arc(-3, -3, 2.2, 0, TAU); g.fill();           // cap
+    g.fillStyle = 'rgba(255,200,120,0.18)'; g.beginPath(); g.ellipse(-5, -6, 6, 2, -0.5, 0, TAU); g.fill();
+  }
+
   function variants(n, seed, make) {
     var out = [], rand = G.util.rng(seed);
     for (var i = 0; i < n; i++) out.push(make(rand, i));
@@ -167,6 +177,7 @@
     SP.tarp = variants(3, 233, function (r, i) { return mk(70, 64, function (g) { drawTarp(g, r, [196, 80, 30][i]); }); });
     SP.cargo = variants(2, 239, function (r) { return mk(64, 60, function (g) { drawCargo(g, r); }); });
     SP.barrel = variants(2, 241, function (r) { return mk(52, 52, function (g) { drawBarrel(g, r); }); });
+    SP.fueldrum = variants(2, 247, function (r) { return mk(52, 52, function (g) { drawFuelDrum(g, r); }); });
     SP.vend_snack = variants(2, 263, function (r) { return mk(60, 52, function (g) { drawVendLoot(g, r, false); }); });
     SP.vend_drink = variants(2, 269, function (r) { return mk(60, 52, function (g) { drawVendLoot(g, r, true); }); });
     SP.papers = variants(4, 271, function (r) { return mk(40, 36, function (g) { drawPapers(g, r); }); });

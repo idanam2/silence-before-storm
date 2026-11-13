@@ -90,6 +90,23 @@
       return list;
     },
 
+    // One new infected of `type` on a free place between minR and maxR from (cx, cy), or null (story waves, js/game.js).
+    spawnNear: function (area, type, rand, cx, cy, minR, maxR) {
+      var d = D().types[type], r, t, a, rr, x, y, s;
+      if (!d) return null;
+      r = d.radius;
+      for (t = 0; t < 60; t++) {
+        a = rand() * TAU; rr = minR + rand() * (maxR - minR);
+        x = cx + Math.cos(a) * rr; y = cy + Math.sin(a) * rr;
+        if (x < 120 || y < 120 || x > area.width - 120 || y > area.height - 120) continue;
+        if (area.footprint && (x < area.footprint.x + 60 || y < area.footprint.y + 60 || x > area.footprint.x + area.footprint.w - 60 || y > area.footprint.y + area.footprint.h - 60)) continue;
+        if (G.area.inWater(area, x, y, r + 30) || G.area.inSolid(area, x, y, r + 16)) continue;
+        for (var i = 0, bad = false; i < area.nodes.length && !bad; i++) { s = area.nodes[i]; if (s.solid > 0 && !s.dead && dist(x, y, s.x, s.y) < s.solid + r + 14) bad = true; }
+        if (!bad) return enemies.create(type, x, y, rand);
+      }
+      return null;
+    },
+
     alive: function (list) { var n = 0; for (var i = 0; i < list.length; i++) if (list[i].state !== 'dying' && list[i].state !== 'dead') n++; return n; },
 
     // A blow or a shot lands. dmg is final (before the unaware bonus); (sx, sy) is where it came from; w: the weapon.

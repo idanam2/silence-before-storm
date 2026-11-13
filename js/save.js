@@ -8,8 +8,9 @@
   var G = root.G;
 
   var KEY = 'silence-before-storm.save';
-  var VERSION = 1;
-  var MIGRATIONS = {};          // none yet: version 1 is the first
+  var VERSION = 2;
+  // 1 -> 2: the story layer. An old save has no story state: it starts quietly with every destination open (see G.story.legacyState).
+  var MIGRATIONS = { 1: function (o) { o.v = 2; o.storyLegacy = true; return o; } };
 
   var storage = null, probed = false;
 
@@ -141,10 +142,12 @@
       placed: (st.placed || []).map(function (p) { return { id: p.id, x: Math.round(p.x), y: Math.round(p.y) }; }),
       floor: { cell: G.placing.CELL, cells: Object.assign({}, st.floor && st.floor.cells) },
       chestAt: { x: Math.round(G.base.layout.chest.x), y: Math.round(G.base.layout.chest.y) },
+      vehicles: (function (list) { var o = {}; for (var vid in list) o[vid] = { fuel: Math.round(list[vid].fuel * 100) / 100, at: list[vid].at ? JSON.parse(JSON.stringify(list[vid].at)) : null }; return o; })(st.vehicles || {}), ride: st.ride || null,     // owned vehicles (fuel, where left) and the one being ridden
       tank: { amount: st.tank.amount, t: st.tank.t },
       visits: JSON.parse(JSON.stringify(st.visits)),
       guns: gunsOf(st.guns),
       wear: cleanWear(st.wear), wearLife: cleanWear(st.wearLife),     // melee weapon wear: { weaponId: integer }
+      story: G.story ? G.story.snapshot() : undefined,
       area: st.area,
       pos: { x: Math.round(st.player.x), y: Math.round(st.player.y) }
     };
@@ -209,6 +212,8 @@
     d.placed = G.placing.clean(o.placed, d.buildings);                                 // missing (old save): structures on their old spots
     d.floor = G.placing.cleanFloor(o.floor);
     d.chestAt = o.chestAt && isFinite(o.chestAt.x) && isFinite(o.chestAt.y) ? { x: o.chestAt.x, y: o.chestAt.y } : null;      // null = where the chest always stood
+    d.vehicles = G.vehicles.clean(o.vehicles, d.buildings);                            // missing (old save): none built yet
+    d.ride = typeof o.ride === 'string' && d.vehicles[o.ride] && !d.vehicles[o.ride].at ? o.ride : null;
     d.bag = cleanInventory(o.bag, G.crafting.bagSlots(d.buildings), items);
     d.chest = cleanInventory(o.chest, G.crafting.chestSlots(d.buildings), items);
 
@@ -230,6 +235,9 @@
 
     d.wear = cleanWear(o.wear); d.wearLife = cleanWear(o.wearLife);
     d.enemies = null; d.enemyKeep = {};                    // null = not in the save (older save): the game re-rolls them
+
+    d.story = null; d.storyLegacy = false;                  // the story (js/story.js): missing = a save from before it existed
+    if (G.story) { d.storyLegacy = !!o.storyLegacy || !o.story || typeof o.story !== 'object'; d.story = d.storyLegacy ? G.story.legacyState() : G.story.sanitize(o.story); }
 
     d.area = 'base'; d.zone = null; d.pos = null;
     if (o.pos && typeof o.pos === 'object' && isFinite(o.pos.x) && isFinite(o.pos.y)) d.pos = { x: o.pos.x, y: o.pos.y };

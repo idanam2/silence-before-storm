@@ -11,7 +11,7 @@
   var G = root.G;
   G.data = G.data || {};
 
-  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'bed', 'tank', 'bag', 'chest', 'fence'];
+  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'garage_moto', 'garage_jeep', 'garage_heli', 'garage_tank', 'bed', 'tank', 'bag', 'chest', 'fence'];
 
   // Fence materials the player chooses between (state: G.state.fence.material). `swap` replaces cost items: the fence
   // levels are priced in planks and stone; stone fences use stone instead of planks, metal fences metal (half as much, rounded up).
@@ -55,6 +55,28 @@
       name: 'מתלה ייבוש', start: 0, station: true, spot: { x: 1390, y: 1150, w: 112, h: 30 },
       desc: 'מייבשים פטריות ואוכל כדי שיחזיקו יותר ויהיו בטוחים לאכילה. רמה 2: מנות שדה מזינות.',
       levels: [{ cost: { wood: 5, stone: 2 } }, { cost: { wood: 6, plank: 4, stone: 4 } }, { cost: { plank: 8, stone: 8 } }, { cost: { plank: 10, nails: 10, cloth: 4 } }]
+    },
+    // Garages: stations where a vehicle is built (recipes with `vehicle` in data/recipes.js) and parked. Level 2: the vehicle's tank holds 50% more.
+    // Costs are forest items (the vehicle itself needs metal and electronics from the places beyond).
+    garage_moto: {
+      name: 'מוסך אופנוע וטרקטורון', start: 0, station: true, spot: { x: 900, y: 1240, w: 190, h: 120 },
+      desc: 'כאן בונים אופנוע וטרקטורון וחונים אותם. כל רמה מגדילה את מיכל הדלק של שניהם (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).',
+      levels: [{ cost: { wood: 10, plank: 8, stone: 6 } }, { cost: { plank: 10, stone: 10, wood: 8 } }, { cost: { plank: 12, stone: 14, wood: 10 } }, { cost: { plank: 14, stone: 16, nails: 14, metal: 8 } }]
+    },
+    garage_jeep: {
+      name: "מוסך ג'יפ", start: 0, station: true, spot: { x: 1150, y: 1230, w: 220, h: 130 },
+      desc: "כאן בונים ג'יפ וחונים אותו. כל רמה מגדילה את מיכל הדלק (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).",
+      levels: [{ cost: { wood: 12, plank: 10, stone: 8 } }, { cost: { plank: 12, stone: 12, wood: 8 } }, { cost: { plank: 14, stone: 16, wood: 12 } }, { cost: { plank: 16, stone: 18, nails: 16, metal: 10 } }]
+    },
+    garage_heli: {
+      name: 'מוסך מסוק', start: 0, station: true, spot: { x: 1440, y: 1210, w: 250, h: 170 },
+      desc: 'האנגר ומנחת: כאן בונים מסוק וחונים אותו. כל רמה מגדילה את מיכל הדלק (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).',
+      levels: [{ cost: { wood: 14, plank: 12, stone: 12 } }, { cost: { plank: 14, stone: 14, wood: 10 } }, { cost: { plank: 16, stone: 18, wood: 14 } }, { cost: { plank: 18, stone: 20, nails: 18, metal: 12 } }]
+    },
+    garage_tank: {
+      name: 'מוסך טנק', start: 0, station: true, spot: { x: 1760, y: 1215, w: 270, h: 160 },
+      desc: 'בונקר חזק במיוחד: כאן בונים טנק וחונים אותו. כל רמה מגדילה את מיכל הדלק (רמה 2: +50%, רמה 3: ×2, רמה 4: ×2.5).',
+      levels: [{ cost: { stone: 24, plank: 12, wood: 10 } }, { cost: { stone: 24, plank: 14, wood: 10 } }, { cost: { stone: 28, plank: 16, wood: 16 } }, { cost: { stone: 32, plank: 18, nails: 20, metal: 14 } }]
     },
     campfire: {
       name: 'מדורה', start: 0, station: true, spot: { x: 1290, y: 1040, w: 56, h: 56 },

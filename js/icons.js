@@ -407,7 +407,25 @@
       g.strokeStyle = '#161918'; g.lineWidth = 1.5; g.stroke();
       g.fillStyle = '#3d4442'; rr(g, -5, -25, 10, 9, 2); g.fill(); g.stroke();
       g.restore();
-    }
+    },
+    fuel: function (g) {                                                  // fuel can (jerrycan)
+      shadow(g, 32, 55, 19, 4);
+      var gr = g.createLinearGradient(16, 0, 48, 0);
+      gr.addColorStop(0, '#7b2c22'); gr.addColorStop(0.45, '#b04a38'); gr.addColorStop(1, '#6a241c');
+      g.fillStyle = gr; rr(g, 16, 17, 32, 36, 4); g.fill();
+      g.strokeStyle = '#2a0f0b'; g.lineWidth = 1.6; g.stroke();
+      g.fillStyle = '#9a3d2e'; g.beginPath(); g.moveTo(16, 21); g.lineTo(24, 12); g.lineTo(48, 12); g.lineTo(48, 17); g.lineTo(16, 17); g.closePath(); g.fill(); g.stroke();
+      g.strokeStyle = '#2a0f0b'; g.lineWidth = 3.2; g.beginPath(); g.moveTo(27, 12); g.quadraticCurveTo(32, 3, 42, 6); g.stroke();   // handle
+      g.fillStyle = '#d4c36a'; rr(g, 40, 8, 6, 6, 1.5); g.fill(); g.strokeStyle = '#2a0f0b'; g.lineWidth = 1; g.stroke();            // cap
+      g.strokeStyle = 'rgba(40,12,8,0.5)'; g.lineWidth = 1.6;                                                                          // pressed cross
+      g.beginPath(); g.moveTo(20, 24); g.lineTo(44, 48); g.moveTo(44, 24); g.lineTo(20, 48); g.stroke();
+      g.strokeStyle = 'rgba(255,200,180,0.2)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(19, 22); g.lineTo(19, 49); g.stroke();
+    },
+    veh_motorcycle: function (g) { G.vehicleArt.icon(g, 'motorcycle'); },
+    veh_atv: function (g) { G.vehicleArt.icon(g, 'atv'); },
+    veh_jeep: function (g) { G.vehicleArt.icon(g, 'jeep'); },
+    veh_heli: function (g) { G.vehicleArt.icon(g, 'heli'); },
+    veh_tank: function (g) { G.vehicleArt.icon(g, 'tank'); }
   };
 
   function canvasFor(id) {

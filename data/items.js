@@ -14,6 +14,13 @@
     mushroom:    { name: 'פטריות',     stack: 50,  color: '#7d6f5e', kind: 'food',  use: { hunger: 8, health: -3 } },
     water_dirty: { name: 'מים מלוכלכים', stack: 50, color: '#55604f', kind: 'drink', use: { thirst: 20, health: -6 } },
     water_clean: { name: 'מים נקיים',  stack: 50,  color: '#4f6670', kind: 'drink', use: { thirst: 40 } },
+    fuel: { name: "ג'ריקן דלק", stack: 50, color: '#a8452f', kind: 'material' },
+    // Vehicles show up in the garage recipes only (a built vehicle is not an item you carry: G.state.vehicles).
+    veh_motorcycle: { name: 'אופנוע', stack: 1, color: '#8a3a2e', kind: 'material' },
+    veh_atv:        { name: 'טרקטורון', stack: 1, color: '#4d5a3c', kind: 'material' },
+    veh_jeep:       { name: "ג'יפ", stack: 1, color: '#5a6246', kind: 'material' },
+    veh_heli:       { name: 'מסוק', stack: 1, color: '#3f4c58', kind: 'material' },
+    veh_tank:       { name: 'טנק', stack: 1, color: '#4a5240', kind: 'material' },
     canned_food: { name: 'שימורים',    stack: 50,  color: '#7a6a4a', kind: 'food',  use: { hunger: 40 } },
     metal:       { name: 'מתכת',       stack: 50, color: '#5c6468', kind: 'resource' },
     cloth:       { name: 'בד',         stack: 50, color: '#6e6660', kind: 'resource' },
@@ -54,7 +61,7 @@
       // pistol, club and ammo: temporary, so combat can be tried right away (the story hands out weapons later, stage 7)
       bag:   [['axe', 1], ['canned_food', 1], ['water_clean', 1], ['club', 1], ['pistol', 1], ['ammo', 16]],
       // metal, plank, nails, cloth, electronics: temporary, so the guns can be crafted and tried right away (the neighborhood, stage 8, gives them for real)
-      chest: [['cloth', 10], ['bandage', 2], ['metal', 10], ['metal', 10], ['metal', 10], ['metal', 10], ['metal', 10], ['metal', 10], ['plank', 10], ['nails', 12], ['electronics', 5], ['electronics', 3]]
+      chest: [['fuel', 12], ['cloth', 10], ['bandage', 2], ['metal', 10], ['metal', 10], ['metal', 10], ['metal', 10], ['metal', 10], ['metal', 10], ['plank', 10], ['nails', 12], ['electronics', 5], ['electronics', 3]]
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

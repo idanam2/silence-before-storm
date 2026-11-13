@@ -36,6 +36,9 @@
     }
   }
 
+  // A recipe with `unlock` (a story flag) shows only after that flag is set. Without the story layer everything shows.
+  function unlocked(r) { return !r.unlock || !G.story || !G.story.S || G.story.hasFlag(r.unlock); }
+
   function recipeById(id) {
     var r = G.data.recipes;
     for (var i = 0; i < r.length; i++) if (r[i].id === id) return r[i];
@@ -46,15 +49,18 @@
     levelOf: levelOf,
     have: function (ctx, id) { return have(invs(ctx), id); },
     recipe: recipeById,
+    unlocked: unlocked,                                // a story recipe stays hidden until its flag is set
 
     // Recipes of one station, in data order; with a category id (not 'all') only that tab's recipes.
     recipesFor: function (station, cat) {
-      return G.data.recipes.filter(function (r) { return r.station === station && (!cat || cat === 'all' || r.cat === cat); });
+      return G.data.recipes.filter(function (r) { return r.station === station && unlocked(r) && (!cat || cat === 'all' || r.cat === cat); });
     },
 
     // Why a recipe cannot be crafted right now: 'station' | 'level' | 'cost' | null (ok).
     // Free space for the result is only checked when crafting (it depends on the order of operations).
     recipeStatus: function (ctx, r) {
+      if (!unlocked(r)) return 'locked';
+      if (r.vehicle && ctx.vehicles && ctx.vehicles[r.vehicle]) return 'owned';          // one of each vehicle
       var lv = levelOf(ctx, r.station);
       if (lv < 1) return 'station';
       if (lv < r.level) return 'level';
@@ -67,6 +73,12 @@
       if (!r) return { ok: false, reason: 'unknown' };
       var why = crafting.recipeStatus(ctx, r);
       if (why) return { ok: false, reason: why };
+      if (r.vehicle) {                                                       // a vehicle: one of each, kept in ctx.vehicles
+        if (!ctx.vehicles || ctx.vehicles[r.vehicle]) return { ok: false, reason: 'owned' };
+        pay(invs(ctx), r.cost);
+        ctx.vehicles[r.vehicle] = G.vehicles.create();
+        return { ok: true, out: r.out, vehicle: r.vehicle };
+      }
       var list = invs(ctx), snap = snapshot(list);
       pay(list, r.cost);
       var left = r.out[1];

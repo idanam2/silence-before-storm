@@ -14,11 +14,11 @@
 
   var REASON = {
     cost: 'חסרים חומרים', space: 'אין מקום בתיק ובמחסן', station: 'אין תחנה כזו בבסיס',
-    level: 'דרוש שדרוג של התחנה', max: 'כבר ברמה המקסימלית', unknown: 'פעולה לא מוכרת'
+    level: 'דרוש שדרוג של התחנה', locked: 'עוד לא ידוע איך', owned: 'כבר בנית כלי רכב כזה', max: 'כבר ברמה המקסימלית', unknown: 'פעולה לא מוכרת'
   };
 
   function items() { return G.data.items; }
-  function ctx() { var s = G.state; return { bag: s.bag, chest: s.chest, buildings: s.buildings, fence: s.fence, placed: s.placed }; }
+  function ctx() { var s = G.state; return { bag: s.bag, chest: s.chest, buildings: s.buildings, fence: s.fence, placed: s.placed, vehicles: s.vehicles }; }
 
   // "שובע +30 · בריאות -3" for an item that can be used.
   function useText(d) {
@@ -84,7 +84,7 @@
         '<span class="tile" style="background-image:url(' + G.icons.url(r.out[0]) + ')"></span>' +
         '<div class="info"><div class="rname">' + d.name + qty + '</div><div class="costs">' + note + '</div></div>' +
         '<button class="act" data-act="craft" data-id="' + r.id + '" tabindex="-1"' + (why ? ' disabled' : '') + '>' +
-        (why === 'level' ? 'נעול' : 'צור') + '</button></div>';
+        (why === 'level' ? 'נעול' : why === 'owned' ? 'נבנה' : 'צור') + '</button></div>';
     });
     return { html: h, level: 'רמה ' + lv };
   }
@@ -150,6 +150,7 @@
     }
     for (i = 0; i < W.order.length; i++) {
       var id = W.order[i], d = W.destinations[id], sel = id === mapSel;
+      if (!G.story.isUnlocked(id)) continue;          // the story opens the map one place at a time
       nodes += '<button class="mnode risk' + d.risk + (sel ? ' sel' : '') + '" data-dest="' + id + '" tabindex="-1" style="left:' + d.pos.x + '%;top:' + d.pos.y + '%">' +
         '<i>' + G.mapArt.icon(id) + '</i><span>' + G.world.name(id) + '</span></button>';
     }
@@ -158,13 +159,17 @@
     var info = '';
     if (mapSel && W.destinations[mapSel]) {
       var s = W.destinations[mapSel], cost = G.world.cost(mapSel, diff), short = energy < cost;
+      var rv = st.ride && st.vehicles && st.vehicles[st.ride], fuel = rv ? G.vehicles.tripFuel(st.ride, s.km) : 0, noFuel = !!rv && rv.fuel < fuel;
+      if (rv) short = noFuel;                         // on a vehicle the trip costs fuel and no energy
       info = '<div class="mi-head"><b>' + G.world.name(mapSel) + '</b>' + pips(s.risk, 5, 'סיכון', 'risk') + '<em>סיכון</em></div>' +
         '<p>' + s.blurb + '</p>' +
         '<div class="costs">' +
         '<span class="cost">מרחק ' + s.km + ' ק״מ</span>' +
-        '<span class="cost ' + (short ? 'lack' : 'ok') + '">עלות ' + cost + ' אנרגיה</span>' +
+        (rv ? '<span class="cost ' + (noFuel ? 'lack' : 'ok') + '">עלות ' + fuel + ' דלק (' + G.data.vehicles[st.ride].name + ' · יש ' + Math.floor(rv.fuel) + ') · 0 אנרגיה</span>'
+          : '<span class="cost ' + (short ? 'lack' : 'ok') + '">עלות ' + cost + ' אנרגיה</span>') +
         '<span class="cost">משאבים: ' + G.world.loot(mapSel).join(' · ') + '</span></div>' +
-        (short ? '<div class="mi-warn">האנרגיה לא מספיקה: תגיעו מותשים (איטיים וחלשים). אפשר לישון במיטה קודם.</div>' : '<div class="mi-warn"></div>') +
+        (rv ? (noFuel ? '<div class="mi-warn">אין מספיק דלק בכלי הרכב. תדלקו (F) או רדו (V) ולכו ברגל.</div>' : '<div class="mi-warn"></div>')
+          : short ? '<div class="mi-warn">האנרגיה לא מספיקה: תגיעו מותשים (איטיים וחלשים). אפשר לישון במיטה קודם.</div>' : '<div class="mi-warn"></div>') +
         '<button class="act go' + (short ? ' warn' : '') + '" data-act="go" data-id="' + mapSel + '" tabindex="-1">צאו לדרך</button>';
     }
     return { lines: lines, nodes: nodes, info: info, energy: 'אנרגיה ' + energy + '/' + G.data.needs.max };
@@ -337,7 +342,7 @@
     openBuild: function () { mode = 'build'; station = null; applyMode(); snd('ui'); },
     openMap: function () {
       mode = 'map'; station = null; snd('ui');
-      if (!mapSel || !G.world.has(mapSel)) mapSel = G.data.world.order[0];
+      if (!mapSel || !G.world.has(mapSel) || !G.story.isUnlocked(mapSel)) mapSel = G.data.world.order.filter(G.story.isUnlocked)[0] || G.data.world.order[0];
       applyMode();
     },
     close: function () {
@@ -354,13 +359,13 @@
     selected: function () { return mapSel; },
 
     selectDest: function (id) {
-      if (mode !== 'map' || !G.world.has(id)) return;
+      if (mode !== 'map' || !G.world.has(id) || !G.story.isUnlocked(id)) return;
       if (mapSel !== id) snd('ui', { vol: 0.6 });
       mapSel = id; dirty = true;
     },
 
     depart: function (id) {
-      if (mode !== 'map' || !G.world.has(id)) return false;
+      if (mode !== 'map' || !G.world.has(id) || !G.story.isUnlocked(id)) return false;
       return G.game.depart(id);
     },
 
@@ -394,7 +399,7 @@
     craft: function (recipeId) {
       if (mode !== 'craft') return null;
       var r = G.crafting.craft(ctx(), recipeId);
-      if (r.ok) { snd(station === 'campfire' ? 'cook' : 'craft'); say('נוצר: ' + items()[r.out[0]].name + (r.out[1] > 1 ? ' ×' + r.out[1] : '')); game('save', 'craft'); }
+      if (r.ok) { G.story.emit('craft', { recipe: recipeId }); snd(station === 'campfire' ? 'cook' : 'craft'); say(r.vehicle ? 'נבנה: ' + G.data.vehicles[r.vehicle].name + ' · עומד מול המוסך. הביאו ג׳ריקן דלק, F לתדלוק, V לעלייה' : 'נוצר: ' + items()[r.out[0]].name + (r.out[1] > 1 ? ' ×' + r.out[1] : '')); game('save', 'craft'); }
       else { snd('uiBad'); say(REASON[r.reason] || REASON.unknown); }
       dirty = true;
       return r;

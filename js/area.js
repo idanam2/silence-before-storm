@@ -132,6 +132,8 @@
       if (big) for (var q = 0; q < paved.length; q++) if (inRect(paved[q], x, y, d.r + 10)) return false;
       if (def.exit && dist(x, y, def.exit.x, def.exit.y) < def.exit.r + d.r + 30) return false;
       for (var dd = 0; def.doors && dd < def.doors.length; dd++) if (dist(x, y, def.doors[dd].x, def.doors[dd].y) < def.doors[dd].r + d.r + 30) return false;
+      var kc = G.data.storyClear && def.id && G.data.storyClear[def.id];        // story objects (data/story-wire.js) keep their spot free
+      for (var kk = 0; kc && kk < kc.length; kk++) if (dist(x, y, kc[kk].x, kc[kk].y) < kc[kk].r + d.r) return false;
       if (big && dist(x, y, def.spawn.x, def.spawn.y) < def.clearing) return false;
       if (big && pathDist(def.paths, x, y) < 80) return false;
       for (var j = 0; j < A.nodes.length; j++) {

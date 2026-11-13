@@ -41,6 +41,12 @@
       jacket: [[77, 85, 80], [112, 122, 112]], pants: [[45, 50, 54], [72, 78, 82]], pack: [[82, 68, 46], [122, 103, 76]],
       skin: [[160, 136, 112], [203, 177, 149]], boot: '#2b2622', hair: '#4a3d33', strap: '#3a3024'
     },
+    // story characters (js/storyart.js draws them standing): no backpack
+    rachel: {
+      line: '#141615', nopack: true,
+      jacket: [[104, 86, 70], [150, 126, 100]], pants: [[58, 56, 60], [92, 90, 94]], pack: [[82, 68, 46], [122, 103, 76]],
+      skin: [[166, 138, 116], [206, 178, 154]], boot: '#2b2622', hair: '#9a9590', strap: '#3a3024'
+    },
     // the infected: grey-green skin, worn clothes in a few variants (chosen by p.variant), no backpack, hollow eyes
     shambler: {
       line: '#121413', dead: true,
@@ -434,7 +440,7 @@
 
       // backpack
       var pk0 = P(S.toBody([-5.8, 0, -12.2])), pk1 = P(S.toBody([-5.8, 0, -2.6]));
-      if (!PAL.dead) {                                  // the infected carry nothing
+      if (!PAL.dead && !PAL.nopack) {                   // the infected (and story characters with nopack) carry nothing
         shade.push({ p: [pk0, pk1], w: 10.5 });
         part((pk0.k + pk1.k) / 2, function () {
           tube(ctx, [pk0, pk1], 10.5, tone(PAL.pack, 0.25 + 0.5 * lit(0) + 0.25 * (-sa)));
@@ -453,7 +459,7 @@
         ctx.fillStyle = col; ctx.fill();
         ctx.lineWidth = 6.5 * SC; ctx.strokeStyle = col; ctx.stroke();
         var front = Math.sin(face + S.twist) * 0.67 + 0.2;                    // pack straps, only seen from the front
-        if (front > 0 && !PAL.dead) {
+        if (front > 0 && !PAL.dead && !PAL.nopack) {
           ctx.globalAlpha = clamp(front * 4, 0, 1); ctx.lineWidth = 1.7; ctx.strokeStyle = PAL.strap;
           [1, -1].forEach(function (sg) {
             var a = P(S.toBody([3.2, sg * 5, 0.8])), b = P(S.toBody([3.4, sg * 4.6, -9]));

@@ -85,6 +85,7 @@
       for (i = 0; i < bag.slots.length; i++) {
         s = bag.slots[i];
         if (!s) continue;
+        if (G.data.items[s.id] && G.data.items[s.id].key) continue;      // quest items are never lost
         used++;
         if (diff.deathLoss >= 1 || used % 2 === 0) { lost.push([s.id, s.n]); bag.slots[i] = null; }
       }

@@ -24,9 +24,9 @@ function test(name, fn) {
 function eq(a, b, msg) { if (a !== b) throw new Error((msg || '') + ` expected ${b}, got ${a}`); }
 function near(a, b, eps, msg) { if (Math.abs(a - b) > (eps || 1e-6)) throw new Error((msg || '') + ` expected ~${b}, got ${a}`); }
 
-const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', ...fs.readdirSync(path.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f), 'data/interiors.js', 'data/recipes.js', 'data/buildings.js',
+const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', ...fs.readdirSync(path.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f), 'data/interiors.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js',
   'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js',
-  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
+  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
 // Fixed item table for the inventory tests, so balance changes in data/items.js do not break them.
 const IT = { wood: { stack: 20 }, stone: { stack: 20 }, axe: { stack: 1 } };
 const world = { width: 1000, height: 800 };
@@ -528,7 +528,7 @@ test('crafting: with no room anywhere it is refused and every change is rolled b
   eq(G.inventory.count(c.bag, 'plank'), 0);
 });
 test('crafting: recipes are split between the workbench and the campfire', () => {
-  eq(G.crafting.recipesFor('workbench').length + G.crafting.recipesFor('campfire').length + G.crafting.recipesFor('rack').length, RECIPES.length);
+  eq(G.crafting.recipesFor('workbench').length + G.crafting.recipesFor('campfire').length + G.crafting.recipesFor('rack').length + RECIPES.filter(r => r.vehicle).length, RECIPES.length);
   const c = mkctx([['mushroom', 2], ['water_dirty', 1]], [], { campfire: 1 });
   eq(G.crafting.craft(c, 'cooked_food').ok, true); eq(total(c, 'cooked_food'), 1);
   eq(G.crafting.craft(c, 'water_clean').ok, true); eq(total(c, 'water_clean'), 1);
@@ -938,12 +938,10 @@ test('damaged saves are refused, never crash', () => {
   eq(G.save.parse(JSON.stringify({ v: 0 })).reason, 'old');
 });
 test('an old version is upgraded through MIGRATIONS', () => {
-  G.save.MIGRATIONS[G.save.VERSION - 1] = null;     // none exist yet: prove the hook is used by faking one
-  const was = G.save.VERSION;
-  const fake = { v: was - 1 };                      // version 0
-  eq(G.save.parse(JSON.stringify(fake)).reason, 'old');
+  const fake = { v: 0 };
+  eq(G.save.parse(JSON.stringify(fake)).reason, 'old');   // no 0 -> 1 step exists
   G.save.MIGRATIONS[0] = o => Object.assign({}, o, { v: 1, diff: 'easy' });
-  const r = G.save.parse(JSON.stringify(fake));
+  const r = G.save.parse(JSON.stringify(fake));            // 0 -> 1 (faked here), then the real 1 -> 2
   eq(r.ok, true); eq(r.data.diff, 'easy');
   delete G.save.MIGRATIONS[0];
 });
@@ -1410,8 +1408,8 @@ if (fs.existsSync(extraDir)) {
     if (!f.endsWith('.js')) continue;
     console.log('extra: ' + f);
     try {
-      new Function('G', 'test', 'eq', 'near', 'arena', 'rig', 'mkEnemy', 'thePlayer', 'stepFor', 'EN', 'WP', 'ITEMS', 'world', 'pc', 'mkState',
-        fs.readFileSync(path.join(extraDir, f), 'utf8'))(G, test, eq, near, arena, rig, mkEnemy, thePlayer, stepFor, EN, WP, ITEMS, world, pc, mkState);
+      new Function('G', 'test', 'eq', 'near', 'arena', 'rig', 'mkEnemy', 'thePlayer', 'stepFor', 'EN', 'WP', 'ITEMS', 'world', 'pc', 'mkState', 'require', 'ROOT',
+        fs.readFileSync(path.join(extraDir, f), 'utf8'))(G, test, eq, near, arena, rig, mkEnemy, thePlayer, stepFor, EN, WP, ITEMS, world, pc, mkState, require, ROOT);
     } catch (e) { failed++; console.log('  FAIL ' + f + ' did not load\n       ' + e.message); }
   }
 }
