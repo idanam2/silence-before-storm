@@ -4,7 +4,7 @@
 //   ('none' = the object already exists on the map). A spot with no entry here does not exist in the game yet:
 //   wiring a chapter = adding its spots here (the story data itself is never changed).
 // storyHints: 'questId.stepId' -> an extra line under that step in the journal (how, not what).
-// Wired so far: base, forest and farm (prologue and chapter 1).
+// Wired so far: base, forest, farm, neighborhood (prologue, chapters 1-2), the police station (chapter 3) the hospital + quarry door (chapter 4) and the port (chapter 5).
 (function (root) {
   'use strict';
   var G = root.G;
@@ -51,7 +51,53 @@
     spot_cellar_log_3: { area: 'forest_cellar', x: 1300, y: 1030, r: 50, art: 'paper' },
     spot_cellar_panel: { area: 'forest_cellar', x: 2380, y: 265, r: 50, art: 'safebox' },
     spot_gil_house:    { x: 1270, y: 2150, r: 40, art: 'none' },
-    spot_hives:        { x: 1950, y: 1065, r: 90, art: 'hives' }
+    spot_hives:        { x: 1950, y: 1065, r: 90, art: 'hives' },
+
+    // ---- police (chapter 3): the station is 'police' (outside), police_f1 / police_f2 (floors, 2400 x 1440). Spots sit in open floor next to the furniture.
+    spot_relay_police: { x: 1800, y: 505, r: 60, art: 'relaymast' },
+    spot_afik_van:     { x: 3290, y: 960, r: 70, art: 'van' },
+    spot_evidence_locker: { area: 'police_f1', x: 1850, y: 215, r: 55, art: 'safebox' },
+    spot_cell3:        { area: 'police_f1', x: 1760, y: 1235, r: 60, art: 'paper' },
+    spot_commander_desk: { area: 'police_f2', x: 1680, y: 460, r: 60, art: 'paper' },
+    spot_archive:      { area: 'police_f2', x: 1255, y: 440, r: 55, art: 'paper' },
+    spot_armory_door:  { area: 'police_f2', x: 380, y: 740, r: 60, art: 'none' },
+    spot_radio_room:   { area: 'police_f2', x: 1900, y: 1215, r: 60, art: 'paper' },
+    spot_sgt_card:     { area: 'police_f2', x: 480, y: 1175, r: 55, art: 'paper' },
+
+    // ---- hospital (chapter 4): the yard 'hospital' (helipad pad at 2900,1900), floors hospital_f1..f3 (2600 x 1440), and the quarry door
+    spot_relay_hospital: { x: 2740, y: 1900, r: 60, art: 'relaymast' },
+    spot_storage_f3:   { area: 'hospital_f3', x: 1115, y: 1150, r: 55, art: 'safebox' },
+    spot_lab_f3:       { area: 'hospital_f3', x: 450, y: 1155, r: 60, art: 'paper' },
+    spot_sigal_1:      { area: 'hospital_f2', x: 1600, y: 1170, r: 50, art: 'paper' },
+    spot_sigal_2:      { area: 'hospital_f1', x: 300, y: 1230, r: 50, art: 'paper' },
+    spot_sigal_3:      { area: 'hospital_f3', x: 2060, y: 1050, r: 50, art: 'paper' },
+    spot_sigal_4:      { area: 'hospital_f3', x: 1700, y: 490, r: 50, art: 'paper' },
+    spot_sigal_5:      { area: 'hospital_f1', x: 2080, y: 1030, r: 50, art: 'paper' },
+    spot_nurse_keys:   { area: 'hospital_f2', x: 1650, y: 975, r: 55, art: 'none' },
+    spot_pharmacy_fridge: { area: 'hospital_f1', x: 1480, y: 670, r: 55, art: 'safebox' },
+    spot_antibiotics:  { area: 'hospital_f1', x: 1450, y: 760, r: 55, art: 'none' },
+    spot_relay3_helmet:{ area: 'hospital_f2', x: 2160, y: 1290, r: 55, art: 'helmet' },
+
+    // ---- quarry: the steel door in the rock wall north of the pit, the metal box beside it, the foreman's desk, the explosives container
+    spot_lab_door:     { x: 1300, y: 300, r: 80, art: 'steeldoor' },
+    spot_lab_door_listen: { x: 1300, y: 330, r: 120, art: 'none' },
+    spot_dead_drop:    { x: 1430, y: 290, r: 55, art: 'safebox' },
+    spot_foreman_office: { x: 1960, y: 2065, r: 60, art: 'paper' },
+    spot_explosives:   { x: 2360, y: 2070, r: 60, art: 'none' },
+
+    // ---- port (chapter 5): the quay (ship hull at y 560..830, quay from y 880), the harbour office is port_in3, the ship's rooms are data/story-areas.js
+    spot_pa_desk:      { area: 'port_in3', x: 570, y: 340, r: 60, art: 'paper' },
+    spot_queue_line:   { x: 1960, y: 2080, r: 180, art: 'none' },
+    spot_relay_port:   { x: 2330, y: 1125, r: 65, art: 'relaymast' },
+    spot_ship_hatch:   { x: 2560, y: 915, r: 60, art: 'hatch' },
+    spot_ship_door:    { x: 2050, y: 915, r: 60, art: 'steeldoor' },
+    spot_roni_engine:  { area: 'ship_engine', x: 1000, y: 560, r: 70, art: 'npc', look: 'partner' },
+    spot_ship_log:     { area: 'ship_bridge', x: 700, y: 420, r: 60, art: 'paper' },
+    spot_ship_watch:   { area: 'ship_bridge', x: 1190, y: 300, r: 60, art: 'paper' },
+    spot_pa_box_1:     { x: 2080, y: 2100, r: 55, art: 'safebox' },
+    spot_pa_box_2:     { x: 760, y: 950, r: 55, art: 'safebox' },
+    spot_pa_box_3:     { x: 2500, y: 1456, r: 55, art: 'safebox' },
+    spot_locked_container: { x: 2230, y: 1456, r: 60, art: 'none' }
   };
 
   // Insides of neighborhood houses: the interiors are generated (and mirrored at random), so the spots follow the furniture.
@@ -80,11 +126,40 @@
     'mq_prologue.bench':  'מקש B בבסיס פותח את חלונית הבנייה',
     'mq_prologue.open':   'עומדים ליד שולחן העבודה ולוחצים E, עם הרדיו בתיק',
     'mq_prologue.sleep':  'צריך מיטה (B), ואנרגיה מתחת ל-95: אפשר לצאת למסע קודם',
+    'mq_ch3.kit':         'שולחן העבודה (רמה 2): ערכת ממסר מהחלקים של פרק 2, אם עוד אין לך',
+    'mq_ch3.key':         'קומה 2 של התחנה (המדרגות בפינה הצפון-מזרחית): משרד המפקד, E ליד השולחן',
+    'mq_ch3.archive':     'קומה 2, חדר הארכיון: להחזיק E ליד הארון האחרון בשורה',
+    'mq_ch3.relay':       'צפון הבניין (בחצר שמאחורי התחנה), סולם התורן: להחזיק E. זה רועש, ויגיעו אליך',
+    'mq_ch3.dog':         'לחזור הביתה דרך שביל הבסיס; משהו מחכה ליד השער',
+    'mq_ch3.report':      'הרדיו בבסיס: E ליד הנורית הירוקה',
+    'mq_ch4.ask':         'הרדיו בבסיס: E ליד הנורית הירוקה',
+    'mq_ch4.cool':        'בית החולים, קומה 3 (מדרגות בפינה הצפון-מזרחית): מחסן הציוד, להחזיק E',
+    'mq_ch4.rotor':       'קומה 3: המעבדה בדרום-מערב, E ליד השולחן',
+    'mq_ch4.meds':        'ערכות עזרה ראשונה: שולחן עבודה רמה 2. תחבושות: מהמדורה/המחסן או שלל',
+    'mq_ch4.relay':       'חצר בית החולים, פינת המנחת בדרום-מזרח: להחזיק E. זה רועש',
+    'mq_ch4.quarry':      'המחצבה במפה; הדלת בקיר הסלע בצפון הבור המדורג',
+    'mq_ch4.door':        'E ליד הדלת, עם הצידנית והרוטור בתיק',
+    'mq_ch4.drop':        'הארגז לצד הדלת: E, עם כל הציוד בתיק',
+    'mq_ch5.ask':         'הרדיו בבסיס: E ליד הנורית הירוקה',
+    'mq_ch5.pa':          'משרד הנמל (הבניין ליד השער): להחזיק E ליד השולחן הפנימי',
+    'mq_ch5.ship':        'הספינה: גרם המדרגות בצד הרציף, E (אופציונלי)',
+    'mq_ch5.relay':       'רגלי המנוף הגבוה, כל מה שרועש מושך אליך. להחזיק E',
+    'mq_ch5.signal':      'ממשיכים עם הממסר; האות יופיע מעצמו',
+    'mq_ch5.roni':        'פתח בצד הספינה, קרוב לקו המים: E. הוא מוביל לחדר המכונות',
+    'mq_ch5.escort':      'ללכת עם רוני לשער הנמל (דרום). היא הולכת אחריך. יהיו דוממים בדרך',
+    'mq_ch5.report':      'הרדיו בבסיס: E ליד הנורית הירוקה',
     'mq_ch1.chimes':      'הפעמונים תלויים באזור החווה; כל אחד נאסף ב-E. אם התיק מלא הם נכנסים למחסן בבסיס',
     'mq_ch1.deal':        'הפעמונים כבר אצלך: חזור לדבר עם רחל (E לידה) כדי למסור אותם. המשימה לא מתקדמת עד השיחה',
     'mq_ch1.fix':        'שולחן העבודה, עם אלקטרוניקה אחת (בחווה אפשר לפרק מכשירי קשר)',
     'mq_ch1.listen':      'הרדיו על אדן הבקתה: E ליד הנורית הירוקה'
   };
+
+  // Chapter 4 sends the player to the quarry once the hospital relay stands, but only the storm (chapter 9) unlocked it: open the map entry now.
+  G.data.storyTriggers.push({ id: 't_unlock_quarry_ch4', on: 'flag', match: 'relay_3', do: [{ do: 'unlock', area: 'quarry' }] });
+
+  // Chapter 5: leaving the ship with Roni, the infected come to the quay (because of the relay and her key). Reaching the gate ends it (js/game-tick.js).
+  G.data.storyTriggers.push({ id: 't_roni_escort_wave', on: 'enter_area', when: { area: 'port', flags: ['roni_met'], notFlags: ['roni_joined'] }, once: false, oncePerVisit: true,
+    do: [{ do: 'spawn', wave: { count: 6, kinds: ['shambler', 'runner', 'shambler', 'runner', 'screamer', 'shambler'] }, near: 'player' }, { do: 'toast', text: 'דוממים מסביב לספינה. לשער הנמל, בדרום.' }] });
 
   // Random resources (trees, stones...) are kept away from story objects so nothing grows on top of them.
   G.data.storyClear = {};

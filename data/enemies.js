@@ -32,6 +32,10 @@
       // (areas with an `enemyPlan`, data/areas.js); `glow` is the halo drawn under it (js/combatart.js via G.art).
       glower:   { id: 'glower', name: 'דומם קורן', look: 'glower', hp: 110, speed: 78, wander: 0.4, radius: 16, scale: 1.08, mass: 1.3, stunMult: 0.6,
                   sight: 360, hear: 1, range: 22, dmg: 20, attackTime: 0.95, hitU: 0.56, cooldown: 0.65, lunge: 0.2, glow: '120,255,90' },
+      // frozen: grey-blue and stiff with frost, slow but tough, and its touch chills you (cold.touch: body heat lost per blow, js/game-fight.js).
+      // Only in the snowy mountains (areas with an `enemyPlan`).
+      frozen:   { id: 'frozen', name: 'דומם קפוא', look: 'frozen', hp: 70, speed: 66, wander: 0.35, radius: 14, scale: 1.02, mass: 1.1, stunMult: 0.7,
+                  sight: 300, hear: 0.8, range: 20, dmg: 12, attackTime: 0.9, hitU: 0.55, cooldown: 0.7, lunge: 0.15, cold: { touch: 14 } },
       screamer: { id: 'screamer', name: 'צורח', look: 'screamer', hp: 26, speed: 88, wander: 0.4, radius: 12, scale: 0.95, mass: 0.8, stunMult: 1.3,
                   sight: 700, hear: 1.6, range: 16, dmg: 6, attackTime: 0.8, hitU: 0.55, cooldown: 0.8, lunge: 0.2,
                   scream: { radius: 600, time: 1.0 } }

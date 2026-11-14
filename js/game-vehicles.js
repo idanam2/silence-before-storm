@@ -43,6 +43,13 @@
   function fly(id, to) {
     var v = st.vehicles[id], d = G.data.vehicles[id];
     if (!v || !d || !d.transport || st.scene !== 'play' || st.paused || st.fade || !canFlyTo(to)) return false;
+    if (G.world.stormGrounded()) {                                     // the storm: the helicopter stays on the ground (the story answers with a line)
+      snd('uiBad'); G.ui.close(); G.ui.toast('סערה: המסוק לא ממריא', 2600);
+      G.story.emit('story_event', { id: 'heli_denied_storm' });
+      return false;
+    }
+    var acc = G.world.access(to, 'fly');
+    if (!acc.ok) { snd('uiBad'); G.ui.toast(acc.deny, 3000); return false; }
     var fuel = flightFuel(id, to);
     if (v.fuel < fuel) { snd('uiBad'); G.ui.toast('אין מספיק דלק לטיסה (' + fuel + ' דרושים, יש ' + Math.floor(v.fuel) + ') · F לתדלוק', 2600); return false; }
     snd('travel');
@@ -147,7 +154,7 @@
     if (r.done) {
       st.vehicles[id] = V().create(); delete st.builds[id];
       G.ui.toast('הושלם: ' + G.data.vehicles[id].name + ' · הביאו ג׳ריקן דלק, F לתדלוק, V לעלייה', 3200);
-      if (G.story && G.story.emit) G.story.emit('craft', { recipe: 'v_' + id });
+      if (G.story && G.story.emit) G.story.emit('vehicle_built', { id: id });                    // the story reacts to the tank and the helicopter (match: vehicle id)
     }
     save('assemble'); G.ui.markDirty();
     return r;

@@ -70,6 +70,7 @@
       if (prev !== 'base') G.story.emit('return_base', {});
     } else {
       G.defense.beginTrip(st.def, st.kills);         // a new trip: count its noise from zero
+      if (id === 'peaks' && G.story.S) G.story.setFlag('peak_known', true);   // the snow clothes can be made from now on (story/data/companions.js)
       enterZone(id, (st.visits[id] || 0) + 1);
     }
     audioScene();
@@ -87,6 +88,7 @@
   // on each floor is kept for the rest of the trip (st.trip), so nothing refills by walking in and out.
   function goThrough(door) {
     if (!G.data.areas[door.to]) return false;
+    if (door.locked) { snd('uiBad'); G.ui.toast(door.needText || 'הדלת נעולה', 2800); return false; }     // a one-way door: shut from this side
     if (door.need && G.inventory.count(st.bag, door.need) === 0) {      // a locked way in: needs an item in the bag (the gas mask)
       snd('uiBad'); G.ui.toast(door.needText || 'צריך ציוד מיוחד כדי להיכנס', 2600); return false;
     }
@@ -112,7 +114,9 @@
   function depart(id) {
     if (st.scene !== 'play' || st.paused || st.fade || st.area !== 'base' || !G.world.has(id) || !G.story.isUnlocked(id)) return false;
     var cost = G.world.cost(id, diffLevel()), rv = st.ride ? st.vehicles[st.ride] : null, fuel = 0;
-    if (rv) {                                          // on a vehicle: the trip burns fuel instead of energy
+    var acc = G.world.access(id, 'ground', st.ride);                   // some places only open to a tank or a helicopter (the story's access rules)
+    if (!acc.ok) { snd('uiBad'); G.ui.toast(acc.deny, 3600); return false; }
+    if (rv) {                                        // on a vehicle: the trip burns fuel instead of energy
       fuel = G.vehicles.tripFuel(st.ride, G.data.world.destinations[id].km);
       if (rv.fuel < fuel) { snd('uiBad'); G.ui.toast('אין מספיק דלק לדרך (' + fuel + ' דרושים) · F לתדלוק', 2400); return false; }
     }
@@ -199,7 +203,7 @@
     st.fence = { material: 'wood' };
     st.creative = false; G.crafting.free = false;
     st.equip = G.gear.create(); st.player.outfit = st.equip;
-    st.placed = []; st.fences = []; st.felled = []; st.floor = G.placing.createFloor(); st.placing = null; G.base.setChest(null);
+    st.placed = []; st.fences = []; st.felled = []; st.comp = G.companions.create(); st.floor = G.placing.createFloor(); st.placing = null; G.base.setChest(null);
     st.vehicles = {}; st.ride = null; st.builds = {};
     st.tank = G.tank.create();
     st.visits = {}; st.playTime = 0; st.sinceSave = 0; st.low = {}; st.saveWarned = false;
@@ -248,7 +252,7 @@
     if (!r.ok) return r;
     var d = r.data;
     resetWorld(d.diff);
-    st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings; st.fence = d.fence; st.creative = !!d.creative; G.crafting.free = st.creative; st.equip = d.equip || G.gear.create(); st.player.outfit = st.equip; st.placed = d.placed; st.fences = d.fences || []; st.felled = d.felled || []; st.floor = d.floor; st.placing = null; G.base.setChest(d.chestAt);
+    st.needs = d.needs; st.bag = d.bag; st.chest = d.chest; st.buildings = d.buildings; st.fence = d.fence; st.creative = !!d.creative; G.crafting.free = st.creative; st.equip = d.equip || G.gear.create(); st.player.outfit = st.equip; st.placed = d.placed; st.fences = d.fences || []; st.felled = d.felled || []; st.comp = d.comp || G.companions.create(); st.floor = d.floor; st.placing = null; G.base.setChest(d.chestAt);
     st.tank = d.tank; st.visits = d.visits; st.playTime = d.playTime;
     st.vehicles = d.vehicles || {}; st.ride = d.ride && st.vehicles[d.ride] ? d.ride : null; st.builds = d.builds || {};
     st.guns = d.guns;                                  // missing in older saves: a gun in the bag then starts with an empty magazine

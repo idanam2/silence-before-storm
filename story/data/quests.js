@@ -22,6 +22,7 @@
 //   notes     { notes: [...] }            all these notes were read
 //   sleep     {}                          slept in a bed
 //   event     { id, n }                   a named story event fired n times (default 1), e.g. 'pa_box'
+//   vehicle   { vehicle }                 that vehicle is built (G.state.vehicles has it; ids from data/vehicles.js: tank, heli, ...)
 (function (root) {
   'use strict';
   var G = root.G = root.G || {};
@@ -35,9 +36,10 @@
     { n: 4, id: 'ch4',      title: `מחלקה שלוש`,       quest: 'mq_ch4' },
     { n: 5, id: 'ch5',      title: `הרציף`,            quest: 'mq_ch5' },
     { n: 6, id: 'ch6',      title: `מים עומדים`,       quest: 'mq_ch6' },
-    { n: 7, id: 'ch7',      title: `מגדלור`,           quest: 'mq_ch7' },
-    { n: 8, id: 'ch8',      title: `המגדל`,            quest: 'mq_ch8' },
-    { n: 9, id: 'finale',   title: `הסערה`,            quest: 'mq_finale' }
+    { n: 7, id: 'peak',     title: `הרכס הלבן`,        quest: 'mq_peak' },     // added in the expansion
+    { n: 8, id: 'ch7',      title: `מגדלור`,           quest: 'mq_ch7' },      // note: quest ids kept from before the expansion,
+    { n: 9, id: 'ch8',      title: `המגדל`,            quest: 'mq_ch8' },      // so mq_ch7 is chapter 8 and mq_ch8 is chapter 9
+    { n: 10, id: 'finale',  title: `הסערה`,            quest: 'mq_finale' }
   ];
 
   G.data.storyQuests = {
@@ -99,6 +101,7 @@
         { id: 'key',      type: 'spot', spot: 'spot_commander_desk', text: `למצוא את מפתח הגג (קומה 2)` },
         { id: 'archive',  type: 'spot', spot: 'spot_archive', text: `הארכיון` },
         { id: 'relay',    type: 'spot', spot: 'spot_relay_police', text: `להקים ממסר על התורן` },
+        { id: 'dog',      type: 'dialogue', id_: 'dlg_dog_arrives', text: `לחזור הביתה` },
         { id: 'report',   type: 'dialogue', id_: 'dlg_maya_ch3', text: `לדבר עם מאיה` }
       ],
       done: [{ do: 'unlock', area: 'hospital' }],
@@ -132,6 +135,9 @@
         { id: 'pa',     type: 'spot', spot: 'spot_pa_desk', text: `משרד הנמל` },
         { id: 'ship',   type: 'spot', spot: 'spot_ship_log', text: `הספינה שנשארה`, optional: true },
         { id: 'relay',  type: 'spot', spot: 'spot_relay_port', text: `להקים ממסר על המנוף` },
+        { id: 'signal', type: 'dialogue', id_: 'dlg_roni_signal', text: `אור בבטן הספינה` },
+        { id: 'roni',   type: 'dialogue', id_: 'dlg_roni_meet', text: `חדר המכונות של הספינה` },
+        { id: 'escort', type: 'dialogue', id_: 'dlg_roni_escaped', text: `להוציא אותה מהנמל בחיים` },
         { id: 'report', type: 'dialogue', id_: 'dlg_maya_ch5', text: `לדבר עם מאיה` }
       ],
       done: [{ do: 'unlock', area: 'lake' }],
@@ -143,7 +149,9 @@
       summary: `לרשת צריך חשמל. בסכר יש טורבינה.`,
       steps: [
         { id: 'ask',     type: 'dialogue', id_: 'dlg_maya_ch6_ask', text: `להדליק את הרדיו` },
-        { id: 'go',      type: 'visit', area: 'lake', text: `להגיע לאגם` },
+        { id: 'idea',    type: 'dialogue', id_: 'dlg_roni_tank_idea', text: `לדבר עם רוני על הדרך לסכר` },
+        { id: 'tank',    type: 'vehicle', vehicle: 'tank', text: `לבנות טנק (מוסך טנק: B, ואז U בפנים)` },
+        { id: 'go',      type: 'visit', area: 'lake', text: `להגיע לאגם בטנק (הדרך שקועה בבוץ)` },
         { id: 'fuse',    type: 'item', item: 'main_fuse', n: 1, text: `נתיך ראשי (בית הסירות)` },
         { id: 'belt',    type: 'item', item: 'drive_belt', n: 1, text: `רצועת הנעה (בקתת הדייג)` },
         { id: 'turbine', type: 'spot', spot: 'spot_turbine', text: `לתקן את הטורבינה (+6 מתכת, 2 חבל)` },
@@ -151,16 +159,39 @@
         { id: 'hum',     type: 'dialogue', id_: 'dlg_noa_live', text: `הרדיו` },
         { id: 'report',  type: 'dialogue', id_: 'dlg_maya_ch6', text: `לדבר עם מאיה` }
       ],
-      done: [{ do: 'unlock', area: 'military' }],
+      done: [],
+      next: 'mq_peak'
+    },
+
+    mq_peak: {
+      title: `הרכס הלבן`, kind: 'main', chapter: 7, area: 'peaks', start: 'auto',
+      summary: `הקול של מאיה לא עובר את הרכס. למעלה יש צלחת, ושלג.`,
+      steps: [
+        { id: 'ask',     type: 'dialogue', id_: 'dlg_maya_peak_ask', text: `להדליק את הרדיו` },
+        { id: 'roni',    type: 'dialogue', id_: 'dlg_roni_peak_go', text: `לספר לרוני` },
+        { id: 'heli',    type: 'vehicle', vehicle: 'heli', text: `לבנות מסוק (מוסך מסוק: B, ואז U בפנים)` },
+        { id: 'fly',     type: 'dialogue', id_: 'dlg_heli_first_flight', text: `טיסה ראשונה` },
+        { id: 'warm',    type: 'items', items: { parka: 1 }, text: `להתלבש חם (מעיל חורף, כובע, מגפי שלג)`, optional: true },
+        { id: 'go',      type: 'visit', area: 'peaks', text: `לטוס לרכס, עם רוני (אין דרך ברגל)` },
+        { id: 'key',     type: 'item', item: 'station_key', n: 1, text: `מפתח התחנה` },
+        { id: 'diesel',  type: 'item', item: 'diesel_can', n: 1, text: `סולר לגנרטור (בקתת הרכבל)` },
+        { id: 'station', type: 'visit', area: 'peak_station', text: `תחנת הרכס` },
+        { id: 'motor',   type: 'item', item: 'dish_motor', n: 1, text: `מנוע הצלחת (במחסן התחנה)` },
+        { id: 'gen',     type: 'dialogue', id_: 'dlg_peak_generator', text: `רוני והגנרטור` },
+        { id: 'dish',    type: 'spot', spot: 'spot_peak_dish', text: `לכוון את הצלחת` },
+        { id: 'rescue',  type: 'event', id_: 'peak_rescue_done', text: `רוני` },
+        { id: 'report',  type: 'dialogue', id_: 'dlg_maya_peak', text: `הרדיו` }
+      ],
+      done: [{ do: 'flag', id: 'peak_link' }, { do: 'unlock', area: 'military' }],
       next: 'mq_ch7'
     },
 
     mq_ch7: {
-      title: `מגדלור`, kind: 'main', chapter: 7, area: 'military', start: 'auto',
+      title: `מגדלור`, kind: 'main', chapter: 8, area: 'military', start: 'auto',
       summary: `מגבר מהבסיס הצבאי, כדי שהאות יגיע לים.`,
       steps: [
         { id: 'ask',    type: 'dialogue', id_: 'dlg_maya_ch7_ask', text: `להדליק את הרדיו` },
-        { id: 'go',     type: 'visit', area: 'military', text: `להגיע לבסיס הצבאי` },
+        { id: 'go',     type: 'visit', area: 'military', text: `להגיע לבסיס הצבאי (בטנק או במסוק: שדה בוץ ומוקשים)` },
         { id: 'card',   type: 'spot', spot: 'spot_officer_bunk', text: `כרטיס כניסה למפקדה (המגורים)` },
         { id: 'amp',    type: 'spot', spot: 'spot_hq_comms', text: `המגבר בחדר התקשורת` },
         { id: 'files',  type: 'spot', spot: 'spot_hq_files', text: `ארון המסמכים`, optional: true },
@@ -172,12 +203,12 @@
     },
 
     mq_ch8: {
-      title: `המגדל`, kind: 'main', chapter: 8, area: 'airport', start: 'auto',
+      title: `המגדל`, kind: 'main', chapter: 9, area: 'airport', start: 'auto',
       summary: `הקול השני ביקש שאבוא. ושאביא אוכל.`,
       steps: [
         { id: 'call',    type: 'dialogue', id_: 'dlg_ori_call', text: `להדליק את הרדיו` },
         { id: 'food',    type: 'items', items: { canned_food: 3 }, text: `3 שימורים בתיק` },
-        { id: 'go',      type: 'visit', area: 'airport', text: `לנסוע לשדה התעופה` },
+        { id: 'go',      type: 'visit', area: 'airport', text: `לטוס לשדה התעופה (הכבישים חסומים)` },
         { id: 'door',    type: 'dialogue', id_: 'dlg_ori_door', text: `מגדל הפיקוח` },
         { id: 'meet',    type: 'dialogue', id_: 'dlg_ori_meet', text: `אורי` },
         { id: 'decide',  type: 'dialogue', id_: 'dlg_ori_decision', text: `להחליט` },
@@ -189,7 +220,7 @@
     },
 
     mq_finale: {
-      title: `הסערה`, kind: 'main', chapter: 9, area: 'quarry', start: 'auto',
+      title: `הסערה`, kind: 'main', chapter: 10, area: 'quarry', start: 'auto',
       summary: `הרשת חיה. הסערה מגיעה מהים.`,
       steps: [
         { id: 'go',      type: 'visit', area: 'quarry', text: `למחצבה` },
@@ -205,7 +236,7 @@
     sq_wall_days: {
       title: `ימים על הקיר`, kind: 'side', chapter: 0, area: 'base', start: 'new_game',
       summary: `קו אחד ביום. מחשבה אחת בפרק.`,
-      steps: [{ id: 'all', type: 'event', id_: 'wall_read', n: 9, text: `לחזור לקיר בכל פרק` }],
+      steps: [{ id: 'all', type: 'event', id_: 'wall_read', n: 10, text: `לחזור לקיר בכל פרק` }],
       done: [{ do: 'note', id: 'note_wall_last' }]
     },
     sq_garden: {
@@ -216,6 +247,62 @@
         { id: 'water', type: 'event', id_: 'garden_water', n: 3, text: `להשקות במים נקיים (3 פעמים)` }
       ],
       done: [{ do: 'give', item: 'vegetables', n: 5 }, { do: 'flag', id: 'garden_grows' }]
+    },
+
+    // ============================================================ EXPANSION: the dog, Roni, the ridge
+    sq_kennel: {
+      title: `בית לפלפל`, kind: 'side', chapter: 3, area: 'base',
+      summary: `כלב צריך מלונה, קערות, ומישהו שיזכור לרחוץ אותו.`,
+      steps: [
+        { id: 'build', type: 'build', building: 'kennel', level: 1, text: `לבנות מלונה (B)` },
+        { id: 'feed',  type: 'event', id_: 'dog_fed_bowl', text: `למלא את קערת האוכל` },
+        { id: 'water', type: 'event', id_: 'dog_watered', text: `למלא את קערת המים` },
+        { id: 'wash',  type: 'event', id_: 'dog_washed', text: `לרחוץ אותו (מים נקיים, סבון אם יש)` }
+      ],
+      done: [{ do: 'flag', id: 'kennel_done' }]
+    },
+    sq_dog_lost: {
+      title: `פלפל הלך`, kind: 'side', chapter: 3, area: 'neighborhood',
+      summary: `המלונה ריקה. עקבות לכיוון העיר.`,
+      steps: [
+        { id: 'food', type: 'item', item: 'dog_food', n: 1, text: `אוכל לכלבים בתיק` },
+        { id: 'find', type: 'dialogue', id_: 'dlg_dog_return', text: `החצר ברחוב הדקלים` }
+      ],
+      done: []
+    },
+    sq_roni_leg: {
+      title: `הרגל של רוני`, kind: 'side', chapter: 5, area: 'hospital',
+      summary: `הרגל מזוהמת. צריך אנטיביוטיקה וקיבוע אמיתי.`,
+      steps: [
+        { id: 'pills',  type: 'item', item: 'antibiotics', n: 1, text: `אנטיביוטיקה (בית המרקחת בבית החולים)` },
+        { id: 'splint', type: 'craft', recipe: 'splint', text: `להכין קיבוע (שולחן עבודה)` },
+        { id: 'treat',  type: 'dialogue', id_: 'dlg_roni_leg', text: `לטפל בה ליד המדורה` }
+      ],
+      done: []
+    },
+    sq_roni_ship: {
+      title: `הגשר הנעול`, kind: 'side', chapter: 5, area: 'port', req: { flags: ['roni_joined'] },
+      summary: `אבא של רוני נעל את עצמו על גשר הספינה ביום 9.`,
+      steps: [
+        { id: 'watch', type: 'item', item: 'father_watch', n: 1, text: `גשר הפיקוד של הספינה` },
+        { id: 'tell',  type: 'dialogue', id_: 'dlg_roni_father', text: `לספר לרוני` }
+      ],
+      done: []
+    },
+    sq_roni_rachel: {
+      title: `להכיר את רחל`, kind: 'side', chapter: 5, area: 'farm', req: { flags: ['roni_leg_healed'] },
+      summary: `רוני רוצה לפגוש את "היחידה שאתה מפחד ממנה".`,
+      steps: [{ id: 'visit', type: 'dialogue', id_: 'dlg_roni_rachel', text: `לבקר בחווה עם רוני` }],
+      done: []
+    },
+    sq_rachel_wool: {
+      title: `צמר של גברת`, kind: 'side', chapter: 7, area: 'farm', req: { flags: ['peak_known'] },
+      summary: `רחל מרגישה שאני הולך לקור.`,
+      steps: [
+        { id: 'hat',     type: 'dialogue', id_: 'dlg_rachel_wool', text: `לבקר את רחל` },
+        { id: 'sweater', type: 'dialogue', id_: 'dlg_dog_sweater', text: `להביא לרחל 3 בד בשביל סוודר לפלפל`, optional: true }
+      ],
+      done: []
     },
 
     // ============================================================ SIDE: forest
@@ -285,10 +372,10 @@
       title: `פלפל`, kind: 'side', chapter: 2, area: 'neighborhood',
       summary: `כלב בחצר. רזה. נובח ובורח.`,
       steps: [
-        { id: 'feed', type: 'event', id_: 'dog_fed', n: 3, text: `להשאיר לו שימורים (3 ביקורים שונים)` },
-        { id: 'come', type: 'dialogue', id_: 'dlg_dog_comes', text: `לבקר שוב` }
+        { id: 'feed', type: 'event', id_: 'dog_fed', n: 3, text: `להשאיר לו שימורים (3 ביקורים שונים)` }
       ],
-      done: [{ do: 'flag', id: 'dog_home' }]
+      // expansion: the dog no longer comes home here; he joins in chapter 3 (dlg_dog_arrives). Feeding him now = he trusts you more then.
+      done: [{ do: 'flag', id: 'dog_trust' }, { do: 'toast', text: `פלפל אכל מהיד שלי. הוא עדיין לא בא איתי.` }]
     },
     sq_house12: {
       title: `בית מספר 12`, kind: 'side', chapter: 2, area: 'neighborhood',
@@ -384,19 +471,19 @@
 
     // ============================================================ SIDE: military
     sq_tamar_tapes: {
-      title: `ההקלטות של תמר`, kind: 'side', chapter: 7, area: 'military',
+      title: `ההקלטות של תמר`, kind: 'side', chapter: 8, area: 'military',
       summary: `"רס"ן ארד, יומן קשר." שלוש קלטות.`,
       steps: [{ id: 'all', type: 'notes', notes: ['rec_tamar_1', 'rec_tamar_2', 'rec_tamar_3'], text: `3 קלטות בבסיס` }],
       done: [{ do: 'flag', id: 'tamar_heard_all' }, { do: 'dialogue', id: 'dlg_tamar_thought' }]
     },
     sq_tower4: {
-      title: `מגדל 4`, kind: 'side', chapter: 7, area: 'military',
+      title: `מגדל 4`, kind: 'side', chapter: 8, area: 'military',
       summary: `מפתח עם תווית "מגדל 4".`,
       steps: [{ id: 'open', type: 'spot', spot: 'spot_tower4_cache', text: `מגדל השמירה הדרום-מזרחי` }],
       done: []
     },
     sq_relay5: {
-      title: `ממסר 5`, kind: 'side', chapter: 7, area: 'military',
+      title: `ממסר 5`, kind: 'side', chapter: 8, area: 'military',
       summary: `עוד קסדה. עוד מספר.`,
       steps: [{ id: 'read', type: 'notes', notes: ['note_relay5_log'], text: `היומן שלו` }],
       done: [{ do: 'dialogue', id: 'dlg_relay5_thought' }]
@@ -404,19 +491,19 @@
 
     // ============================================================ SIDE: airport
     sq_luggage: {
-      title: `מזוודות`, kind: 'side', chapter: 8, area: 'airport',
+      title: `מזוודות`, kind: 'side', chapter: 9, area: 'airport',
       summary: `אנשים שלא המריאו.`,
       steps: [{ id: 'all', type: 'notes', notes: ['note_luggage_1', 'note_luggage_2', 'note_luggage_3', 'note_luggage_4'], text: `4 מזוודות` }],
       done: []
     },
     sq_crash: {
-      title: `המטוס הקטן`, kind: 'side', chapter: 8, area: 'airport',
+      title: `המטוס הקטן`, kind: 'side', chapter: 9, area: 'airport',
       summary: `מישהו ניסה לנחות כאן אחרי שהמגדל אמר "אין נחיתות".`,
       steps: [{ id: 'read', type: 'notes', notes: ['note_pilot'], text: `תא הטייס` }],
       done: []
     },
     sq_ori_trust: {
-      title: `לסמוך על אורי`, kind: 'side', chapter: 8, area: 'airport', start: 'new_game', hidden: true,
+      title: `לסמוך על אורי`, kind: 'side', chapter: 9, area: 'airport', start: 'new_game', hidden: true,
       summary: `(נסתרת: לא מוצגת ביומן. נספרת מתחילת המשחק, מבחירות בשיחות עם אורי ועם מאיה.)`,
       steps: [{ id: 'points', type: 'event', id_: 'ori_trust_point', n: 3, text: `` }],
       done: [{ do: 'flag', id: 'ori_trust' }]   // the decoder itself is handed over by trigger t_ori_decoder

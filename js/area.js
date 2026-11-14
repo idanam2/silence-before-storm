@@ -73,7 +73,7 @@
       ponds: [], nodes: [], visit: visit || 0,
       seed: def.seed, lots: def.lots || [], pads: def.pads || [], crops: def.crops || [], terraces: def.terraces || [], floors: def.floors || [], lights: def.lights || [], footprint: def.footprint || null,
       water: def.water || [], decks: def.decks || [], structures: (def.structures || []).map(function (q) { return q.breakable ? Object.assign({}, q) : q; }), roads: def.roads || [], solids: [],
-      dark: def.dark || null, enemyPlan: def.enemyPlan || null, need: def.need || null,
+      dark: def.dark || null, enemyPlan: def.enemyPlan || null, need: def.need || null, cold: def.cold || null, warm: def.warm || [],
       rads: def.rads || [], valves: (def.valves || []).map(function (v) { return Object.assign({}, v, { closed: false }); })
     };
     var i, k;
@@ -352,7 +352,7 @@
   // One simulation step of "hold E to gather". g is mutated. Returns what happened this step.
   function gatherStep(g, target, held, dt, bag, resDefs, items) {
     var out = { active: false, hit: false, done: null, blocked: null };
-    if (!held || !target || target.kind === 'exit' || target.kind === 'door') { g.node = null; g.t = 0; return out; }
+    if (!held || !target || target.kind === 'exit' || target.kind === 'door' || target.kind === 'valve' || !target.node) { g.node = null; g.t = 0; return out; }
     if (g.node !== target.node) { g.node = target.node; g.t = 0; }
     var d = resDefs[target.node.type];
     g.time = d.time;

@@ -21,7 +21,11 @@
     ship_bridge:  { parent: 'port', interior: true, hint: `גשר הפיקוד של ספינת המשא. חדר קטן, חלונות לים, הגה, שולחן מפות, רדיו.` },
     tower_top:    { parent: 'airport', interior: true, hint: `ראש מגדל הפיקוח: חדר עגול, חלונות מסביב, ציוד רדיו, שק שינה, קירות עם תדרים כתובים.` },
     lab_tunnel:   { parent: 'quarry', interior: true, hint: `מנהרת כרייה ארוכה (צפון-דרום), אורות חירום אדומים, פסי עגלות, דוממים קשורים בשרשראות לקירות.` },
-    lab_main:     { parent: 'quarry', interior: true, hint: `מעבדה: חדר זכוכית עם 7 מיטות ילדים, קונסולת שידור, מקרר, מכשיר ניתוח, החדר של מאיה.` }
+    lab_main:     { parent: 'quarry', interior: true, hint: `מעבדה: חדר זכוכית עם 7 מיטות ילדים, קונסולת שידור, מקרר, מכשיר ניתוח, החדר של מאיה.` },
+    // expansion
+    ship_engine:  { parent: 'port', interior: true, hint: `חדר המכונות של ספינת המשא: צינורות, מנוע ענק כבוי, גנרטור קטן דולק עם נורה אחת, מזרן, דלי גשם, חכה דרך פתח. חלון עגול לכיוון החוף.` },
+    // the snowy ridge itself is the world destination 'peaks' (data/world.js, built by the build thread); only its interior is new:
+    peak_station: { parent: 'peaks', interior: true, hint: `תחנת השדה של אפיק: בטון נמוך, תנור, מיטות שדה, לוח לבן, ציוד רדיו, מחסן חלקים. חם יחסית כשהתנור בוער.` }
   };
 
   G.data.storySpots = {
@@ -36,6 +40,14 @@
                          hint: `קרש רופף ברצפת הבקתה / מתחת למחסן.`, on: [{ do: 'dialogue', id: 'dlg_amp_hide' }] },
     spot_garden:       { area: 'base', kind: 'use', label: `ערוגה`, isNew: true, once: false, req: { flags: ['sq_garden_started'] },
                          hint: `מבנה בנייה חדש (2x1 משבצות רצפה). אדמה כהה, נבטים לפי שלב.`, on: [{ do: 'event', id: 'garden_use' }] },
+
+    // ---------------------------------------------------------------- companions (expansion)
+    spot_dog:          { area: 'base', kind: 'npc', label: `פלפל`, once: false, req: { flags: ['dog_joined'], notFlags: ['dog_ran'] },
+                         hint: `הכלב עצמו (הולך אחרי השחקן, ישן במלונה). E = תפריט קטן: להאכיל / מים / לרחוץ / ללטף. הפעולות פולטות dog_fed_bowl, dog_watered, dog_washed, dog_pet.`,
+                         on: [{ do: 'event', id: 'talk_dog' }] },
+    spot_roni:         { area: 'base', kind: 'npc', label: `רוני`, once: false, req: { flags: ['roni_joined'], notFlags: ['roni_lost'] },
+                         hint: `רוני עצמה (בבסיס ליד המדורה, או הולכת איתך). E = שיחה (בוחר storyRoni) / לבוא / להישאר / לתת נשק.`,
+                         on: [{ do: 'event', id: 'talk_roni' }] },
 
     // ---------------------------------------------------------------- forest
     spot_levi_camp:    { area: 'forest', kind: 'use', label: `מחנה נטוש`, isNew: true,
@@ -152,6 +164,8 @@
                          hint: `עמדת האחיות, לוח מפתחות על הקיר.`, on: [{ do: 'give', item: 'pharmacy_key', n: 1 }] },
     spot_pharmacy_fridge:{ area: 'hospital_f1', kind: 'use', label: `מקרר תרופות`, req: { items: { pharmacy_key: 1 } }, deny: `נעול. תווית אדומה.`,
                          hint: `בית המרקחת, המקרר הנמוך.`, on: [{ do: 'take', item: 'pharmacy_key', n: 1 }, { do: 'give', item: 'insulin', n: 1 }] },
+    spot_antibiotics:  { area: 'hospital_f1', kind: 'use', label: `מדף תרופות`, req: { flags: ['roni_joined'] },
+                         hint: `בית המרקחת, המדף הגבוה מאחורי הדלפק.`, on: [{ do: 'give', item: 'antibiotics', n: 1 }] },
     spot_relay3_helmet:{ area: 'hospital_f2', kind: 'use', label: `קסדה`, isNew: true,
                          hint: `חדר המטופלים החמישי: קסדת עבודה צהובה על המיטה, תיק כלים, יומן.`,
                          on: [{ do: 'note', id: 'note_relay3_helmet' }, { do: 'note', id: 'note_relay3_log' }, { do: 'flag', id: 'knows_relay3' }, { do: 'quest', id: 'sq_relay3' }] },
@@ -179,6 +193,13 @@
                          wave: { count: 9, kinds: ['shambler', 'runner', 'runner', 'shambler', 'brute', 'screamer', 'runner', 'shambler', 'crawler'] },
                          label: `להקים ממסר`, req: { items: { relay_kit: 1 }, flags: ['ch5_active'] }, hint: `רגלי המנוף הגבוה, סולם.`,
                          on: [{ do: 'take', item: 'relay_kit', n: 1 }, { do: 'flag', id: 'relay_4' }, { do: 'event', id: 'relay_built' }] },
+    spot_ship_hatch:   { area: 'port', building: 'cargo ship', kind: 'use', label: `פתח למכונות`, once: false, req: { flags: ['saw_signal'] },
+                         hint: `פתח בצד הספינה, קרוב לקו המים, ליד החלון המהבהב. מוביל ל-ship_engine.`, on: [{ do: 'door', to: 'ship_engine' }] },
+    spot_roni_engine:  { area: 'ship_engine', kind: 'npc', label: `מישהי`, req: { notFlags: ['roni_met'] },
+                         hint: `רוני על ארגז ליד הגנרטור הקטן, רגל בקיבוע.`, on: [{ do: 'dialogue', id: 'dlg_roni_meet' }] },
+    spot_ship_watch:   { area: 'ship_bridge', kind: 'use', label: `הקברניט`, req: { flags: ['roni_joined'] },
+                         hint: `ליד ההגה. תיאור בלבד: שמיכה, כיסא, שעון על השולחן.`,
+                         on: [{ do: 'give', item: 'father_watch', n: 1 }, { do: 'note', id: 'note_captain_3' }, { do: 'quest', id: 'sq_roni_ship' }] },
     spot_ship_door:    { area: 'port', building: 'cargo ship', kind: 'use', label: `גשר הפיקוד`, once: false,
                          hint: `גרם מדרגות בצד הספינה הקרוב לרציף. מוביל ל-ship_bridge.`, on: [{ do: 'door', to: 'ship_bridge' }] },
     spot_ship_log:     { area: 'ship_bridge', kind: 'use', label: `יומן הספינה`, hint: `על שולחן המפות.`,
@@ -246,6 +267,27 @@
     spot_luggage_4:    { area: 'airport', kind: 'use', label: `מזוודה`, hint: `ליד המטוס הגדול, על הרחבה.`, on: [{ do: 'note', id: 'note_luggage_4' }, { do: 'quest', id: 'sq_luggage' }, { do: 'give', item: 'bandage', n: 2 }] },
     spot_crash_cockpit:{ area: 'airport', building: 'crashed small plane', kind: 'hold', hold: 2, label: `תא הטייס`,
                          hint: `המטוס הקטן המרוסק.`, on: [{ do: 'note', id: 'note_pilot' }, { do: 'give', item: 'flare_gun', n: 1 }, { do: 'quest', id: 'sq_crash' }] },
+
+    // ---------------------------------------------------------------- the ridge (expansion, chapter 7)
+    spot_peak_body:    { area: 'peaks', kind: 'use', label: `קפוא בשלג`, isNew: true,
+                         hint: `ליד השלט "תחנת שדה 2 — 400 מ'", דומם קפוא שלא זז (לא אויב). על החגורה: מפתח עם תווית כחולה.`,
+                         on: [{ do: 'give', item: 'station_key', n: 1 }, { do: 'note', id: 'note_peak_tag' }] },
+    spot_peak_hut:     { area: 'peaks', kind: 'hold', hold: 3, label: `בקתת הרכבל`, isNew: true,
+                         hint: `תחנת רכבל עליונה הרוסה; קרון תלוי באוויר; בפנים ג'ריקן ויומן מפעיל.`,
+                         on: [{ do: 'give', item: 'diesel_can', n: 1 }, { do: 'note', id: 'note_peak_operator' }] },
+    spot_peak_door:    { area: 'peaks', kind: 'use', label: `דלת התחנה`, isNew: true, once: false, req: { items: { station_key: 1 } }, deny: `נעולה. קרח על המנעול.`,
+                         hint: `הדלת של תחנת הבטון.`, on: [{ do: 'door', to: 'peak_station' }] },
+    spot_peak_board:   { area: 'peak_station', kind: 'use', label: `לוח לבן`, hint: `על הקיר.`, on: [{ do: 'note', id: 'note_peak_test' }, { do: 'flag', id: 'read_peak_test' }] },
+    spot_peak_journal: { area: 'peak_station', kind: 'use', label: `מחברת`, hint: `על מיטת שדה.`, on: [{ do: 'note', id: 'note_peak_journal_1' }, { do: 'note', id: 'note_peak_journal_2' }] },
+    spot_peak_parts:   { area: 'peak_station', kind: 'hold', hold: 2, label: `מחסן חלקים`, hint: `ארון מתכת בפינה.`,
+                         on: [{ do: 'give', item: 'dish_motor', n: 1 }, { do: 'give', item: 'hand_warmer', n: 4 }] },
+    spot_peak_generator:{ area: 'peaks', kind: 'use', label: `מחסן הגנרטור`, isNew: true, req: { items: { dish_motor: 1, diesel_can: 1 } }, deny: `קודם המנוע של הצלחת וסולר.`,
+                         hint: `מבנה קטן 50 מטר מהתחנה, דלת פח. רוני נשארת כאן.`, on: [{ do: 'take', item: 'diesel_can', n: 1 }, { do: 'dialogue', id: 'dlg_peak_generator' }] },
+    spot_peak_dish:    { area: 'peaks', kind: 'hold', hold: 8, label: `לכוון את הצלחת`, isNew: true, req: { flags: ['peak_split'] },
+                         hint: `צלחת גדולה על תורן ליד התחנה, עם ארגז שליטה. בזמן הכיוון: רוח, ובסוף הסופה.`,
+                         on: [{ do: 'take', item: 'dish_motor', n: 1 }, { do: 'dialogue', id: 'dlg_peak_blizzard' }] },
+    spot_peak_cliff:   { area: 'peaks', kind: 'listen', hold: 3, r: 160, label: ``, isNew: true,
+                         hint: `קצה צוק בצד המערבי: רואים משם את כל האזור, את הסכר ואת הים.`, on: [{ do: 'dialogue', id: 'dlg_peak_view' }] },
 
     // ---------------------------------------------------------------- the lab (finale)
     spot_tunnel_shortcut:{ area: 'lab_tunnel', kind: 'use', label: `פיר צדדי`, req: { flags: ['knows_tunnel'] },

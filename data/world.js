@@ -21,6 +21,7 @@
   R.neighborhood = R.east.concat([[63, 70], [71, 66]]);
   R.north = R.east.concat([[57, 64], [60, 56]]);
   R.quarry = R.north.concat([[70, 52], [79, 50], [86, 49]]);
+  R.peaks = R.quarry.concat([[88, 43], [92, 37], [93, 32]]);
   R.town = R.north.concat([[62, 48]]);
   R.police = R.town.concat([[62, 41]]);
   R.hospital = R.town.concat([[55, 42], [46, 37], [38, 34]]);
@@ -31,12 +32,13 @@
   G.data.world = {
     base: { name: 'הבסיס', pos: { x: 50, y: 88 } },
     energy: { base: 2, perKm: 2.4 },
-    order: ['forest', 'farm', 'neighborhood', 'quarry', 'lake', 'police', 'hospital', 'port', 'military', 'airport'],
+    order: ['forest', 'farm', 'neighborhood', 'quarry', 'lake', 'peaks', 'police', 'hospital', 'port', 'military', 'airport'],
     destinations: {
       forest:       { km: 1,  risk: 1, pos: { x: 50, y: 72 }, blurb: 'היער הקרוב לבסיס. שקט יחסית, עצים ומים בשפע.' },
       farm:         { km: 3,  risk: 1, pos: { x: 29, y: 71 }, finds: ['canned_food', 'plank', 'wood', 'mushroom'], blurb: 'שדות ופרדס שהתפרע. מעט עצים, הרבה פטריות ואבנים.' },
       neighborhood: { km: 4,  risk: 2, pos: { x: 71, y: 66 }, finds: ['canned_food', 'cloth', 'electronics', 'metal'], blurb: 'רחובות ריקים ובתים שקרסו, בפאתי העיר. קרוב מספיק לחזור באותו יום.' },
       quarry:       { km: 6,  risk: 2, pos: { x: 86, y: 49 }, finds: ['stone', 'metal', 'plank'], blurb: 'חציבה ישנה בין ההרים במזרח. מקום טוב לאבן.' },
+      peaks:        { km: 8,  risk: 3, pos: { x: 93, y: 32 }, finds: ['cloth', 'wood', 'stone'], blurb: 'פסגות מושלגות בצפון-מזרח. קר מאוד: בלי בגדים חמים הגוף קופא. יש שם מדורות ישנות לחימום.' },
       lake:         { km: 7,  risk: 2, pos: { x: 20, y: 49 }, finds: ['canned_food', 'wood', 'mushroom', 'cloth'], blurb: 'אגם גדול מאחורי סכר, שממנו זורם נהר לים. מים, פטריות ויער צפוף.' },
       police:       { km: 9,  risk: 3, pos: { x: 62, y: 41 }, finds: ['bandage', 'electronics', 'metal', 'canned_food'],
                       blurb: 'תחנה במרכז העיר שננטשה בחופזה. ניידות בחניון, שקי חול בכניסה ומגרש גרירה מגודר.' },
@@ -49,7 +51,7 @@
 
     geo: {
       routes: {
-        forest: R.forest, farm: R.farm, neighborhood: R.neighborhood, quarry: R.quarry, lake: R.lake,
+        forest: R.forest, farm: R.farm, neighborhood: R.neighborhood, quarry: R.quarry, peaks: R.peaks, lake: R.lake,
         police: R.police, hospital: R.hospital, port: R.port, military: R.military, airport: R.airport
       },
       // the sea fills everything west / north of this line
@@ -64,6 +66,7 @@
       fields: { x0: 18, y0: 64, x1: 38, y1: 84 },
       hills: [[89, 42, 15, 5], [84, 30, 10, 4], [95, 60, 11, 4], [70, 13, 7, 3], [96, 22, 9, 3]],
       quarry: { x: 86, y: 49, r: 5 },
+      snow: { x: 93, y: 32, r: 5.5 },
       town: { x0: 53, y0: 33, x1: 71, y1: 50 },
       suburbs: { x0: 63, y0: 59, x1: 80, y1: 73 },
       campus: { x: 38, y: 34 },

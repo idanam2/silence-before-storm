@@ -120,7 +120,7 @@
     list.forEach(function (r) {
       var d = items()[r.out[0]], why = G.crafting.recipeStatus(c, r);
       var qty = r.out[1] > 1 ? ' ×' + r.out[1] : '';
-      var note = why === 'level' ? '<span class="lock">דרוש ' + G.data.buildings[station].name + ' רמה ' + r.level + '</span>' : costHtml(r.cost);
+      var note = why === 'level' ? '<span class="lock">דרוש ' + G.data.buildings[station].name + ' רמה ' + r.level + '</span>' : costHtml(G.crafting.recipeCost(r));
       h += '<div class="row' + (why ? ' off' : '') + '">' +
         '<span class="tile" style="background-image:url(' + G.icons.url(r.out[0]) + ')"></span>' +
         '<div class="info"><div class="rname">' + d.name + qty + '</div><div class="costs">' + note + '</div></div>' +
@@ -178,6 +178,7 @@
   function buildHtml() {
     var c = ctx(), h = '', CARDS = G.data.buildingCards || {};
     G.data.buildingOrder.forEach(function (id) {
+      if (id === 'kennel' && !(G.state.comp && G.state.comp.dog.on)) return;     // the kennel is for the dog: no card before he joins
       var d = G.data.buildings[id], lv = G.crafting.levelOf(c, id), next = G.crafting.nextLevel(c, id), card = CARDS[id] || {};
       var why = G.crafting.buildStatus(c, id);
       var label = !next ? 'מקסימום' : (lv === 0 ? 'בנה' : 'שדרג');
@@ -273,7 +274,7 @@
       var id = W.order[i], d = W.destinations[id], sel = id === mapSel;
       if (!G.story.isUnlocked(id)) continue;          // the story opens the map one place at a time
       nodes += '<button class="mnode risk' + d.risk + (sel ? ' sel' : '') + (flight && id === at ? ' here' : '') + '" data-dest="' + id + '" tabindex="-1" style="left:' + d.pos.x + '%;top:' + d.pos.y + '%">' +
-        '<i>' + G.mapArt.icon(id) + '</i><span>' + G.world.name(id) + (flight && id === at ? ' · אתם כאן' : '') + '</span></button>';
+        '<i>' + G.mapArt.icon(id) + '</i><span>' + G.world.name(id) + (flight && id === at ? ' · אתם כאן' : '') + (!flight && !G.world.access(id, 'ground', st.ride).ok ? ' 🔒' : '') + '</span></button>';
     }
     if (flight && at !== 'base') nodes += '<button class="mnode mhome' + (mapSel === 'base' ? ' sel' : '') + '" data-dest="base" tabindex="-1" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i>' + G.mapArt.icon('base') + '</i><span>' + W.base.name + '</span></button>';
     else nodes += '<div class="mhome" style="left:' + W.base.pos.x + '%;top:' + W.base.pos.y + '%"><i>' + G.mapArt.icon('base') + '</i><span>' + W.base.name + (flight ? ' · אתם כאן' : '') + '</span></div>';
@@ -285,11 +286,12 @@
         '<p>' + (fs ? fs.blurb : 'חזרה הביתה. המסוק נוחת ליד ההאנגר.') + '</p>' +
         '<div class="costs"><span class="cost ' + (lack ? 'lack' : 'ok') + '">טיסה: ' + need + ' דלק · במיכל ' + Math.floor(hv ? hv.fuel : 0) + '</span>' +
         (fs ? '<span class="cost">משאבים: ' + G.world.loot(mapSel).join(' · ') + '</span>' : '') + '</div>' +
-        (lack ? '<div class="mi-warn">אין מספיק דלק במסוק. סגרו את המפה ותדלקו לידו (F).</div>' : '<div class="mi-warn"></div>') +
+        (G.world.stormGrounded() ? '<div class="mi-warn">סערה: המסוק לא ממריא.</div>' : lack ? '<div class="mi-warn">אין מספיק דלק במסוק. סגרו את המפה ותדלקו לידו (F).</div>' : '<div class="mi-warn"></div>') +
         '<button class="act go' + (lack ? ' warn' : '') + '" data-act="go" data-id="' + mapSel + '" tabindex="-1">המראה</button>';
     } else if (!flight && mapSel && W.destinations[mapSel]) {
       var s = W.destinations[mapSel], cost = G.world.cost(mapSel, diff), short = energy < cost;
       var rv = st.ride && st.vehicles && st.vehicles[st.ride], fuel = rv ? G.vehicles.tripFuel(st.ride, s.km) : 0, noFuel = !!rv && rv.fuel < fuel;
+      var acc = G.world.access(mapSel, 'ground', st.ride);                // the story's hard places: only by a tank or a helicopter
       if (rv) short = noFuel;                         // on a vehicle the trip costs fuel and no energy
       info = '<div class="mi-head"><b>' + G.world.name(mapSel) + '</b>' + pips(s.risk, 5, 'סיכון', 'risk') + '<em>סיכון</em></div>' +
         '<p>' + s.blurb + '</p>' +
@@ -298,9 +300,9 @@
         (rv ? '<span class="cost ' + (noFuel ? 'lack' : 'ok') + '">עלות ' + fuel + ' דלק (' + G.data.vehicles[st.ride].name + ' · יש ' + Math.floor(rv.fuel) + ') · 0 אנרגיה</span>'
           : '<span class="cost ' + (short ? 'lack' : 'ok') + '">עלות ' + cost + ' אנרגיה</span>') +
         '<span class="cost">משאבים: ' + G.world.loot(mapSel).join(' · ') + '</span></div>' +
-        (rv ? (noFuel ? '<div class="mi-warn">אין מספיק דלק בכלי הרכב. תדלקו (F) או רדו (V) ולכו ברגל.</div>' : '<div class="mi-warn"></div>')
+        (!acc.ok ? '<div class="mi-warn">' + acc.deny + ' עולים על הכלי (V) ופותחים את המפה ממנו.</div>' : rv ? (noFuel ? '<div class="mi-warn">אין מספיק דלק בכלי הרכב. תדלקו (F) או רדו (V) ולכו ברגל.</div>' : '<div class="mi-warn"></div>')
           : short ? '<div class="mi-warn">האנרגיה לא מספיקה: תגיעו מותשים (איטיים וחלשים). אפשר לישון במיטה קודם.</div>' : '<div class="mi-warn"></div>') +
-        '<button class="act go' + (short ? ' warn' : '') + '" data-act="go" data-id="' + mapSel + '" tabindex="-1">צאו לדרך</button>';
+        '<button class="act go' + (short ? ' warn' : '') + '" data-act="go" data-id="' + mapSel + '" tabindex="-1"' + (acc.ok ? '' : ' disabled') + '>' + (acc.ok ? 'צאו לדרך' : 'אין דרך') + '</button>';
     }
     return { lines: flight ? '' : lines, nodes: nodes, info: info, energy: flight ? 'טיסה במסוק · בחרו יעד' : 'אנרגיה ' + energy + '/' + G.data.needs.max };
   }

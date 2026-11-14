@@ -12,6 +12,7 @@
     create: function () {
       var s = D().start, o = {};
       D().order.forEach(function (k) { o[k] = s[k]; });
+      o.warmth = s.warmth;
       return o;
     },
 
@@ -97,6 +98,7 @@
       var r = D().revive;
       D().order.forEach(function (k) { n[k] = Math.max(n[k], r[k]); });
       n.health = r.health;
+      n.warmth = Math.max(n.warmth == null ? 0 : n.warmth, 60);
       return n;
     }
   };

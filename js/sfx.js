@@ -272,6 +272,7 @@
     brute:    { f: 38, fr: [220, 560, 1200], q: [6, 6, 4], fry: 17, br: 600, bk: 0.8, dist: 16 },
     crawler:  { f: 70, fr: [380, 900, 2300], q: [4, 5, 3], fry: 37, br: 1800, bk: 1.4, dist: 22 },
     screamer: { f: 96, fr: [600, 1300, 2600], q: [4, 5, 3], fry: 29, br: 2000, bk: 1.2, dist: 26 },
+    frozen:   { f: 58, fr: [280, 700, 1700], q: [6, 6, 4], fry: 18, br: 700, bk: 0.9, dist: 14 },
     glower:   { f: 46, fr: [260, 640, 1400], q: [5, 6, 4], fry: 20, br: 800, bk: 1.0, dist: 20 }
   };
   // c = pitch at start / middle / end (kept close to 1), a = attack, peak = loudness.

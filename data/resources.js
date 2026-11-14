@@ -31,6 +31,13 @@
     stash_med:   { action: 'פתיחת מחבוא: תרופות', item: 'bandage',     yield: [3, 4], time: 1.4, tool: null, r: 18, solid: 0, fx: 'cloth' },
     stash_ammo:  { action: 'פתיחת מחבוא: תחמושת', item: 'ammo_556',    yield: [14, 20], time: 1.6, tool: null, r: 18, solid: 0, fx: 'metal' },
     stash_arms:  { action: 'פתיחת מחבוא: נשק',    item: 'm16',         yield: [1, 1],  time: 2.0, tool: null, r: 18, solid: 0, fx: 'metal' },
+    // warm things in frozen packs (the snowy mountains, data/places/peaks.js); the items themselves are in story/data/companions.js
+    pack_parka:  { action: 'פתיחת תרמיל קפוא: מעיל חורף', item: 'parka',         yield: [1, 1], time: 1.6, tool: null, r: 18, solid: 0, fx: 'cloth' },
+    pack_hat:    { action: 'פתיחת תרמיל קפוא: כובע',      item: 'wool_hat',      yield: [1, 1], time: 1.3, tool: null, r: 18, solid: 0, fx: 'cloth' },
+    pack_pants:  { action: 'פתיחת תרמיל קפוא: מכנסיים',  item: 'thermal_pants', yield: [1, 1], time: 1.4, tool: null, r: 18, solid: 0, fx: 'cloth' },
+    pack_boots:  { action: 'פתיחת תרמיל קפוא: מגפיים',   item: 'snow_boots',    yield: [1, 1], time: 1.4, tool: null, r: 18, solid: 0, fx: 'cloth' },
+    pack_tea:    { action: 'פתיחת תרמיל קפוא: תה',         item: 'hot_tea',       yield: [1, 2], time: 1.1, tool: null, r: 18, solid: 0, fx: 'cloth' },
+    pack_warmer: { action: 'פתיחת תרמיל קפוא: מחממים',   item: 'hand_warmer',   yield: [1, 2], time: 1.0, tool: null, r: 18, solid: 0, fx: 'cloth' },
     stash_parts: { action: 'פתיחת מחבוא: חלקים',  item: 'electronics', yield: [2, 3], time: 1.5, tool: null, r: 18, solid: 0, fx: 'metal' },
     fueldrum:  { action: "מילוי ג'ריקנים מחבית דלק", item: 'fuel', yield: [2, 3], time: 1.1, tool: null, r: 16, solid: 0, fx: 'water' },
     barrel:    { action: 'מילוי מחבית גשם', item: 'water_dirty', yield: [2, 3], time: 0.9, tool: null, r: 16, solid: 0, fx: 'water' },

@@ -42,6 +42,12 @@
       jacket: [[50, 82, 96], [84, 128, 144]], pants: [[42, 52, 74], [70, 84, 114]], pack: [[96, 76, 44], [146, 120, 78]],
       skin: [[164, 132, 104], [212, 180, 148]], boot: '#3a3430', hair: '#42342a', strap: '#3a3024'
     },
+    // the partner who walks beside you (js/companions.js): a lighter build, dark red jacket, long dark hair
+    partner: {
+      line: '#141615', nopack: true,
+      jacket: [[112, 54, 60], [160, 92, 98]], pants: [[48, 54, 70], [78, 88, 112]], pack: [[82, 68, 46], [122, 103, 76]],
+      skin: [[176, 144, 120], [222, 190, 162]], boot: '#2e2824', hair: '#3a2a22', strap: '#3a3024'
+    },
     // story characters (js/storyart.js draws them standing): no backpack
     rachel: {
       line: '#141615', nopack: true,
@@ -77,6 +83,12 @@
       jackets: [[[44, 54, 40], [74, 98, 62]], [[60, 66, 44], [96, 112, 66]], [[40, 50, 52], [66, 90, 84]]],
       pants: [[38, 44, 36], [62, 72, 56]], skin: [[96, 150, 80], [160, 230, 120]], boot: '#1c2119', hair: '#202a1c'
     },
+    // frozen: blue-grey skin dusted with frost, stiff old winter clothes
+    frozen: {
+      line: '#10151a', dead: true,
+      jackets: [[[70, 86, 104], [118, 140, 162]], [[84, 90, 100], [136, 146, 160]], [[62, 74, 92], [102, 122, 146]]],
+      pants: [[52, 60, 72], [84, 94, 110]], skin: [[128, 150, 168], [196, 220, 236]], boot: '#22262a', hair: '#9aa8b4'
+    },
     // screamer: pale, bleached, thin pale clothes: stands out from far away
     screamer: {
       line: '#171918', dead: true,
@@ -89,11 +101,13 @@
   // mane = long hair down the back.
   var BODY = {
     player:   { torso: 1, arm: 1, leg: 1, head: 1 },
+    partner:  { torso: 0.88, arm: 0.9, leg: 0.96, head: 0.98, mane: true },
     // ribs = an open wound with the ribs showing, stump = some of them lost a forearm, drag = some drag a leg
     shambler: { torso: 1.05, arm: 1, leg: 1, head: 1, bareArms: 'left', blood: 2, ribs: true, stump: true, drag: true },
     runner:   { torso: 0.86, arm: 0.86, leg: 0.9, head: 0.96, bareArms: true, blood: 2, ribs: true },
     brute:    { torso: 1.5, arm: 1.4, leg: 1.25, head: 0.92, bare: true, bareArms: true, blood: 3, spikes: true, ribs: true },
     glower:   { torso: 1.12, arm: 1.05, leg: 1, head: 1.05, bareArms: true, blood: 1, ribs: true, drag: true },
+    frozen:   { torso: 1.08, arm: 1, leg: 1, head: 1, bareArms: 'left', blood: 0, ribs: false, drag: true },
     crawler:  { torso: 0.95, arm: 0.95, leg: 0.9, head: 1, bareArms: true, blood: 2, stump: true },
     screamer: { torso: 0.82, arm: 0.8, leg: 0.85, head: 1.1, mouth: 1.9, mane: true, blood: 1 }
   };
@@ -105,7 +119,13 @@
     vest:   { vest: [[58, 70, 50], [98, 114, 84]] },
     hazsuit: { pal: { jacket: [[190, 160, 26], [244, 214, 64]], pants: [[176, 148, 24], [226, 196, 56]], boot: '#2c2a1a' }, collar: 'rgba(120,98,10,0.95)' },
     pants:  { pal: { pants: [[76, 76, 46], [118, 118, 78]] }, cargo: true },
-    boots:  { pal: { boot: '#3b2a1c' }, tall: true }
+    boots:  { pal: { boot: '#3b2a1c' }, tall: true },
+    // winter clothes (story/data/companions.js)
+    parka:  { pal: { jacket: [[44, 62, 82], [82, 110, 140]] }, collar: 'rgba(214,220,226,0.92)' },
+    aharon_coat: { pal: { jacket: [[92, 74, 50], [140, 116, 80]] }, collar: 'rgba(52,38,24,0.9)' },
+    wool_hat: { head: { col: [[108, 52, 74], [164, 88, 116]], r: 1.0, band: 'rgba(236,224,226,0.7)' } },
+    thermal_pants: { pal: { pants: [[60, 60, 70], [98, 98, 112]] } },
+    snow_boots: { pal: { boot: '#4a3a2c' }, tall: true }
   };
   var NOWEAR = {}, outfitCache = {};
   function outfitOf(eq) {

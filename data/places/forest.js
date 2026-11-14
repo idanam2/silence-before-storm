@@ -1,7 +1,7 @@
 // The forest's two hidden places (plain data; mutates G.data.areas before data/interiors.js links the doors):
 //   forest_cellar  a dark bunker cellar under a hatch in the forest: a corridor, six open rooms (storage, workshop, bunks,
 //                  generator, pantry, radio room) and two rooms sealed behind boarded walls that only an axe opens.
-//   forest_rad     an irradiated zone behind a gate in the east of the forest. The gate opens only with a gas mask in the bag
+//   forest_rad     an irradiated zone in the east of the forest, reached only through the tunnels under the cellar (the gas mask is needed there); the forest gate is locked from outside, the way out is open
 //                  (item `gasmask`, crafted at the workbench level 2). Irradiated infected (`glower`) live there.
 // Rooms are meant as places for story tasks: spots can be added per room in data/story-wire.js (area + x, y).
 (function (root) {
@@ -184,7 +184,7 @@
   F.doors = (F.doors || []).concat([
     { x: 1330, y: 1130, r: 50, to: 'forest_cellar', at: { x: 260, y: 660 }, face: 0, label: 'ירידה למרתף', art: 'hatch' },
     { x: 3180, y: 1030, r: 100, to: 'forest_rad', at: { x: 1500, y: 1960 }, face: -PI / 2, label: 'כניסה לאזור הקרינה', art: 'rad',
-      need: 'gasmask', needText: 'השער מסומן בסימן קרינה. צריך מסכת גז בתיק (שולחן עבודה רמה 2)' }
+      locked: true, needText: 'השער נעול מבחוץ וסגור בשרשרת. אפשר לצאת דרכו רק מבפנים: הדרך לאזור הקרינה עוברת דרך המרתף והמנהרות' }
   ]);
   F.paths = (F.paths || []).concat([[[2640, 1530], [2900, 1300], [3180, 1090]]]);
 })(typeof window !== 'undefined' ? window : globalThis);

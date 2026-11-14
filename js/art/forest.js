@@ -98,9 +98,10 @@
   }
   function sealedRooms(area) {
     var out = null;
-    for (var i = 0; i < area.structures.length; i++) { var s = area.structures[i]; if (s.room && s.breakable && !s.smashed) (out = out || []).push(s.room); }
+    for (var i = 0; i < area.structures.length; i++) { var s = area.structures[i]; if (s.room && s.breakable && !s.smashed) (out = out || []).push({ x: s.room.x, y: s.room.y, w: s.room.w, h: s.room.h, wall: s }); }
     return out;
   }
+  var STRIP = 100;                                   // how deep into a sealed room you can see from the door side
   function angDiff(a, b) { var d = a - b; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return d; }
   G.darkArt = {
     // area.dark = { level: 0..1 how black it is (default 0.95), torch: reach of the beam in world px (default 260) }
@@ -137,11 +138,17 @@
       var rooms = sealedRooms(area);
       if (rooms) {                                                           // sealed rooms: solid black, taller than the room so tall things in it are hidden too
         cx2.globalCompositeOperation = 'source-over'; cx2.fillStyle = '#020304';
-        for (i = 0; i < rooms.length; i++) { var q = rooms[i]; cx2.fillRect((q.x - camX) * sc, (q.y - 70 - camY) * sc, q.w * sc, (q.h + 70) * sc); }
-      }
-      if (rooms) {                                                           // ... but not the boarded wall itself: it has to be seen, that is where you strike
-        cx2.globalCompositeOperation = 'destination-out'; cx2.fillStyle = '#000';
-        for (i = 0; i < area.structures.length; i++) { var bw = area.structures[i]; if (bw.room && bw.breakable && !bw.smashed) cx2.fillRect((bw.x - 6 - camX) * sc, (bw.y - 56 - camY) * sc, (bw.w + 12) * sc, (bw.h + 62) * sc); }
+        for (i = 0; i < rooms.length; i++) {                                 // the black starts only past the boarded wall: a thin strip just inside stays lit
+          var q = rooms[i], south = q.wall.y > q.y + q.h / 2, y0 = south ? q.y : q.y + STRIP, hh = Math.max(0, q.h - STRIP);   // the wall is on the north or the south side
+          cx2.fillRect((q.x - camX) * sc, (y0 - camY) * sc, q.w * sc, hh * sc);
+        }
+        cx2.globalCompositeOperation = 'destination-out';                    // and a soft pool of light on the boards themselves, so you see where the wall is and what it is made of
+        for (i = 0; i < area.structures.length; i++) {
+          var bw = area.structures[i];
+          if (!bw.room || !bw.breakable || bw.smashed) continue;
+          var lr = Math.max(150, bw.w * 0.75), lsp = lampSprite(lr), lx = (bw.x + bw.w / 2 - camX) * sc, ly = (bw.y + bw.h / 2 - camY) * sc, lrs = lr * sc;
+          cx2.drawImage(lsp.c, lx - lrs, ly - lrs, lrs * 2, lrs * 2);
+        }
         cx2.globalCompositeOperation = 'source-over';
       }
       ctx.imageSmoothingEnabled = true;

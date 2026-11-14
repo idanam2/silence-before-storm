@@ -184,6 +184,8 @@
     var p = st.player;
     if (st.invuln > 0 || st.needs.health <= 0) return;
     var dealt = G.needs.hurt(st.needs, dmg * (1 - G.gear.armor(st.equip)), diffLevel());    // worn clothes take a share of the blow
+    var ed = from && from.type && G.data.enemies.types[from.type];
+    if (ed && ed.cold) st.needs.warmth = Math.max(0, (st.needs.warmth == null ? 100 : st.needs.warmth) - ed.cold.touch * (1 - G.cold.warmthOf(st.equip)));   // a frozen one chills you
     snd('hurt');
     st.invuln = G.data.hurt.invuln; st.hurtGoal = 1; st.lastHitAt = st.playTime;
     floater(p.x, p.y - 22, null, 0, '-' + Math.round(dealt), '#e08a7c');
@@ -274,7 +276,7 @@
 
   function moveInput() {
     var m = G.input.getMove();
-    if (m.run && !st.ride && !G.needs.canRun(st.needs)) m.run = false;   // on a vehicle Shift is the boost: no energy needed
+    if (m.run && !st.ride && (!G.needs.canRun(st.needs) || G.cold.noRun(st))) m.run = false;   // on a vehicle Shift is the boost: no energy needed
     return m;
   }
 

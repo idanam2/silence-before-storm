@@ -8,11 +8,11 @@ function storyGame() {
   vmS.createContext(ctx);
   const files = ['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js',
     ...fsS.readdirSync(pathS.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f),
-    'data/interiors.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js', 'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js',
-    'story/data/story-items.js', 'story/data/spots.js', 'story/data/quests.js', 'story/data/dialogue-1.js', 'story/data/dialogue-2.js',
+    'data/interiors.js', 'data/story-areas.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js', 'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js',
+    'story/data/story-items.js', 'story/data/spots.js', 'story/data/quests.js', 'story/data/dialogue-1.js', 'story/data/dialogue-2.js', 'story/data/dialogue-3.js',
     'story/data/notes.js', 'story/data/triggers.js', 'story/data/endings.js', 'story/data/cellar.js', 'data/story-wire.js',
     'js/input.js', 'js/inventory.js', 'js/dialogue.js', 'js/story.js', 'js/crafting.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js',
-    'js/player.js', 'js/base.js', 'js/placing.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js'];
+    'js/player.js', 'js/base.js', 'js/placing.js', 'js/companions.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js'];
   for (const f of files) vmS.runInContext(fsS.readFileSync(pathS.join(ROOT, f), 'utf8'), ctx, { filename: f });
   return ctx.G;
 }
@@ -149,7 +149,7 @@ test('story: steps are evaluated after the fact (items gathered before the quest
 test('story: spots that are not wired yet do not exist, a used once-spot disappears', () => {
   const { S, w } = rigStory();
   S.story.begin(); drain(S);
-  eq(S.story.visibleSpots('police').length, 0);
+  eq(S.story.visibleSpots('hospital').length, 0);
   useSpot(S, w, 'spot_wall_tally');
   eq(S.story.visibleSpots('base').some(e => e.id === 'spot_wall_tally'), true, 'the wall can be read again (not once-only) or is gone: both are valid');
 });
@@ -226,4 +226,115 @@ test('story: a relay spot is loud and calls its wave halfway (host receives nois
   const e = { id: relay, s: sp, p: { x: 0, y: 0 }, x: 0, y: 0, r: 60, state: 'ok' };
   for (let i = 0; i < 40; i++) S.story.holdSpot(e, 0.1);
   eq(w.noise > 0, true); eq(w.spawns.length >= 1, true);
+});
+
+// ---- chapter 3: the police station, then Pelpel at the gate
+test('chapter 3: every spot of the station is placed on open floor (not inside furniture, walls or water)', () => {
+  const { S } = rigStory();
+  const ids = Object.keys(S.data.storySpots).filter(id => /^police/.test(S.data.storySpots[id].area));
+  eq(ids.length >= 9, true);
+  const zones = {};
+  for (const id of ids) {
+    const P = S.data.storyPlace[id];
+    if (!P) throw new Error('not placed: ' + id);
+    const aid = P.area || S.data.storySpots[id].area;
+    const z = zones[aid] || (zones[aid] = S.area.generate(S.data.areas[aid], S.data.resources, 1));
+    if (S.area.inSolid(z, P.x, P.y, 14)) throw new Error(id + ' stands inside a solid at ' + P.x + ',' + P.y);
+    if (S.area.inWater(z, P.x, P.y, 0)) throw new Error(id + ' is in water');
+    if (P.x < 0 || P.y < 0 || P.x > z.width || P.y > z.height) throw new Error(id + ' is outside the area');
+  }
+});
+
+test('chapter 3: play it through: key, archive, relay, then Pelpel joins at the gate', () => {
+  const { S, w } = rigStory();
+  S.story.begin(); drain(S);
+  S.story.setFlag('ch2_done'); S.story.startQuest('mq_ch3'); drain(S);
+  w.items.relay_kit = 1;
+  S.story.emit('item_gain', { item: 'relay_kit', n: 1, src: 'give' }); drain(S);
+  S.story.emit('enter_area', { area: 'police' }); drain(S);
+  eq(!!S.story.S.flags.ch3_active, true);
+  useSpot(S, w, 'spot_commander_desk'); drain(S);
+  eq(w.items.commander_key, 1, 'the roof key');
+  const arc = useSpot(S, w, 'spot_archive'); for (let i = 0; i < 40; i++) S.story.holdSpot(arc, 0.1); drain(S);
+  eq(!!S.story.S.flags.knows_vehicle4, true);
+  w.area = 'police';
+  const relay = S.story.visibleSpots('police').find(x => x.id === 'spot_relay_police');
+  if (!relay) throw new Error('relay spot is not available');
+  for (let i = 0; i < 100; i++) S.story.holdSpot(relay, 0.1); drain(S);
+  eq(!!S.story.S.flags.relay_2, true);
+  S.story.emit('return_base', {}); drain(S);
+  eq(!!S.story.S.flags.dog_joined, true, 'Pelpel joins when you come home');
+  eq(S.story.S.quests.sq_kennel && S.story.S.quests.sq_kennel.status, 'active');
+  // the engine only sets the flag: the game switches the dog on (js/game-tick.js)
+  const comp = S.companions.create(); S.companions.unlock(comp, 'dog'); eq(comp.dog.on, true);
+});
+
+// ---- chapter 4: the hospital, the quarry door
+test('chapter 4: hospital and quarry spots are placed on open floor', () => {
+  const { S } = rigStory();
+  const ids = Object.keys(S.data.storySpots).filter(id => /^(hospital|quarry)/.test(S.data.storySpots[id].area));
+  eq(ids.length >= 16, true);
+  const zones = {};
+  for (const id of ids) {
+    const P = S.data.storyPlace[id];
+    if (!P) throw new Error('not placed: ' + id);
+    const aid = P.area || S.data.storySpots[id].area;
+    const z = zones[aid] || (zones[aid] = S.area.generate(S.data.areas[aid], S.data.resources, 1));
+    if (S.area.inSolid(z, P.x, P.y, 14)) throw new Error(id + ' stands inside a solid at ' + P.x + ',' + P.y);
+    if (S.area.inWater(z, P.x, P.y, 0)) throw new Error(id + ' is in water');
+  }
+});
+
+test('chapter 4: the hospital relay unlocks the quarry on the map', () => {
+  const { S } = rigStory();
+  S.story.begin(); drain(S);
+  eq(S.story.isUnlocked('quarry'), false);
+  S.story.setFlag('relay_3'); drain(S);
+  eq(S.story.isUnlocked('quarry'), true);
+});
+
+// ---- chapter 5: the port, the ship, Roni
+test('chapter 5: port, harbour office and ship spots are placed on open floor', () => {
+  const { S } = rigStory();
+  const ids = Object.keys(S.data.storySpots).filter(id => { const a = S.data.storyPlace[id] && (S.data.storyPlace[id].area || S.data.storySpots[id].area); return /^(port|ship_)/.test(S.data.storySpots[id].area); });
+  eq(ids.length >= 10, true, ids.length + " spots: ");
+  const zones = {};
+  for (const id of ids) {
+    const P = S.data.storyPlace[id];
+    if (!P) throw new Error('not placed: ' + id);
+    const aid = P.area || S.data.storySpots[id].area;
+    const z = zones[aid] || (zones[aid] = S.area.generate(S.data.areas[aid], S.data.resources, 1));
+    if (S.area.inSolid(z, P.x, P.y, 14)) throw new Error(id + ' stands inside a solid at ' + P.x + ',' + P.y);
+    if (S.area.inWater(z, P.x, P.y, 0)) throw new Error(id + ' is in water');
+  }
+});
+
+test('chapter 5: the engine-room and bridge areas exist and belong to the port', () => {
+  const { S } = rigStory();
+  for (const id of ['ship_engine', 'ship_bridge']) {
+    const a = S.data.areas[id];
+    eq(!!a && a.parent === 'port' && a.interior === true, true, id + ': ');
+    const z = S.area.generate(a, S.data.resources, 1), p = { x: a.spawn.x, y: a.spawn.y, radius: 14 };
+    eq(S.area.inSolid(z, a.spawn.x, a.spawn.y, 14), false, id + ' spawn: ');
+  }
+});
+
+test('chapter 5: meeting Roni on the ship, the escort, and she is with you', () => {
+  const { S, w } = rigStory();
+  S.story.begin(); drain(S);
+  S.story.setFlag('ch5_active'); S.story.startQuest('mq_ch5'); drain(S);
+  S.story.setFlag('saw_signal'); w.area = 'port';
+  eq(S.story.visibleSpots('port').some(x => x.id === 'spot_ship_hatch'), true);
+  useSpot(S, w, 'spot_ship_hatch'); drain(S);
+  eq(w.doors.includes('ship_engine'), true);
+  w.area = 'ship_engine';
+  const e = S.story.visibleSpots('ship_engine').find(x => x.id === 'spot_roni_engine'); S.story.activate(e); drain(S);
+  eq(!!S.story.S.flags.roni_met, true);
+  eq((S.story.S.events.roni_escort_start || 0) >= 1, true);
+  eq(S.story.visibleSpots('ship_engine').some(x => x.id === 'spot_roni_engine'), false, 'she leaves with you');
+  S.story.emit('enter_area', { area: 'port' }); drain(S);
+  eq(w.spawns.length >= 1, true, 'the wave');
+  S.story.run([{ do: 'event', id: 'roni_escort_done' }]); drain(S);
+  eq(!!S.story.S.flags.roni_joined, true);
+  S.story.run([{ do: 'event', id: 'talk_roni' }]); drain(S);
 });

@@ -73,12 +73,14 @@
       items.push({ y: e.state === 'dead' ? e.y - 6 : e.y, e: e });
     }
     items.push({ y: py, e: st.player });
+    G.companions.items(st, vr, items);
     items = items.concat(X.vehItems(alpha));                         // the vehicles parked here and the one being ridden
     items.sort(function (a, b) { return a.y - b.y; });
     for (i = 0; i < items.length; i++) {
       G.forestArt.drawRange(ctx, st.zone, st, vr, time, lo, items[i].y, py);
       lo = items[i].y;
       if (items[i].veh) { G.vehicleArt.draw(ctx, items[i].veh, time); continue; }
+      if (items[i].comp) { G.companions.draw(ctx, st, items[i].comp, alpha, time); continue; }
       if (items[i].e === st.player && X.vehHides()) continue;       // inside a closed cab
       if (items[i].e !== st.player && G.darkArt) G.darkArt.halo(ctx, items[i].e, time);   // the irradiated glow under a glower
       G.player.draw(ctx, items[i].e, alpha, time);
@@ -92,11 +94,13 @@
     var items = [{ y: st.player.y, e: st.player }], i, e, gate = G.defense.gateInfo(st.def, st.base);
     for (i = 0; i < st.enemies.length; i++) { e = st.enemies[i]; items.push({ y: e.state === 'dead' ? e.y - 6 : e.y, e: e }); }
     if (gate) items.push({ y: gate.y + gate.h, gate: gate });
+    G.companions.items(st, vr, items);
     items = items.concat(X.vehItems(alpha));
     items.sort(function (a, b) { return a.y - b.y; });
     for (i = 0; i < items.length; i++) {
       if (items[i].gate) { G.baseArt.drawGate(ctx, st.base, vr, items[i].gate.frac, time); continue; }
       if (items[i].veh) { G.vehicleArt.draw(ctx, items[i].veh, time); continue; }
+      if (items[i].comp) { G.companions.draw(ctx, st, items[i].comp, alpha, time); continue; }
       if (items[i].e === st.player && X.vehHides()) continue;
       G.player.draw(ctx, items[i].e, alpha, time);
       if (items[i].e.hurtK > 0 && G.feel.enabled && items[i].e !== st.player) G.combatArt.drawHit(ctx, items[i].e);
@@ -149,6 +153,7 @@
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (st.area !== 'base' && st.zone && G.darkArt && G.darkArt.needed(st.zone)) G.darkArt.draw(ctx, st.zone, canvas, cx, cy, view.dpr, p, py, time);   // a dark cellar: only light near you and the lamps
+    if (st.area !== 'base' && st.zone && st.zone.cold && st.scene === 'play') G.cold.draw(ctx, canvas.width, canvas.height, st, time, cx, cy);   // snow, chill, frost
     if (st.fade) {                                   // travel / sleep: smooth fade through black
       var f = st.fade, ft = f.t + alpha * cfg.stepMs / 1000;
       var a = ft < f.dur ? ft / f.dur : 1 - (ft - f.dur) / f.dur;
@@ -180,7 +185,7 @@
     }
     G.ui.setWeapon(wd ? wd.name : '', wtxt, wlow);
     G.ui.setHotbar(st.equip, p.held);
-    if (st.needs) G.ui.setNeeds(st.needs);
+    if (st.needs) { G.ui.setNeeds(st.needs); G.compHud.update(st); }
     G.ui.update();
     if (G.hud) G.hud.frame(st, alpha);
   }
@@ -209,6 +214,7 @@
   // Called after a structure was built or upgraded (or a save was loaded): collision, drawing and chest size follow the levels.
   function applyBuildings() {
     st.fences = st.fences || []; st.felled = st.felled || [];
+    st.base.kennelOn = !!(st.comp && st.comp.dog.on); st.base.bowl = st.comp ? st.comp.bowl : null;
     st.buildings.fence = G.placing.fenceLevel(st.fences.length);        // the fence level follows the pieces that stand (js/placing.js)
     G.base.setBuildings(st.base, st.buildings, st.placed, st.fences, st.felled);
     G.baseArt.refresh(st.base);
@@ -244,7 +250,7 @@
       G.forestArt.prepare(G.area.generate(G.data.areas.forest, G.data.resources, 0));
       st.buildings = G.crafting.startBuildings();
       st.fence = st.fence || { material: 'wood' };
-      st.fences = st.fences || []; st.felled = st.felled || [];
+      st.fences = st.fences || []; st.felled = st.felled || []; st.comp = G.companions.create();
       st.placed = st.placed || []; st.floor = st.floor || G.placing.createFloor();
       st.base = G.base.build();
       G.base.setBuildings(st.base, st.buildings, st.placed, st.fences, st.felled);

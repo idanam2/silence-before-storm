@@ -333,6 +333,22 @@
     if (near) outline(ctx, pole.t, true);
   }
 
+  // The dog's kennel: a low wooden house with a dark doorway; and its bowl (food and water show as fill).
+  function drawKennel(ctx, r, c) {
+    var base = box(ctx, r, 0.0, 0.05, c, { n: '#5a4630', w: '#54402c', s: '#3a2d1e', e: '#322818', top: '#6a5438' }, 3);
+    var roof = box(ctx, { x: r.x - 5, y: r.y - 4, w: r.w + 10, h: r.h + 6 }, 0.05, 0.062, c, { n: '#6b4a38', w: '#654433', s: '#4a3226', e: '#402b21', top: '#7b5844' });
+    var dr = { x: r.x + r.w / 2 - 15, y: r.y + r.h - 3, w: 30, h: 4 };
+    poly(ctx, [lift(dr.x, dr.y, 0, c), lift(dr.x + dr.w, dr.y, 0, c), lift(dr.x + dr.w, dr.y, 0.04, c), lift(dr.x, dr.y, 0.04, c)], '#171310');
+  }
+  function drawBowl(ctx, r, c, bowl) {
+    var f = bowl ? bowl.food : 0, w = bowl ? bowl.water : 0, cap = 3, h = 0.012;
+    box(ctx, { x: r.x, y: r.y + 2, w: 18, h: r.h - 4 }, 0, h, c, { n: '#8a8f94', w: '#80858a', s: '#585c60', e: '#4e5256', top: '#a4a9ae' });
+    box(ctx, { x: r.x + 22, y: r.y + 2, w: 18, h: r.h - 4 }, 0, h, c, { n: '#8a8f94', w: '#80858a', s: '#585c60', e: '#4e5256', top: '#a4a9ae' });
+    var a = lift(r.x + 9, r.y + r.h / 2, h, c), b2 = lift(r.x + 31, r.y + r.h / 2, h, c);
+    if (f > 0) { ctx.fillStyle = '#6b4a2a'; ctx.beginPath(); ctx.ellipse(a[0], a[1], 3 + f * 1.6, 2 + f, 0, 0, 6.3); ctx.fill(); }
+    if (w > 0) { ctx.fillStyle = '#5a8fb0'; ctx.beginPath(); ctx.ellipse(b2[0], b2[1], 3 + w * 1.6, 2 + w, 0, 0, 6.3); ctx.fill(); }
+  }
+
   function drawBed(ctx, r, c, lvl, near) {
     var up = lvl >= 2, i, FR = { n: '#4a3f30', w: '#463b2d', s: '#2c251b', e: '#251f16', top: '#5a4d3a' };
     [[0, 0], [r.w - 8, 0], [0, r.h - 8], [r.w - 8, r.h - 8]].forEach(function (p) {
@@ -714,6 +730,8 @@
       else if (r.kind === 'rack') drawRack(ctx, r, c, opts.near === 'rack', lv, time);
       else if (r.kind === 'bed') drawBed(ctx, r, c, lv, opts.near === 'bed');
       else if (r.kind === 'tank') drawTank(ctx, r, c, opts.near === 'tank', time, lv);
+      else if (r.kind === 'kennel') drawKennel(ctx, r, c);
+      else if (r.kind === 'dogbowl') drawBowl(ctx, r, c, b.bowl);
       else if (r.kind.indexOf('garage_') === 0) drawGarage(ctx, r, c, opts.near === r.kind, lv, r.kind);
     }
   }

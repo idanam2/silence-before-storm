@@ -74,6 +74,7 @@
       case 'collect': return (qs.counters[st.id] || 0) >= st.n;
       case 'craft': case 'sleep': return (qs.counters[st.id] || 0) >= 1;
       case 'build': return ((host.buildings() || {})[st.building] || 0) >= (st.level || 1);
+      case 'vehicle': return !!(host.hasVehicle && host.hasVehicle(st.vehicle));                 // the vehicle is built (checked from the state, so an earlier build counts)
       case 'dialogue': return !!S.played[st.id_];
       case 'flag': return !!S.flags[st.flag];
       case 'notes': for (i = 0; i < st.notes.length; i++) if (!S.read[st.notes[i]]) return false; return true;
@@ -185,6 +186,7 @@
     else if (id === 'radio_use') useRadio();
     else if (id === 'talk_rachel') talk(D().storyRachel);
     else if (id === 'talk_ori') talk(D().storyOri);
+    else if (id === 'talk_roni') talk(D().storyRoni);
   }
 
   function trigOk(t, e) {
@@ -394,7 +396,7 @@
   function poll() {
     if (!S) return;
     var b = host.buildings() || {}, k;
-    if (lastBuild) for (k in b) if ((b[k] || 0) > (lastBuild[k] || 0)) emit('build', { building: k, level: b[k] });
+    if (lastBuild) for (k in b) if ((b[k] || 0) > (lastBuild[k] || 0)) emit('build', { building: k, level: b[k], id: k });      // id: so a trigger can match the building
     lastBuild = {}; for (k in b) lastBuild[k] = b[k];
     if (S.owed.length) {
       var rest = [];

@@ -13,7 +13,7 @@
 //   new_game · enter_area (area) · leave_area (area) · return_base · sleep · wake · station (id: workbench | campfire | rack, E at a station)
 //   spot (spot) · story_event (id) — every { do: 'event', id } from spots/dialogue lands here
 //   dialogue_end (id) · note_read (id) · quest_start (id) · quest_done (id) · flag (id)
-//   item_gain (item, n) · craft (recipe) · build (building, level) · relay_built (spot)
+//   item_gain (item, n) · craft (recipe) · build (building, level) · relay_built (spot) · vehicle_built (match: vehicle id)
 //
 // Actions (shared by spots, dialogue nodes, quests and triggers):
 //   { do: 'dialogue', id }                 open a dialogue (queue it if one is open)
@@ -46,7 +46,9 @@
       { dialogue: 'dlg_maya_ch5',     req: { flags: ['relay_4'] } },
       { dialogue: 'dlg_maya_ch6_ask', req: { questDone: 'mq_ch5' } },
       { dialogue: 'dlg_maya_ch6',     req: { flags: ['noa_answered'] } },
-      { dialogue: 'dlg_maya_ch7_ask', req: { questDone: 'mq_ch6' } },
+      { dialogue: 'dlg_maya_peak_ask', req: { questDone: 'mq_ch6' } },
+      { dialogue: 'dlg_maya_peak',    req: { flags: ['peak_dish_done'] } },
+      { dialogue: 'dlg_maya_ch7_ask', req: { questDone: 'mq_peak' } },
       { dialogue: 'dlg_maya_ch7',     req: { flags: ['relay_6'] } },
       { dialogue: 'dlg_ori_call',     req: { questDone: 'mq_ch7' } },
       { dialogue: 'dlg_maya_ch8',     req: { flags: ['relay_7'] } }
@@ -70,7 +72,30 @@
     { dialogue: 'dlg_rachel_hives_start', req: { quest: 'sq_hives', notFlags: ['sq_hives_started'] } },
     { dialogue: 'dlg_rachel_rhythm',      req: { flags: ['hives_smoked'] } },
     { dialogue: 'dlg_rachel_letter_give', req: { flags: ['rachel_deal_done'], chapter: 2 } },
+    { dialogue: 'dlg_rachel_wool',        req: { flags: ['peak_known'] } },
+    { dialogue: 'dlg_dog_sweater',        req: { flags: ['rachel_knits', 'dog_joined'], items: { cloth: 3 } }, take: { cloth: 3 } },
+    { dialogue: 'dlg_rachel_soap',        req: { flags: ['dog_joined'] } },
+    { dialogue: 'dlg_roni_rachel',        req: { flags: ['roni_joined', 'roni_leg_healed'], notFlags: ['roni_lost'], companion: 'roni' } }, // companion: Roni must be following you here
     { dialogue: 'dlg_rachel_idle',        req: { flags: ['rachel_deal_done'] }, repeat: true }
+  ];
+
+  // When the player talks to Roni (spot_roni). The relationship grows slowly: at most one campfire talk per chapter.
+  G.data.storyRoni = [
+    { dialogue: 'dlg_roni_leg',      req: { items: { antibiotics: 1, splint: 1 } }, take: { antibiotics: 1, splint: 1 } },
+    { dialogue: 'dlg_roni_father',   req: { items: { father_watch: 1 }, notFlags: ['roni_lost'] } },
+    { dialogue: 'dlg_roni_peak_go',  req: { flags: ['ch_peak_active'] } },
+    { dialogue: 'dlg_roni_storm',    req: { flags: ['storm'] } },
+    { dialogue: 'dlg_roni_base_4',   req: { questDone: 'mq_ch7' } },
+    { dialogue: 'dlg_roni_base_3',   req: { flags: ['roni_saved_peak'] } },
+    { dialogue: 'dlg_roni_base_2',   req: { questDone: 'mq_ch6' } },
+    { dialogue: 'dlg_roni_base_1',   req: { questDone: 'mq_ch5' } }
+  ];
+  // idle lines when nothing is pending (random, no dialogue box needed: show as a small speech toast)
+  G.data.storyRoniIdle = [
+    `"המדורה הזאת עושה עשן כמו ספינת פחם. אני אתקן לך ארובה."`,
+    `"פלפל אכל? אל תשקר לי, אני רואה את הקערה."`,
+    `"אני שומרת. לך לישון."`,
+    `"תביא לי פעם מנוע. כל מנוע. אני משתגעת בלי משהו לפרק."`
   ];
 
   // When the player talks to Ori in the tower (spot_ori).
@@ -82,7 +107,7 @@
 
   // The tally wall: which note the wall shows, by current chapter (sq_wall_days counts each first read).
   G.data.storyWall = ['note_wall_0', 'note_wall_1', 'note_wall_2', 'note_wall_3', 'note_wall_4',
-                      'note_wall_5', 'note_wall_6', 'note_wall_7', 'note_wall_8'];
+                      'note_wall_5', 'note_wall_6', 'note_wall_peak', 'note_wall_7', 'note_wall_8'];   // index = chapter
 
   // First sleep after each of these flags plays a dream (in order, each once).
   G.data.storyDreams = [
@@ -179,6 +204,42 @@
     { id: 't_tower_door', on: 'story_event', match: 'tower_door', once: false, when: { notFlags: ['tower_open'] }, do: [{ do: 'dialogue', id: 'dlg_ori_door' }] },
     { id: 't_tower_door_open', on: 'story_event', match: 'tower_door', once: false, when: { flags: ['tower_open'] }, do: [{ do: 'door', to: 'tower_top' }] },
 
+    // ---- expansion: Pelpel
+    { id: 't_dog_arrives', on: 'return_base', when: { flags: ['relay_2'], notFlags: ['dog_joined'] }, do: [{ do: 'dialogue', id: 'dlg_dog_arrives' }] },
+    { id: 't_kennel', on: 'build', match: 'kennel', do: [{ do: 'dialogue', id: 'dlg_kennel_built' }] },
+    { id: 't_dog_wash', on: 'story_event', match: 'dog_washed', do: [{ do: 'dialogue', id: 'dlg_dog_wash' }] },
+    { id: 't_dog_sniff', on: 'story_event', match: 'dog_sniff', do: [{ do: 'dialogue', id: 'dlg_dog_sniff' }] },
+    { id: 't_dog_weak', on: 'story_event', match: 'dog_weak', do: [{ do: 'dialogue', id: 'dlg_dog_weak' }] },        // engine fires when a need < weakBelow
+    { id: 't_dog_ran', on: 'story_event', match: 'dog_ran', once: false, do: [{ do: 'flag', id: 'dog_ran' }, { do: 'dialogue', id: 'dlg_dog_ran' }] },
+    { id: 't_dog_back', on: 'story_event', match: 'dog_use', once: false, when: { flags: ['dog_ran'], items: { dog_food: 1 } },
+      do: [{ do: 'take', item: 'dog_food', n: 1 }, { do: 'dialogue', id: 'dlg_dog_return' }] },
+
+    // ---- expansion: Roni
+    { id: 't_roni_signal', on: 'flag', match: 'relay_4', do: [{ do: 'dialogue', id: 'dlg_roni_signal' }] },
+    { id: 't_roni_escaped', on: 'story_event', match: 'roni_escort_done', do: [{ do: 'dialogue', id: 'dlg_roni_escaped' }] }, // engine: both reached the port exit
+    { id: 't_roni_home', on: 'return_base', when: { flags: ['roni_joined'] }, do: [{ do: 'dialogue', id: 'dlg_roni_home' }] },
+    { id: 't_roni_grief', on: 'return_base', when: { flags: ['roni_lost'] }, do: [{ do: 'dialogue', id: 'dlg_roni_grief' }] },
+    { id: 't_roni_tunnel', on: 'enter_area', when: { area: 'lab_tunnel', flags: ['roni_comes_finale'], notFlags: ['roni_lost'] },
+      do: [{ do: 'dialogue', id: 'dlg_roni_tunnel' }] },
+
+    // ---- expansion: the ridge
+    { id: 't_peak_enter', on: 'enter_area', when: { area: 'peaks' }, do: [{ do: 'dialogue', id: 'dlg_peak_arrive' }] },
+    { id: 't_peak_station', on: 'enter_area', when: { area: 'peak_station' }, do: [{ do: 'dialogue', id: 'dlg_peak_station' }] },
+    { id: 't_peak_split', on: 'dialogue_end', match: 'dlg_peak_generator', do: [{ do: 'flag', id: 'peak_split' }] },
+    { id: 't_peak_won', on: 'story_event', match: 'peak_rescue_won', do: [{ do: 'dialogue', id: 'dlg_peak_saved' }, { do: 'flag', id: 'peak_dish_done' }] },
+    { id: 't_peak_lost', on: 'story_event', match: 'peak_rescue_lost', do: [{ do: 'dialogue', id: 'dlg_peak_lost' }, { do: 'flag', id: 'peak_dish_done' }] },
+
+    // ---- expansion: vehicles (tank chapter 6, helicopter chapter 7)
+    // Roni always joins in chapter 5 (main quest), so she is there for the tank idea
+    { id: 't_tank_idea', on: 'dialogue_end', match: 'dlg_maya_ch6_ask', do: [{ do: 'dialogue', id: 'dlg_roni_tank_idea' }] },
+    { id: 't_tank_built', on: 'vehicle_built', match: 'tank', do: [{ do: 'dialogue', id: 'dlg_tank_built' }] },
+    { id: 't_lake_mud', on: 'enter_area', when: { area: 'lake' }, do: [{ do: 'dialogue', id: 'dlg_lake_mud' }] },
+    { id: 't_heli_idea', on: 'dialogue_end', match: 'dlg_maya_peak_ask', do: [{ do: 'dialogue', id: 'dlg_roni_heli_idea' }] },
+    { id: 't_heli_built', on: 'vehicle_built', match: 'heli', do: [{ do: 'dialogue', id: 'dlg_heli_first_flight' }] },
+    { id: 't_military_tank', on: 'enter_area', when: { area: 'military' }, do: [{ do: 'dialogue', id: 'dlg_military_tank' }] },
+    { id: 't_ori_heli', on: 'enter_area', when: { area: 'airport', quest: 'mq_ch8' }, do: [{ do: 'dialogue', id: 'dlg_ori_heli' }] },
+    { id: 't_storm_grounded', on: 'story_event', match: 'heli_denied_storm', do: [{ do: 'dialogue', id: 'dlg_storm_grounded' }] }, // engine: the player tries to fly while flag storm
+
     // ---- the storm and the finale
     { id: 't_storm', on: 'flag', match: 'storm', do: [{ do: 'weather', id: 'storm' }, { do: 'unlock', area: 'quarry' }] },
     { id: 't_storm_leave', on: 'leave_area', when: { area: 'base', flags: ['storm'] }, do: [{ do: 'dialogue', id: 'dlg_storm_start' }] },
@@ -193,6 +254,21 @@
       do: [{ do: 'dialogue', id: 'dlg_final_choice' }] },
     { id: 't_ending', on: 'flag', match: 'ending_chosen', do: [{ do: 'event', id: 'play_ending' }] }   // game: show G.data.storyEndings
   ];
+
+  // ------------------------------------------------------------------ access: places you cannot reach on foot (expansion)
+  // The world map / travel code checks this before a trip. by: the vehicles that get you in (data/vehicles.js ids).
+  // 'heli' means flying there (the helicopter is a transport, see CLAUDE.md); a ground vehicle means driving it on the trip.
+  // deny: shown on the map card when the player has none of them. Places not listed are open to everyone.
+  // stormNoFly: while flag `storm` is set the helicopter cannot take off (story: dlg_storm_grounded) - the finale is on foot or by tank.
+  G.data.storyAccess = {
+    lake:     { by: ['tank', 'heli'], deny: `העמק לפני הסכר מוצף בבוץ. צריך טנק (או מסוק).` },
+    military: { by: ['tank', 'heli'], deny: `שדות בוץ ומוקשים סביב הבסיס. צריך טנק (או מסוק).` },
+    peaks:    { by: ['heli'],         deny: `מפולת קברה את הכביש לרכס. מגיעים רק במסוק.` },
+    airport:  { by: ['heli'],         deny: `הכבישים לשדה התעופה חסומים בשברי מטוסים. מגיעים רק במסוק.` },
+    stormNoFly: true
+  };
+  // Roni helps in the garage once she has joined: the tank's and helicopter's part recipes cost this much less (0.25 = 25%).
+  G.data.storyGarageHelp = { flag: 'roni_joined', discount: 0.25, vehicles: ['tank', 'heli'] };
 
   // ------------------------------------------------------------------ flags
   // Every story flag, what sets it and what reads it. Keep in sync; story/check.js warns on unknown flags.
@@ -229,6 +305,19 @@
     // finale
     saw_noa: `ראה אותה`, finale_heard: `שמע את מאיה עד הסוף`, finale_pa_talk: `דיבר על הנמל בסיום`, finale_relays_talk: `דיבר על הטכנאים`,
     ending_hum: `סוף א`, ending_broadcast: `סוף ב`, ending_song: `סוף ג`, amp_destroyed: `השמיד מגבר`, amp_left: `השאיר מגבר`,
-    noa_home_sick: `לקח אותה הביתה חולה`, noa_with_maya: `השאיר אותה אצל מאיה`
+    noa_home_sick: `לקח אותה הביתה חולה`, noa_with_maya: `השאיר אותה אצל מאיה`,
+    // expansion: Pelpel
+    dog_trust: `האכיל את פלפל בשכונה`, dog_joined: `פלפל איתו`, kennel_done: `מלונה, קערות, רחצה`, dog_ran: `פלפל ברח (זמני)`,
+    rachel_soap: `מתכון סבון`, rachel_knits: `רחל סורגת`,
+    // expansion: Roni
+    saw_signal: `ראה את האיתות מהספינה`, roni_met: `פגש את רוני`, roni_joined: `רוני איתו`, roni_leg_healed: `הרגל טופלה`,
+    roni_father_known: `קראה את היומן של אבא`, roni_met_rachel: `רוני פגשה את רחל`, roni_knows_noa: `רוני יודעת על נועה`,
+    roni_close_1: `יד ביד`, roni_close_2: `אחרי הרכס`, roni_together: `ביחד`, roni_waits: `מחכה בבסיס בסיום`,
+    roni_comes_finale: `באה להר`, roni_in_finale: `הייתה במנהרה`, roni_peak: `באה לרכס`, roni_saved_peak: `ניצלה בסופה`, roni_lost: `אבדה בסופה (סופי)`,
+    // expansion: the ridge
+    peak_known: `שמע על הרכס`, ch_peak_active: `פרק הרכס`, peak_split: `רוני ליד הגנרטור`, peak_dish_done: `הצלחת מכוונת`,
+    peak_link: `הקישור מההר פעיל`, read_peak_test: `קרא את הלוח בתחנה`,
+    // expansion: vehicles
+    tank_idea: `רוני הציעה טנק`, heli_idea: `רוני הציעה מסוק`, heli_flown: `טיסה ראשונה`
   };
 })(typeof window !== 'undefined' ? window : globalThis);

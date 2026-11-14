@@ -967,3 +967,17 @@ body.menu #story-layer { display: none; }
 .mnode.mhome { cursor: pointer; }
 .mnode.here { opacity: 0.45; cursor: default; }
 .mnode.here:hover i { transform: none; }
+
+/* cold meter and the dog's meters (js/cold.js, G.compHud) */
+.need.warmth { grid-column: 1 / -1; --bar: #8cc4e8; }
+.need.warmth .val { min-width: 26px; font-size: 12px; font-weight: 600; text-align: right; color: #e6eef4; font-variant-numeric: tabular-nums; }
+.need.warmth.low { --bar: #b8e0ff; animation: chillpulse 1.6s ease-in-out infinite; }
+@keyframes chillpulse { 50% { opacity: 0.62; } }
+.dogbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; color: #d8c8a8; }
+.dogbar .ico { flex: none; width: 14px; height: 14px; }
+.dogbar .ico svg { display: block; width: 100%; height: 100%; }
+.dogbar .nm { font-size: 11px; margin-inline-end: 2px; }
+.dogbar .meter { flex: 1; height: 3px; background: rgba(0, 0, 0, 0.55); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); overflow: hidden; }
+.dogbar .meter i { display: block; height: 100%; width: 100%; transform-origin: left; background: var(--bar); transition: transform 0.3s ease; }
+.dogbar .hunger { --bar: #c9a35a; } .dogbar .thirst { --bar: #7fb0c8; } .dogbar .clean { --bar: #b6c8a0; }
+.dogbar .meter.low { --bar: #e08a3c; }

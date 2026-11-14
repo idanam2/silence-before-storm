@@ -11,7 +11,7 @@
   var area = { key: '', c: null, w: 0, h: 0, at: 0 };
   var last = -1, target = { id: null, name: '', hp: -1, show: false };
 
-  var GROUND = { concrete: '#8e9189', gravel: '#a39c88', tiles: '#2b2e2d' };
+  var GROUND = { concrete: '#8e9189', gravel: '#a39c88', tiles: '#2b2e2d', snow: '#dde6ef' };
 
   function rr(g, r, col) { g.fillStyle = col; g.fillRect(r.x * K, r.y * K, Math.max(1, r.w * K), Math.max(1, r.h * K)); }
 

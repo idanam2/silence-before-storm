@@ -290,6 +290,12 @@
                { type: 'lowpass', f: 200, q: 0.7, g: 0.06, lfos: [] }],
       ev: [['gravel', 8, 20]]
     },
+    peaks: {
+      echo: true,
+      layers: [{ type: 'bandpass', f: 520, q: 1.4, g: 0.09, lfos: [[0.11, 260, 'f'], [0.07, 0.05, 'g']] },
+               { type: 'highpass', f: 2400, q: 0.5, g: 0.01, lfos: [[0.2, 0.008, 'g']] }],
+      ev: [['creak', 14, 35], ['gravel', 20, 50]]
+    },
     lake: {
       echo: true,
       layers: [{ type: 'lowpass', f: 700, q: 0.6, g: 0.08, lfos: [[0.18, 0.055, 'g'], [0.07, 200, 'f']] },

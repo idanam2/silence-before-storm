@@ -131,6 +131,7 @@
       s.push(r);
     }
     for (i = 0; fences && i < fences.length; i++) { var fr = G.placing.fenceRect(fences[i]); fr.kind = 'fence'; fr.mat = fences[i].m; fr.piece = true; s.push(fr); }
+    if (b.kennelOn) { s.push(rect(1960, 640, 96, 64, 'kennel')); s.push(rect(1978, 722, 40, 24, 'dogbowl')); }   // appear when the dog joins (js/companions.js)
     b.solids = s;
     return b;
   }

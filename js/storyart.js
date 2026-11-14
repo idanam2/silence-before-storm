@@ -111,6 +111,25 @@
       box(c, x - 18, y - 12, 36, 6, '#5a636a');
       box(c, x + 14, y + 6, 12, 8, '#d6d2c0'); box(c, x + 22, y + 10, 12, 8, '#c9c4b0');
     },
+    van: function (c, x, y) {                                     // a white van with a blue stripe, back door open (parked sideways)
+      shadow(c, x, y + 20, 56, 8);
+      box(c, x - 52, y - 20, 104, 40, '#d8d8d2', '#8a8a84');
+      box(c, x - 52, y - 4, 104, 8, '#2f5d9a');
+      box(c, x + 30, y - 18, 20, 14, '#3a4650');
+      box(c, x - 60, y - 16, 10, 32, '#9a9a94', '#5a5a56');
+    },
+    steeldoor: function (c, x, y) {                               // a round-cornered steel door set in the rock, red lamp above
+      shadow(c, x, y + 30, 50, 6);
+      box(c, x - 46, y - 40, 92, 74, '#4a463e', '#2c2a26');
+      box(c, x - 34, y - 30, 68, 62, '#6a7078', '#3a3e44');
+      line(c, x, y - 30, x, y + 32, '#3a3e44', 2); box(c, x - 5, y - 4, 10, 10, '#2c3034');
+      box(c, x - 4, y - 48, 8, 6, '#a82820', '#5a1410');
+    },
+    helmet: function (c, x, y) {                                  // a yellow hard hat on a bed, a tool bag beside it
+      shadow(c, x, y + 6, 22, 5);
+      box(c, x - 14, y - 10, 28, 14, '#d6b020', '#8a7010'); box(c, x - 18, y + 2, 36, 5, '#b89818');
+      box(c, x + 22, y - 4, 22, 14, '#4a4a3a', '#2a2a22');
+    },
     paper: function (c, x, y) {                                   // a sheet or booklet left lying about
       box(c, x - 9, y - 7, 18, 14, '#c9c4b0', '#8a8472');
       line(c, x - 5, y - 2, x + 5, y - 2, '#7a7466', 1); line(c, x - 5, y + 2, x + 3, y + 2, '#7a7466', 1);

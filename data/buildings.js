@@ -11,7 +11,7 @@
   var G = root.G;
   G.data = G.data || {};
 
-  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'garage_moto', 'garage_jeep', 'garage_heli', 'garage_tank', 'bed', 'tank', 'bag', 'chest', 'box'];                      // the fence is not a card of its own any more: pieces are laid one by one (see fencePiece)
+  G.data.buildingOrder = ['workbench', 'campfire', 'rack', 'garage_moto', 'garage_jeep', 'garage_heli', 'garage_tank', 'bed', 'tank', 'bag', 'kennel', 'chest', 'box'];                      // the fence is not a card of its own any more: pieces are laid one by one (see fencePiece)
 
   // Fence materials the player chooses between (state: G.state.fence.material). `swap` replaces cost items: the fence
   // levels are priced in planks and stone; stone fences use stone instead of planks, metal fences metal (half as much, rounded up).
@@ -45,6 +45,17 @@
         { cost: { cloth: 4, wood: 6 }, bagSlots: 18 },
         { cost: { cloth: 8, plank: 6, nails: 6 }, bagSlots: 24 },
         { cost: { cloth: 12, plank: 10, nails: 10 }, bagSlots: 32 }
+      ]
+    },
+    // Pelpel's kennel (chapter 3): not placed in the yard (js/base.js puts the kennel and its bowl where they are once the dog is on); only the
+    // level counts (story/data/companions.js: storyDog.kennel). Hidden from the build panel until the dog has joined (js/ui.js).
+    kennel: {
+      name: 'מלונה', start: 0, station: false, spot: null,
+      desc: 'מלונה וקערות לפלפל. רמה 2: קערות גדולות ומצע. רמה 3: מבודדת מקור.',
+      levels: [
+        { cost: { wood: 8, plank: 4 }, bowls: 1 },
+        { cost: { plank: 8, nails: 6, cloth: 3 }, bowls: 2 },
+        { cost: { plank: 10, nails: 8, cloth: 6 }, bowls: 3, warm: true }
       ]
     },
     workbench: {
@@ -128,6 +139,7 @@
   // How each building looks on its card in the build panel (B): an emoji and a one-line "what it does".
   // The long text stays in buildings[id].desc and shows as the card's tooltip.
   G.data.buildingCards = {
+    kennel:       { icon: '🐕', blurb: 'בית לפלפל: קערות אוכל ומים, מצע ומקום חם' },
     bag:          { icon: '🎒', blurb: 'יותר מקום בתיק: עד 32 משבצות' },
     workbench:    { icon: '🛠️', blurb: 'יצירת כלים, נשקים ותחמושת' },
     rack:         { icon: '🍄', blurb: 'ייבוש פטריות ואוכל, מנות שדה' },

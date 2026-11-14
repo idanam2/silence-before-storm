@@ -135,7 +135,7 @@
   function snapshot(st, now) {
     var o = {
       v: VERSION, savedAt: now || 0, diff: st.diff, playTime: Math.round(st.playTime),
-      needs: { health: st.needs.health, hunger: st.needs.hunger, thirst: st.needs.thirst, energy: st.needs.energy },
+      needs: { health: st.needs.health, hunger: st.needs.hunger, thirst: st.needs.thirst, energy: st.needs.energy, warmth: st.needs.warmth == null ? 100 : st.needs.warmth },
       bag: slotsOf(st.bag), chest: slotsOf(st.chest),
       buildings: JSON.parse(JSON.stringify(st.buildings)),
       fence: { material: st.fence && st.fence.material },
@@ -143,6 +143,7 @@
       equip: st.equip ? JSON.parse(JSON.stringify(st.equip)) : undefined,       // worn clothes and the two weapon slots (js/gear.js)
       fences: (st.fences || []).map(function (f) { return { o: f.o, cx: f.cx, cy: f.cy, m: f.m }; }),
       felled: (st.felled || []).slice(0, 200),
+      comp: st.comp ? G.companions.snapshot(st.comp) : undefined,
       placed: (st.placed || []).map(function (p) { return { id: p.id, x: Math.round(p.x), y: Math.round(p.y) }; }),
       floor: { cell: G.placing.CELL, cells: Object.assign({}, st.floor && st.floor.cells) },
       chestAt: { x: Math.round(G.base.layout.chest.x), y: Math.round(G.base.layout.chest.y) },
@@ -202,6 +203,7 @@
     d.needs = {};
     var ns = o.needs && typeof o.needs === 'object' ? o.needs : {};
     data.needs.order.forEach(function (key) { d.needs[key] = num(ns[key], data.needs.start[key], 0, data.needs.max); });
+    d.needs.warmth = num(ns.warmth, 100, 0, data.needs.max);                              // missing (old save): warm
     if (d.needs.health < 1) d.needs.health = 1;           // a save never holds a dead player
 
     d.buildings = {};
@@ -215,6 +217,7 @@
     d.fence = { material: data.fenceMaterials.hasOwnProperty(fm) ? fm : 'wood' };      // unknown or missing: wood
     d.creative = o.creative === true;
     d.equip = G.gear ? G.gear.clean(o.equip, items, data.weapons) : null;              // missing (old save): nothing worn, slots refill by themselves
+    d.comp = G.companions.clean(o.comp);                                                  // missing (old save): nobody has joined yet
     d.fences = G.placing.cleanFences(o.fences);                                           // missing (old save): no fence, the old one is gone
     d.felled = Array.isArray(o.felled) ? o.felled.filter(function (i) { return Number.isInteger(i) && i >= 0 && i < 400; }).slice(0, 200) : [];
     d.placed = G.placing.clean(o.placed, d.buildings);                                 // missing (old save): structures on their old spots

@@ -81,6 +81,36 @@ console.log('garage workshop');
     eq(G.vehicles.inGarage('jeep', { fuel: 5, at: null }, 'base', [{ id: 'garage_jeep', x: 1150, y: 1230 }]), true);
   });
 
+  test('story access: hard places open only to the right vehicle (a ground trip needs the vehicle under you, a flight needs the helicopter), and the storm grounds the helicopter', () => {
+    const keepA = G.data.storyAccess, keepS = G.story;
+    try {
+      G.data.storyAccess = { lake: { by: ['tank', 'heli'], deny: 'mud' }, peaks: { by: ['heli'], deny: 'slide' }, stormNoFly: true };
+      eq(G.world.access('forest', 'ground', null).ok, true);                                        // no rule = open
+      eq(G.world.access('lake', 'ground', null).ok, false); eq(G.world.access('lake', 'ground', null).deny, 'mud');
+      eq(G.world.access('lake', 'ground', 'jeep').ok, false); eq(G.world.access('lake', 'ground', 'tank').ok, true);
+      eq(G.world.access('peaks', 'ground', 'tank').ok, false); eq(G.world.access('peaks', 'fly').ok, true); eq(G.world.access('lake', 'fly').ok, true);
+      G.story = { S: {}, hasFlag: f => f === 'storm' };
+      eq(G.world.stormGrounded(), true);
+      G.story = { S: {}, hasFlag: () => false }; eq(G.world.stormGrounded(), false);
+      G.data.storyAccess = { stormNoFly: false }; G.story = { S: {}, hasFlag: () => true }; eq(G.world.stormGrounded(), false);
+    } finally { G.data.storyAccess = keepA; G.story = keepS; }
+  });
+
+  test('story help: once the companion has joined, the tank and helicopter garage parts cost 25% less (never 0), other garages and creative mode unchanged', () => {
+    const keepH = G.data.storyGarageHelp, keepS = G.story, rec = (id) => G.data.recipes.filter(r => r.id === id)[0];
+    try {
+      G.data.storyGarageHelp = { flag: 'roni_joined', discount: 0.25, vehicles: ['tank', 'heli'] };
+      G.story = { S: {}, hasFlag: () => false };
+      eq(G.crafting.recipeCost(rec('t_frame')).metal, 8);                                            // not joined yet
+      G.story = { S: {}, hasFlag: f => f === 'roni_joined' };
+      eq(G.crafting.recipeCost(rec('t_frame')).metal, 6); eq(G.crafting.recipeCost(rec('h_rod')).metal, 2);   // ceil(2 * 0.75) = 2
+      eq(G.crafting.recipeCost(rec('g_frame')).metal, 8); eq(G.crafting.recipeCost(rec('j_frame')).metal, 8);   // the bike and jeep garages are not helped
+      const c = { bag: bag([['metal', 6], ['iron_rod', 3], ['nails', 3]]), chest: chestOf([]), buildings: Object.assign(G.crafting.startBuildings(), { garage_tank: 1 }), vehicles: {} };
+      eq(G.crafting.craft(c, 't_frame').ok, true); eq(G.inventory.count(c.bag, 'metal'), 0);        // paid the discounted price
+      G.crafting.free = true; eq(G.crafting.recipeCost(rec('t_frame')).metal, 8); G.crafting.free = false;
+    } finally { G.data.storyGarageHelp = keepH; G.story = keepS; G.crafting.free = false; }
+  });
+
   test('mud: grows with the distance, slows and burns more, washing needs 1 clean water and resets it', () => {
     const v = G.vehicles.create(), b = bag([['water_clean', 1]]), c = chestOf([]);
     G.vehicles.dirtAdd(v, G.data.vehicleDirt.per / 2); near(v.dirt, 0.5, 1e-9);

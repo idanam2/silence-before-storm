@@ -82,6 +82,10 @@
       g.strokeStyle = 'rgba(20,18,14,0.5)'; g.lineWidth = 1; g.stroke();
     }
 
+    if (geo.snow) {                                                         // snow caps on the high ground in the north-east
+      for (i = 0; i < 3; i++) { wobble(X(geo.snow.x), Y(geo.snow.y), U(geo.snow.r) * (1 - i * 0.28) * 1.3, U(geo.snow.r) * (1 - i * 0.28), 0.08, i + 4); g.fillStyle = 'rgba(232,240,248,' + (0.5 + i * 0.12).toFixed(2) + ')'; g.fill(); g.strokeStyle = 'rgba(150,170,196,0.5)'; g.lineWidth = 1; g.stroke(); }
+    }
+
     // ---- forests: soft dark ground, then hundreds of little crowns
     geo.forests.forEach(function (f) { blob(X(f[0]), Y(f[1]), U(f[2]) * 1.25, 'rgba(10,22,12,0.55)'); });
     geo.forests.forEach(function (f) {
@@ -217,6 +221,7 @@
     farm: '<path d="M2.5 7 8 3l5.5 4v6h-11z"/><path d="M5.5 13V9h5v4M5.5 9l5 4M10.5 9l-5 4"/>',
     neighborhood: '<path d="M1.5 9 5 6l3.5 3v4h-7zM8.5 8 11.5 5.5 14.5 8v5h-6"/>',
     quarry: '<path d="M2 13 6 6l3 4 2-3 3 6z"/><path d="M9.5 3.5l3 3M11 2.5 9 6"/>',
+    peaks: '<path d="M1.500 13 6 5l2.500 4 2-3 4 7z"/><path d="M4.800 7.500 6 9l1-1M10.500 8l1 1.500"/>',
     lake: '<path d="M2 6c2-1.5 4 1.5 6 0s4 1.5 6 0M2 9.5c2-1.5 4 1.5 6 0s4 1.5 6 0M2 13c2-1.5 4 1.5 6 0s4 1.5 6 0"/>',
     police: '<path d="M8 2 13 4v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z"/><path d="M8 5.5l.9 1.9 2 .3-1.5 1.4.4 2L8 10.2 6.2 11.1l.4-2-1.5-1.4 2-.3z"/>',
     hospital: '<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M8 5v6M5 8h6"/>',

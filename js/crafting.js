@@ -41,6 +41,15 @@
   // A recipe with `unlock` (a story flag) shows only after that flag is set. Without the story layer everything shows.
   function unlocked(r) { return crafting.free || !r.unlock || !G.story || !G.story.S || G.story.hasFlag(r.unlock); }
 
+  // What a recipe costs now: the story's companion (G.data.storyGarageHelp) makes the parts of some garages cheaper once she has joined.
+  function costOf(r) {
+    var H = G.data.storyGarageHelp, cost = r.cost, out = {}, k;
+    if (!H || r.cat !== 'parts' || crafting.free || !G.story || !G.story.S || !G.story.hasFlag(H.flag)) return cost;
+    if (!(H.vehicles || []).some(function (v) { var d = G.data.vehicles[v]; return d && d.garage === r.station; })) return cost;
+    for (k in cost) out[k] = Math.max(1, Math.ceil(cost[k] * (1 - H.discount)));
+    return out;
+  }
+
   function recipeById(id) {
     var r = G.data.recipes;
     for (var i = 0; i < r.length; i++) if (r[i].id === id) return r[i];
@@ -52,6 +61,7 @@
     levelOf: levelOf,
     have: function (ctx, id) { return have(invs(ctx), id); },
     recipe: recipeById,
+    recipeCost: costOf,                                // the cost to show and pay (with the story's garage discount)
     unlocked: unlocked,                                // a story recipe stays hidden until its flag is set
 
     // Recipes of one station, in data order; with a category id (not 'all') only that tab's recipes.
@@ -67,7 +77,7 @@
       var lv = levelOf(ctx, r.station);
       if (lv < 1) return 'station';
       if (lv < r.level) return 'level';
-      if (missing(invs(ctx), r.cost)) return 'cost';
+      if (missing(invs(ctx), costOf(r))) return 'cost';
       return null;
     },
 
@@ -78,12 +88,12 @@
       if (why) return { ok: false, reason: why };
       if (r.vehicle) {                                                       // a vehicle: one of each, kept in ctx.vehicles
         if (!ctx.vehicles || ctx.vehicles[r.vehicle]) return { ok: false, reason: 'owned' };
-        pay(invs(ctx), r.cost);
+        pay(invs(ctx), costOf(r));
         ctx.vehicles[r.vehicle] = G.vehicles.create();
         return { ok: true, out: r.out, vehicle: r.vehicle };
       }
       var list = invs(ctx), snap = snapshot(list);
-      pay(list, r.cost);
+      pay(list, costOf(r));
       var left = r.out[1];
       for (var i = 0; i < list.length && left > 0; i++) left = G.inventory.add(list[i], r.out[0], left);
       if (left > 0) { restore(list, snap); return { ok: false, reason: 'space' }; }
@@ -157,6 +167,7 @@
     // Takes / returns a cost (floor blocks). spend: null when paid, else 'cost'. refund: bag first, then chest, lost if full.
     spend: function (ctx, cost) { if (missing(invs(ctx), cost)) return 'cost'; pay(invs(ctx), cost); return null; },
     refund: function (ctx, cost) {
+      if (crafting.free) return;                                      // creative mode paid nothing, so nothing comes back
       for (var id in cost) { var left = cost[id]; for (var i = 0; i < 2 && left > 0; i++) left = G.inventory.add(invs(ctx)[i], id, left); }
     },
 

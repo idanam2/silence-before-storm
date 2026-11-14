@@ -32,6 +32,7 @@
       toast: function (t, ms) { G.ui.toast(t, ms); },
       area: function () { return st.area; },
       buildings: function () { return st.buildings; },
+      hasVehicle: function (id) { return !!st.vehicles[id]; },                                   // quest step type 'vehicle' (the vehicle is built)
       door: function (to) { if (st.zone && G.data.areas[to]) goThrough({ to: to }); },
       noise: function (r) { G.combat.addBurst(st.burst, r); },
       spawn: function (a) {                              // a relay wave { wave: {count, kinds} } or { kind, near, count, calm }

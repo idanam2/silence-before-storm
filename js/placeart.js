@@ -186,14 +186,14 @@
   }
 
   function buildConcrete(ctx, kind) {
-    var gravel = kind === 'gravel';
+    var gravel = kind === 'gravel', snow = kind === 'snow';
     var size = 512, rand = G.util.rng(4121), i;
     var c = document.createElement('canvas');
     c.width = c.height = size * S;
     var g = c.getContext('2d');
     g.scale(S, S);
-    g.fillStyle = gravel ? '#25221d' : '#1b1d1c'; g.fillRect(0, 0, size, size);
-    var tones = gravel ? ['0,0,0,0.2', '96,86,66,0.14', '70,62,48,0.14', '50,46,38,0.14'] : ['0,0,0,0.2', '70,74,68,0.12', '60,52,40,0.1', '40,48,40,0.12'];
+    g.fillStyle = snow ? '#9aa9bc' : gravel ? '#25221d' : '#1b1d1c'; g.fillRect(0, 0, size, size);
+    var tones = snow ? ['255,255,255,0.28', '120,150,200,0.16', '230,240,252,0.22', '70,92,130,0.12'] : gravel ? ['0,0,0,0.2', '96,86,66,0.14', '70,62,48,0.14', '50,46,38,0.14'] : ['0,0,0,0.2', '70,74,68,0.12', '60,52,40,0.1', '40,48,40,0.12'];
     for (i = 0; i < 40; i++) {
       var px = rand() * size, py = rand() * size, pr = 30 + rand() * 90, t = tones[i % 4];
       for (var ox = -size; ox <= size; ox += size) for (var oy = -size; oy <= size; oy += size) {
@@ -204,12 +204,12 @@
     }
     for (i = 0; i < 3200; i++) { g.fillStyle = ['rgba(150,150,140,0.06)', 'rgba(0,0,0,0.22)', 'rgba(90,80,64,0.08)'][i % 3]; g.fillRect(rand() * size, rand() * size, 1 + rand() * 1.5, 1 + rand() * 1.5); }
     if (gravel) for (i = 0; i < 2600; i++) { g.fillStyle = ['rgba(150,140,120,0.12)', 'rgba(0,0,0,0.3)'][i % 2]; g.beginPath(); g.arc(rand() * size, rand() * size, 0.8 + rand() * 1.6, 0, TAU); g.fill(); }
-    g.strokeStyle = gravel ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.32)'; g.lineWidth = 1.5;                                       // slab joints
+    g.strokeStyle = gravel || snow ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.32)'; g.lineWidth = 1.5;                                       // slab joints
     for (i = 0; i <= size; i += 128) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, size); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(size, i); g.stroke(); }
-    g.strokeStyle = gravel ? 'rgba(0,0,0,0)' : 'rgba(170,170,160,0.05)'; g.lineWidth = 1;
+    g.strokeStyle = gravel || snow ? 'rgba(0,0,0,0)' : 'rgba(170,170,160,0.05)'; g.lineWidth = 1;
     for (i = 0; i <= size; i += 128) { g.beginPath(); g.moveTo(i + 1.5, 0); g.lineTo(i + 1.5, size); g.stroke(); g.beginPath(); g.moveTo(0, i + 1.5); g.lineTo(size, i + 1.5); g.stroke(); }
     g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1;                                          // hairline cracks
-    for (i = 0; i < 14; i++) {
+    for (i = 0; i < (snow ? 0 : 14); i++) {
       var x = rand() * size, y = rand() * size, a = rand() * TAU;
       g.beginPath(); g.moveTo(x, y);
       for (var s = 0; s < 6; s++) { a += (rand() - 0.5) * 1.2; x += Math.cos(a) * 9; y += Math.sin(a) * 9; g.lineTo(x, y); }

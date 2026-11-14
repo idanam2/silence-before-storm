@@ -12,6 +12,21 @@
     get: function (id) { return W().destinations[id] || null; },
     name: function (id) { var a = G.data.areas[id]; return a ? a.name : id; },
 
+    // Can the player get to `id`? G.data.storyAccess (story/data/triggers.js) lists the hard places and the vehicles that get you there (`by`).
+    // how = 'ground' (a trip from the base; `ride` = the vehicle being ridden or null) or 'fly' (in the helicopter, which counts as 'heli' in `by`).
+    // Places without a rule are open. Returns { ok: true } or { ok: false, deny: text for the map, by: [vehicle ids] }.
+    access: function (id, how, ride) {
+      var A = G.data.storyAccess, r = A && A[id];
+      if (!r || !r.by) return { ok: true };
+      var ok = how === 'fly' ? r.by.indexOf('heli') >= 0 : !!ride && ride !== 'heli' && r.by.indexOf(ride) >= 0;
+      return ok ? { ok: true } : { ok: false, deny: r.deny || 'המקום הזה לא נגיש כרגע.', by: r.by.slice() };
+    },
+    // The helicopter cannot take off while the storm flag is set (G.data.storyAccess.stormNoFly).
+    stormGrounded: function () {
+      var A = G.data.storyAccess;
+      return !!(A && A.stormNoFly && G.story && G.story.S && G.story.hasFlag('storm'));
+    },
+
     // Energy spent on leaving for a destination (the way back is free). At least 1.
     cost: function (id, diff) {
       var d = W().destinations[id];

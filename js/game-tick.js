@@ -49,11 +49,35 @@
     return best;
   }
 
+  // Companions: E next to the dog feeds / waters / washes it; E at the kennel bowl fills it. Returns true when E was used.
+  function bowlNear(p) {
+    if (st.area !== 'base' || !st.comp || !st.comp.dog.on) return null;
+    var s = st.base.solids;
+    for (var i = 0; i < s.length; i++) if (s[i].kind === 'dogbowl' && Math.hypot(p.x - (s[i].x + s[i].w / 2), p.y - (s[i].y + s[i].h / 2)) < 70) return s[i];
+    return null;
+  }
+  function compE(frozen) {
+    if (frozen || st.fade || st.placing || !st.comp || !G.input.wasPressed('KeyE') || G.ui.isOpen()) return false;
+    var p = st.player, C = G.companions, o;
+    if (C.nearPartner(st) && G.story.S && G.story.S.flags.roni_joined) { G.story.run([{ do: 'event', id: 'talk_roni' }]); return true; }     // talking to Roni (the story picks the conversation)
+    if (C.nearDog(st)) { o = C.careOption(st.comp, st.bag); if (o && C.care(st.comp, st.bag, o)) { snd('pickup'); G.ui.markDirty(); return true; } }
+    if (bowlNear(p)) { o = C.fillBowl(st.comp, st.bag); if (o) { snd('pickup'); G.ui.markDirty(); G.ui.toast(o === 'food' ? 'מילאתם אוכל בקערה' : 'מילאתם מים בקערה', 1600); } else G.ui.toast('אין מה למלא בקערה', 1600); return true; }
+    return false;
+  }
+  function compPrompt(text, frozen) {
+    if (frozen || !st.comp) return text;
+    var C = G.companions;
+    if (C.nearPartner(st) && G.story.S && G.story.S.flags.roni_joined) return 'E · לדבר עם רוני';
+    if (C.nearDog(st)) return C.prompt(st.comp, st.bag);
+    if (bowlNear(st.player)) return C.bowlPrompt(st.comp, st.bag);
+    return text;
+  }
+
   function tickBase(dt, frozen) {
-    var inp = G.input, p = st.player, ui = G.ui;
+    var inp = G.input, p = st.player, ui = G.ui, cu = compE(frozen);
     var near = st.ride ? null : G.base.nearStation(p, st.base), trail = G.base.nearTrail(p);   // no workbench, chest or bed from the saddle
     var sp = storySpot('base', dt, frozen || ui.isOpen() || !!st.fade || !!st.placing);
-    if (inp.wasPressed('KeyE') && !st.fade && !sp.sp) {
+    if (inp.wasPressed('KeyE') && !st.fade && !sp.sp && !cu) {
       if (ui.isOpen()) ui.close();
       else if (near === 'chest' || near === 'box') ui.openChest();      // every box opens the same storage
       else if (near === 'bed') sleep();
@@ -141,14 +165,14 @@
   }
 
   function tickZone(dt, frozen) {
-    var inp = G.input, p = st.player, ui = G.ui, F = st.zone;
+    var inp = G.input, p = st.player, ui = G.ui, F = st.zone, cu = compE(frozen);
     var res = G.data.resources, items = G.data.items;
     var target = G.area.findTarget(F, p);
     var sp = storySpot(F.id, dt, frozen || ui.isOpen() || !!st.fade);
     if (sp.sp) target = null;                       // a story object in reach wins over exits, doors and gathering
     chimeStep(dt, frozen || ui.isOpen() || !!st.fade);
 
-    if (inp.wasPressed('KeyE') && !st.fade && !sp.sp) {
+    if (inp.wasPressed('KeyE') && !st.fade && !sp.sp && !cu) {
       if (ui.isOpen()) ui.close();
       else if (target && target.kind === 'exit') travel('base');
       else if (target && target.kind === 'door') goThrough(target.door);
@@ -176,7 +200,7 @@
     }
     if (out.blocked === 'full') noteFull(p);
 
-    pcfg.walkSpeed = cfg.player.walkSpeed * G.needs.speedMult(st.needs);
+    pcfg.walkSpeed = cfg.player.walkSpeed * G.needs.speedMult(st.needs) * G.cold.speedMult(st);   // snow and the chill slow you down (js/cold.js)
     var riding = X.vehSpeed(pcfg, cfg.player.walkSpeed);
     var aim = out.active ? { x: target.x, y: target.y }
       : (!riding && !frozen && inp.mouse.inside ? { x: inp.mouse.x + cam.x, y: inp.mouse.y + cam.y } : null);
@@ -209,7 +233,7 @@
     }
     var vp = !frozen && X.vehPrompt(p);
     if (vp) text = text ? text + ' · ' + vp : vp;
-    ui.showPrompt(text);
+    ui.showPrompt(compPrompt(text, frozen));
   }
 
   // Needs, rain tank and the autosave timer. Time stands still while a panel is open or a fade runs.
@@ -231,6 +255,7 @@
       if (low && !st.low[k]) floater(p.x, p.y - 22, null, 0, LOW_NOTE[k]);
       st.low[k] = low;
     }
+    G.cold.step(st, dt);                              // body heat: drains in snow, comes back by a fire or at home
     if (n.health <= 0) { faint(); return; }
     st.sinceSave += dt;
     if (st.sinceSave >= AUTOSAVE) save('auto');
@@ -297,6 +322,15 @@
     checkHeld();
 
     if (st.area === 'base') tickBase(dt, frozen); else tickZone(dt, frozen);
+    // the story hands the dog over (flag set by dlg_dog_arrives, chapter 3): switch him on once
+    if (st.comp && !st.comp.dog.on && G.story.S && G.story.S.flags.dog_joined) { G.companions.unlock(st.comp, 'dog'); G.ui.markDirty(); }
+    // Roni leaves the ship with the player (chapter 5): she walks along from the moment they meet, and the escort ends at the port gate
+    if (st.comp && G.story.S && G.story.S.flags.roni_met && !st.comp.partner.on) { G.companions.unlock(st.comp, 'partner'); G.ui.markDirty(); }
+    if (st.area === 'port' && st.comp && st.comp.partner.on && G.story.S && G.story.S.flags.roni_met && !G.story.S.flags.roni_joined && !frozen && st.zone && st.zone.exit &&
+        Math.hypot(st.player.x - st.zone.exit.x, st.player.y - st.zone.exit.y) < 260 && Math.hypot(st.comp.partner.x - st.player.x, st.comp.partner.y - st.player.y) < 300) {
+      G.story.run([{ do: 'event', id: 'roni_escort_done' }]);
+    }
+    if (st.comp && !frozen && !G.ui.isOpen() && !st.fade) G.companions.step(st, dt);
 
     for (i = st.floaters.length - 1; i >= 0; i--) {
       st.floaters[i].t += dt;

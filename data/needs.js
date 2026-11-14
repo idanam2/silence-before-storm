@@ -9,8 +9,8 @@
   G.data.needs = {
     max: 100,
     order: ['health', 'hunger', 'thirst', 'energy'],
-    labels: { health: 'בריאות', hunger: 'שובע', thirst: 'שתייה', energy: 'אנרגיה' },
-    start: { health: 100, hunger: 100, thirst: 100, energy: 100 },
+    labels: { health: 'בריאות', hunger: 'שובע', thirst: 'שתייה', energy: 'אנרגיה', warmth: 'חום גוף' },   // warmth is not in `order`: it only matters in the cold (js/cold.js)
+    start: { health: 100, hunger: 100, thirst: 100, energy: 100, warmth: 100 },
     drain: { hunger: 0.11, thirst: 0.17 },               // always dropping (about 15 and 10 minutes from full to empty)
     energyUse: { walk: 0.04, run: 0.45, gather: 0.3 },   // energy spent per second of that activity
     starve: { hunger: 0.45, thirst: 0.8 },               // health lost per second while that need is empty

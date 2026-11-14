@@ -16,7 +16,7 @@ function load(file) { vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { 
 for (const f of ['data/items.js', 'data/world.js']) {
   try { load(path.join(ROOT, f)); } catch (e) { console.warn('warn: could not load ' + f + ': ' + e.message); }
 }
-const order = ['story-items.js', 'spots.js', 'quests.js', 'dialogue-1.js', 'dialogue-2.js', 'notes.js', 'triggers.js', 'endings.js', 'cellar.js'];
+const order = ['story-items.js', 'companions.js', 'spots.js', 'quests.js', 'dialogue-1.js', 'dialogue-2.js', 'dialogue-3.js', 'notes.js', 'triggers.js', 'endings.js', 'cellar.js'];
 for (const f of order) load(path.join(__dirname, 'data', f));
 
 const G = sandbox.G, D = G.data;
@@ -80,7 +80,7 @@ for (const [id, s] of Object.entries(spots)) {
 }
 
 // quests
-const STEP = ['spot', 'visit', 'item', 'items', 'collect', 'craft', 'build', 'dialogue', 'flag', 'notes', 'sleep', 'event'];
+const STEP = ['spot', 'visit', 'item', 'items', 'collect', 'craft', 'build', 'dialogue', 'flag', 'notes', 'sleep', 'event', 'vehicle'];
 for (const [id, q] of Object.entries(quests)) {
   if (q.area) chkArea(q.area, `quest ${id}`);
   chkReq(q.req, `quest ${id}`);
@@ -129,7 +129,7 @@ for (const t of D.storyTriggers) { chkReq(t.when, `trigger ${t.id}`); chkActions
   if (t.on === 'dialogue_end' && !dlg[t.match]) err(`trigger ${t.id}: dialogue_end unknown "${t.match}"`);
   if (t.on === 'note_read' && t.match && !notes[t.match]) err(`trigger ${t.id}: unknown note "${t.match}"`);
   (t.notesAll || []).forEach(n => { if (!notes[n]) err(`trigger ${t.id}: unknown note "${n}"`); }); }
-for (const p of [D.storyRadio.queue, D.storyRachel, D.storyOri, D.storyDreams]) p.forEach(e => { if (!dlg[e.dialogue]) err(`picker: unknown dialogue ${e.dialogue}`); chkReq(e.req, `picker ${e.dialogue}`); });
+for (const p of [D.storyRadio.queue, D.storyRachel, D.storyOri, D.storyRoni, D.storyDreams]) p.forEach(e => { if (!dlg[e.dialogue]) err(`picker: unknown dialogue ${e.dialogue}`); chkReq(e.req, `picker ${e.dialogue}`); });
 D.storyRadio.replay.forEach(r => { if (!dlg[r]) err(`radio replay: unknown ${r}`); });
 D.storyWall.forEach(n => { if (!notes[n]) err(`wall: unknown note ${n}`); });
 

@@ -24,9 +24,10 @@ function test(name, fn) {
 function eq(a, b, msg) { if (a !== b) throw new Error((msg || '') + ` expected ${b}, got ${a}`); }
 function near(a, b, eps, msg) { if (Math.abs(a - b) > (eps || 1e-6)) throw new Error((msg || '') + ` expected ~${b}, got ${a}`); }
 
-const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', ...fs.readdirSync(path.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f), 'data/interiors.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js',
-  'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js', 'data/gear.js',
-  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/gear.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
+const G = loadGame(['js/core.js', 'data/items.js', 'data/resources.js', 'data/areas.js', ...fs.readdirSync(path.join(ROOT, 'data/places')).sort().map(f => 'data/places/' + f), 'data/interiors.js', 'data/story-areas.js', 'data/recipes.js', 'data/buildings.js', 'data/vehicles.js',
+  'data/difficulty.js', 'data/needs.js', 'data/world.js', 'data/weapons.js', 'data/enemies.js', 'data/gear.js', 'story/data/story-items.js', 'story/data/companions.js',
+  'js/input.js', 'js/inventory.js', 'js/crafting.js', 'js/gear.js', 'js/needs.js', 'js/tank.js', 'js/world.js', 'js/save.js', 'js/player.js', 'js/base.js', 'js/placing.js', 'js/companions.js', 'js/vehicles.js', 'js/area.js', 'js/combat.js', 'js/enemies.js', 'data/loot.js', 'js/loot.js', 'data/defense.js', 'js/defense.js', 'js/feel.js']);
+for (const k in (G.data.storyItems || {})) if (!G.data.items[k]) G.data.items[k] = G.data.storyItems[k];   // what js/story.js install() does
 // Fixed item table for the inventory tests, so balance changes in data/items.js do not break them.
 const IT = { wood: { stack: 20 }, stone: { stack: 20 }, axe: { stack: 1 } };
 const world = { width: 1000, height: 800 };
@@ -268,7 +269,7 @@ const nodeOf = (F, type) => F.nodes.find(n => n.type === type && !n.border);
 const targetOf = n => ({ kind: 'node', node: n, x: n.x, y: n.y, r: n.r });
 test('data: every resource gives a known item and needs a known tool', () => {
   for (const [id, d] of Object.entries(RES)) {
-    if (!ITEMS[d.item]) throw new Error(id + ' item ' + d.item);
+    if (!ITEMS[d.item] && !(G.data.storyItems && G.data.storyItems[d.item])) throw new Error(id + ' item ' + d.item);   // story items join the items when js/story.js loads
     if (d.tool && !ITEMS[d.tool]) throw new Error(id + ' tool ' + d.tool);
     if (!(d.time > 0) || d.yield[0] > d.yield[1]) throw new Error(id + ' numbers');
   }
@@ -449,7 +450,7 @@ test('data: every building has 2 levels, known costs, a spot inside the yard tha
 test('data: nothing is stuck: every upgrade cost is made of items the player can obtain in the forest or chest', () => {
   const obtainable = new Set(['wood', 'stone', 'plank', 'mushroom', 'water_dirty']);
   for (const id of G.data.buildingOrder) for (const lv of BLD[id].levels) for (const it of Object.keys(lv.cost)) {
-    if (id === 'bag') continue;                  // the bag needs cloth and nails from the places beyond the forest (checked in its own test)
+    if (id === 'bag' || id === 'kennel') continue;   // the bag needs cloth and nails from the places beyond the forest (checked in its own test); the kennel is built after chapter 3, when the dog joins
     if (BLD[id].levels.indexOf(lv) >= 3 && ['nails', 'metal', 'cloth'].includes(it)) continue;   // the last upgrade needs things from beyond the forest
     if (!obtainable.has(it)) throw new Error(id + ' needs ' + it);
   }
@@ -588,7 +589,7 @@ test('data: difficulty levels are complete and ordered easy < normal < hard', ()
 });
 test('data: needs have labels, a start value and every item effect names a real need', () => {
   for (const k of ND.order) if (!ND.labels[k] || ND.start[k] !== 100) throw new Error(k);
-  for (const [id, d] of Object.entries(ITEMS)) for (const k of Object.keys(d.use || {})) if (!ND.order.includes(k)) throw new Error(id + ' effect ' + k);
+  for (const [id, d] of Object.entries(ITEMS)) for (const k of Object.keys(d.use || {})) if (!ND.order.includes(k) && k !== 'warmth') throw new Error(id + ' effect ' + k);
   for (const lv of BLD.bed.levels) for (const k of ['energy', 'health', 'hunger', 'thirst']) if (!(lv.sleep[k] >= 0)) throw new Error('bed sleep ' + k);
   for (const lv of BLD.tank.levels) if (!(lv.tank.cap > 0 && lv.tank.secs > 0)) throw new Error('tank level');
 });
@@ -877,7 +878,7 @@ test('buildings: every door leads somewhere, both ways, to a free spot outside t
     for (const d of AR[id].doors || []) {
       const to = AR[d.to];
       if (!to) throw new Error(id + ' door to nowhere: ' + d.to);
-      if (!(to.doors || []).some(b => b.to === id)) throw new Error(d.to + ' has no way back to ' + id);
+      if (!d.storyEntry && !(to.doors || []).some(b => b.to === id)) throw new Error(d.to + ' has no way back to ' + id);
       const A = G.area.generate(to, RES, 1), p = G.player.create(d.at.x, d.at.y);
       G.area.collide(p, A);
       if (Math.hypot(p.x - d.at.x, p.y - d.at.y) > 0.5) throw new Error(id + ' -> ' + d.to + ': arrival spot is blocked');
@@ -1563,6 +1564,12 @@ test('fence pieces: only beside a floor block, turn lengthwise or crosswise, no 
   eq(clean.length, 1); eq(clean[0].m, 'wood');
   eq(G.save.parse(JSON.stringify({ v: 1, fences: [{ o: 'v', cx: 2, cy: 2, m: 'stone' }, { o: 'v', cx: -1, cy: 0 }], felled: [3, 'x', -2] })).data.fences.length, 1);
   eq(JSON.stringify(G.save.parse(JSON.stringify({ v: 1, felled: [3, 'x', -2] })).data.felled), '[3]');
+});
+test('the irradiated zone is a one-way street: no way in from the forest, out through the tunnels only from inside', () => {
+  const A = G.data.areas, gate = A.forest.doors.find(d => d.to === 'forest_rad');
+  if (!gate || !gate.locked) throw new Error('the forest gate into the irradiated zone must be locked');
+  if (!A.forest_rad.doors.some(d => d.to === 'forest' && !d.locked)) throw new Error('the way out of the zone is open');
+  if (!A.forest_deep.doors.some(d => d.to === 'forest_rad')) throw new Error('the tunnels lead to the zone');
 });
 test('yard trees: block floor and structures until felled; felling is kept by the list', () => {
   const P = G.placing, b = G.base.build(), lv = G.crafting.startBuildings(), yt = b.trees.filter(t => t.yard);
