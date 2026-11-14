@@ -153,6 +153,7 @@
 
 ## טכני
 - HTML + JS רגיל, Canvas 2D, בלי פריימוורק ובלי build. נפתח בלחיצה כפולה על `index.html` (file://).
+- **הרצה דרך http:** `node serve.mjs` (או `node serve.mjs 3000`) מגיש את התיקייה ב-`http://localhost:8080`, בלי חבילות, רק על 127.0.0.1. מגיש גם `.glb`/`.gltf` עם סוג נכון, לקראת שכבת Three.js. (שרת הבית של עידן לא מעורב; פריסה אליו לא הוחלט.)
 - **אסור ES modules ואסור fetch.** כל קובץ הוא script רגיל שמוסיף ל-`window.G`. סדר טעינה ב-`index.html`.
 - נתונים בקבצים נפרדים ב-`data/` (resources, items, recipes, buildings, enemies, areas, difficulty, dialogue).
 - לוגיקה טהורה (בלי DOM) כדי שתיבדק ב-Node דרך `vm` ב-`tests/`, בלי חבילות.
